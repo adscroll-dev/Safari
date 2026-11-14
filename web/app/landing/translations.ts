@@ -13,11 +13,13 @@ export type LangCode =
   | "es"
   | "fr"
   | "de"
-  | "hi";
+  | "hi"
+  | "ps";
 
 export const languages: { code: LangCode; label: string; dir: "ltr" | "rtl" }[] = [
   { code: "en", label: "English", dir: "ltr" },
   { code: "fa", label: "فارسی", dir: "rtl" },
+  { code: "ps", label: "پښتو", dir: "rtl" },
   { code: "ar", label: "العربية", dir: "rtl" },
   { code: "ur", label: "اردو", dir: "rtl" },
   { code: "tr", label: "Türkçe", dir: "ltr" },
@@ -43,6 +45,17 @@ export type Strings = {
   detected: string;
   downloadButton: string;
   verify: string;
+  category: string;
+  free: string;
+  updated: string;
+  requires: string;
+  offeredBy: string;
+  screenshotsTitle: string;
+  slowTitle: string;
+  slowDesc: string;
+  infoTitle: string;
+  versionLabel: string;
+  sizeLabel: string;
 };
 
 export const translations: Record<LangCode, Strings> = {
@@ -76,6 +89,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Detected for your phone:",
     downloadButton: "Download VYRO for Android",
     verify: "Verify the download (SHA-256):",
+    category: "Communication",
+    free: "Free",
+    updated: "Updated Nov 14, 2026",
+    requires: "Requires Android 6.0+",
+    offeredBy: "Offered by VYRO Team",
+    screenshotsTitle: "Preview",
+    slowTitle: "Built for slow internet",
+    slowDesc: "Small downloads that resume. Data Saver is on by default: voice calls at 12 kbps, compressed photos, tap-to-download media.",
+    infoTitle: "App info",
+    versionLabel: "Version",
+    sizeLabel: "Size",
   },
   fa: {
     tagline: "اتصال فراتر از محدودیت‌ها",
@@ -107,6 +131,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "برای گوشی شما تشخیص داده شد:",
     downloadButton: "دانلود VYRO برای اندروید",
     verify: "بررسی دانلود (SHA-256):",
+    category: "ارتباطات",
+    free: "رایگان",
+    updated: "به‌روز شده ۱۴ نوامبر ۲۰۲۶",
+    requires: "نیاز به اندروید ۶٫۰ به بالا",
+    offeredBy: "ارائه‌دهنده: تیم VYRO",
+    screenshotsTitle: "پیش‌نمایش",
+    slowTitle: "ساخته‌شده برای انترنت کم‌سرعت",
+    slowDesc: "دانلودهای کم‌حجم که ادامه می‌یابند. صرفه‌جویی در مصرف داده به‌صورت پیش‌فرض روشن است: تماس صوتی با ۱۲ کیلوبیت بر ثانیه، عکس‌های فشرده، دانلود با لمس.",
+    infoTitle: "اطلاعات برنامه",
+    versionLabel: "نسخه",
+    sizeLabel: "حجم",
   },
   ar: {
     tagline: "تواصل بلا حدود",
@@ -138,6 +173,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "تم الكشف لهاتفك:",
     downloadButton: "تنزيل VYRO لأندرويد",
     verify: "تحقق من التنزيل (SHA-256):",
+    category: "الاتصالات",
+    free: "مجاني",
+    updated: "تم التحديث في 14 نوفمبر 2026",
+    requires: "يتطلب Android 6.0+",
+    offeredBy: "مقدَّم من فريق VYRO",
+    screenshotsTitle: "معاينة",
+    slowTitle: "مصمَّم لإنترنت بطيء",
+    slowDesc: "تنزيلات صغيرة قابلة للاستئناف. توفير البيانات مفعَّل افتراضيًا: مكالمات صوتية بسرعة 12 كيلوبت/ث، صور مضغوطة، تنزيل باللمس.",
+    infoTitle: "معلومات التطبيق",
+    versionLabel: "الإصدار",
+    sizeLabel: "الحجم",
   },
   ur: {
     tagline: "حدود سے آگے جڑیں",
@@ -169,6 +215,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "آپ کے فون کے لیے پہچانا گیا:",
     downloadButton: "اینڈرائیڈ کے لیے VYRO ڈاؤن لوڈ کریں",
     verify: "ڈاؤن لوڈ کی تصدیق کریں (SHA-256):",
+    category: "مواصلات",
+    free: "مفت",
+    updated: "اپ ڈیٹ: 14 نومبر 2026",
+    requires: "Android 6.0+ درکار ہے",
+    offeredBy: "VYRO ٹیم کی پیشکش",
+    screenshotsTitle: "جھلک",
+    slowTitle: "سست انٹرنیٹ کے لیے بنایا گیا",
+    slowDesc: "چھوٹے ڈاؤن لوڈ جو جاری رہتے ہیں۔ ڈیٹا سیور بطور پیش فرض آن ہے: 12 kbps پر وائس کالز، کمپریس شدہ تصاویر، ٹیپ کر کے ڈاؤن لوڈ۔",
+    infoTitle: "ایپ کی معلومات",
+    versionLabel: "ورژن",
+    sizeLabel: "سائز",
   },
   tr: {
     tagline: "Sınırların Ötesinde Bağlanın",
@@ -200,6 +257,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Telefonunuz için algılandı:",
     downloadButton: "Android için VYRO'yu indirin",
     verify: "İndirmeyi doğrulayın (SHA-256):",
+    category: "İletişim",
+    free: "Ücretsiz",
+    updated: "Güncellendi: 14 Kasım 2026",
+    requires: "Android 6.0+ gerekir",
+    offeredBy: "Sunucu: VYRO Ekibi",
+    screenshotsTitle: "Önizleme",
+    slowTitle: "Yavaş internet için tasarlandı",
+    slowDesc: "Devam eden küçük indirmeler. Veri Tasarrufu varsayılan olarak açık: 12 kbps sesli aramalar, sıkıştırılmış fotoğraflar, dokunarak indirme.",
+    infoTitle: "Uygulama bilgisi",
+    versionLabel: "Sürüm",
+    sizeLabel: "Boyut",
   },
   ru: {
     tagline: "Связь без границ",
@@ -231,6 +299,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Определено для вашего телефона:",
     downloadButton: "Скачать VYRO для Android",
     verify: "Проверьте загрузку (SHA-256):",
+    category: "Связь",
+    free: "Бесплатно",
+    updated: "Обновлено: 14 ноября 2026 г.",
+    requires: "Требуется Android 6.0+",
+    offeredBy: "Разработчик: команда VYRO",
+    screenshotsTitle: "Предпросмотр",
+    slowTitle: "Сделано для медленного интернета",
+    slowDesc: "Небольшие загрузки, которые можно продолжить. Экономия трафика включена по умолчанию: голосовые звонки 12 кбит/с, сжатые фото, загрузка по касанию.",
+    infoTitle: "Информация о приложении",
+    versionLabel: "Версия",
+    sizeLabel: "Размер",
   },
   es: {
     tagline: "Conecta más allá de los límites",
@@ -262,6 +341,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Detectado para tu teléfono:",
     downloadButton: "Descargar VYRO para Android",
     verify: "Verifica la descarga (SHA-256):",
+    category: "Comunicación",
+    free: "Gratis",
+    updated: "Actualizado: 14 de noviembre de 2026",
+    requires: "Requiere Android 6.0+",
+    offeredBy: "Ofrecido por el equipo de VYRO",
+    screenshotsTitle: "Vista previa",
+    slowTitle: "Hecho para internet lento",
+    slowDesc: "Descargas pequeñas que se reanudan. Ahorro de datos activado por defecto: llamadas de voz a 12 kbps, fotos comprimidas, descarga al tocar.",
+    infoTitle: "Información de la app",
+    versionLabel: "Versión",
+    sizeLabel: "Tamaño",
   },
   fr: {
     tagline: "Connectez-vous au-delà des limites",
@@ -293,6 +383,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Détecté pour votre téléphone :",
     downloadButton: "Télécharger VYRO pour Android",
     verify: "Vérifiez le téléchargement (SHA-256) :",
+    category: "Communication",
+    free: "Gratuit",
+    updated: "Mis à jour : 14 novembre 2026",
+    requires: "Nécessite Android 6.0+",
+    offeredBy: "Proposé par l'équipe VYRO",
+    screenshotsTitle: "Aperçu",
+    slowTitle: "Conçu pour internet lent",
+    slowDesc: "Petits téléchargements qui reprennent. Économie de données activée par défaut : appels vocaux à 12 kbps, photos compressées, téléchargement au toucher.",
+    infoTitle: "Infos sur l'app",
+    versionLabel: "Version",
+    sizeLabel: "Taille",
   },
   de: {
     tagline: "Verbinde dich über Grenzen hinaus",
@@ -324,6 +425,17 @@ export const translations: Record<LangCode, Strings> = {
     detected: "Für dein Telefon erkannt:",
     downloadButton: "VYRO für Android herunterladen",
     verify: "Download überprüfen (SHA-256):",
+    category: "Kommunikation",
+    free: "Kostenlos",
+    updated: "Aktualisiert: 14. November 2026",
+    requires: "Erfordert Android 6.0+",
+    offeredBy: "Angeboten vom VYRO-Team",
+    screenshotsTitle: "Vorschau",
+    slowTitle: "Für langsames Internet gemacht",
+    slowDesc: "Kleine Downloads, die fortgesetzt werden. Datensparmodus standardmäßig an: Sprachanrufe mit 12 kbps, komprimierte Fotos, Download per Tippen.",
+    infoTitle: "App-Info",
+    versionLabel: "Version",
+    sizeLabel: "Größe",
   },
   hi: {
     tagline: "सीमाओं से परे जुड़ें",
@@ -355,5 +467,58 @@ export const translations: Record<LangCode, Strings> = {
     detected: "आपके फ़ोन के लिए पहचाना गया:",
     downloadButton: "Android के लिए VYRO डाउनलोड करें",
     verify: "डाउनलोड सत्यापित करें (SHA-256):",
+    category: "संचार",
+    free: "निःशुल्क",
+    updated: "अपडेट किया गया: 14 नवंबर 2026",
+    requires: "Android 6.0+ आवश्यक",
+    offeredBy: "VYRO टीम द्वारा प्रस्तुत",
+    screenshotsTitle: "पूर्वावलोकन",
+    slowTitle: "धीमे इंटरनेट के लिए बनाया गया",
+    slowDesc: "छोटे डाउनलोड जो फिर से शुरू होते हैं। डेटा सेवर डिफ़ॉल्ट रूप से चालू: 12 kbps पर वॉइस कॉल, कंप्रेस्ड फ़ोटो, टैप करके डाउनलोड।",
+    infoTitle: "ऐप की जानकारी",
+    versionLabel: "संस्करण",
+    sizeLabel: "आकार",
+  },
+  ps: {
+    tagline: "له حدودو هاخوا وصل شئ",
+    intro:
+      "VYRO د Android لپاره یو چټک او خوندي مسینجر دی: شخصي او ډله‌ییز چیټ، چینلونه، غږیز زنګونه، کیسې، بوټان او د یو په یو پیغامونو لپاره له پایه تر پایه کوډ کول. دا یو بیټا نسخه ده — ځینې ځانګړتیاوې لا په لار دي. مسینجر یوازې د اپ دننه دی — د چیټ پیلولو لپاره یې لاندې ډاونلوډ کړئ.",
+    downloadTitle: "د Android لپاره VYRO ډاونلوډ کړئ",
+    versionLine:
+      "نسخه 0.6.0 (بیټا) · Android 6.0+ (API 23) ته اړتیا لري · سایټ ستاسو تلیفون په اوتومات ډول پېژني او د هغه لپاره جوړ شوی بیلډ ډاونلوډ کوي — یوازې لاندې تڼۍ کېکاږئ. د دې لومړۍ ټیسټ بیلډ لپاره د پراختیا کوونکي کیلي سره لاسلیک شوی؛ له پراخ خپرېدو وړاندې به رسمي لاسلیک ولري.",
+    warning:
+      "VYRO یوازې له دې رسمي ویب‌سایټ څخه ډاونلوډ کړئ. له نورو سایټونو څخه APK خوندي نه دي او باید نصب نه شي.",
+    featuresTitle: "ځانګړتیاوې",
+    features: [
+      { title: "شخصي او ډله‌ییز چیټ", desc: "د مدیر رولونو سره مستقیم پیغامونه، ډلې او چینلونه." },
+      { title: "په ژوندۍ بڼه چیټ", desc: "د WebSocket له لارې سمدستي پیغامونه، د لوستلو نښې او د ټایپ کولو نښه." },
+      { title: "غږیز او ویډیويي زنګونه", desc: "د WebRTC له لارې غږیز زنګونه؛ ویډیويي زنګونه په ټیټ کیفیت پیلېږي (د ډاټا سپما)." },
+      { title: "انځورونه، فایلونه او غږ", desc: "تر 50 MB پورې اپلوډ، د انځور او فایل پیغامونه، غږیز پیغامونه." },
+      { title: "24 ساعته کیسې", desc: "کیسې او حالت، لکه هغه مسینجرونه چې تاسو یې پېژنئ." },
+      { title: "له پایه تر پایه کوډ کول", desc: "د یو په یو DMs لپاره رښتینی E2EE (X3DH + Double Ratchet)؛ د ډلې E2EE د لېږونکي کیليو سره." },
+      { title: "بوټان", desc: "د اتومات کولو لپاره د ټوکن او webhook سره بوټان." },
+      { title: "ژبې", desc: "په ډیفالټ انګلیسي؛ پښتو او نورې ژبې په ترتیباتو کې شتون لري." },
+      { title: "ډېر ټیټ ډاټا کارول", desc: "ډاټا سیور په ډیفالټ فعال دی: په Opus 12 kbps غږیز زنګونه (~0.09 MB/دقیقه)، کمپریس شوي انځورونه، په ټچ کولو ډاونلوډ." },
+      { title: "ځایي AI مرستیال", desc: "په وسیله کې مرستیال، د قاموس ژباړه او هوښیار ځوابونه — هیڅ کلاوډ AI نشته، ستاسو ډاټا له وسیلې نه وځي." },
+    ],
+    footer:
+      "یوازې وړیا او خلاص سرچینه، تر هغه چې VYRO 10,000 راجستر شویو کاروونکو ته ورسېږي. د Android بیټا APK پورته شتون لري؛ iOS وروسته راځي.",
+    aboutTitle: "د VYRO په اړه",
+    languageLabel: "ژبه",
+    forYourPhone: "VYRO 0.6.0 — ستاسو تلیفون لپاره",
+    detected: "ستاسو تلیفون لپاره وپېژندل شو:",
+    downloadButton: "د Android لپاره VYRO ډاونلوډ کړئ",
+    verify: "ډاونلوډ تایید کړئ (SHA-256):",
+    category: "اړیکې",
+    free: "وړیا",
+    updated: "تازه شوی: نومبر ۱۴، ۲۰۲۶",
+    requires: "Android 6.0+ ته اړتیا لري",
+    offeredBy: "د VYRO ټیم لخوا وړاندې شوی",
+    screenshotsTitle: "مخکتنه",
+    slowTitle: "د کم سرعت انټرنېټ لپاره جوړ شوی",
+    slowDesc: "کوچني ډاونلوډونه چې دوام مومي. ډاټا سیور په ډیفالټ فعال دی: په 12 kbps غږیز زنګونه، کمپریس شوي انځورونه، په ټچ کولو ډاونلوډ.",
+    infoTitle: "د اپ معلومات",
+    versionLabel: "نسخه",
+    sizeLabel: "سایز",
   },
 };
