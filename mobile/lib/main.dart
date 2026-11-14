@@ -764,12 +764,93 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Join a group/channel with a pasted invite link or code: preview
+  /// the chat first (title, type, member count), then join.
+  Future<void> _joinViaInvite() async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join via invite link'),
+        content: TextField(
+          controller: ctrl,
+          decoration: const InputDecoration(
+            labelText: 'Paste the invite link or code',
+            hintText: 'https://…/join/Ab3x…',
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final token = ApiClient.extractInviteToken(ctrl.text);
+    if (token.isEmpty) return;
+    try {
+      final preview = await _api.previewInvite(token);
+      if (!mounted) return;
+      final join = await showDialog<bool>(
+        // ignore: use_build_context_synchronously
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(preview['title'] as String? ?? 'Join chat'),
+          content: Text(
+              '${preview['type'] ?? 'group'} · ${preview['member_count'] ?? '?'} members'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Join')),
+          ],
+        ),
+      );
+      if (join != true) return;
+      final res = await _api.joinViaInvite(token);
+      await _refreshChats();
+      if (!mounted) return;
+      final chatId = res['chat_id'] as String?;
+      final chat = _chats.firstWhere(
+          (c) => (c as Map)['id'] == chatId,
+          orElse: () => null);
+      if (chat != null) {
+        await _openChat(chat as Map<String, dynamic>);
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
   /// Members + admin sheet for a group/channel.
   Future<void> _showMembers() async {
     if (_activeChat == null) return;
     final chatId = _activeChat!['id'] as String;
     try {
       final members = await _api.listMembers(chatId);
+      // The active invite link, if any (owners/admins manage it).
+      List<dynamic> invites = [];
+      try {
+        invites = await _api.listInvites(chatId);
+      } catch (_) {
+        // Non-admins get a 403 here; the members list still shows.
+      }
+      final activeInvites =
+          invites.where((i) => (i as Map)['revoked'] != true).toList();
+      final activeInvite =
+          activeInvites.isEmpty ? null : activeInvites.first as Map<String, dynamic>;
+      final myRole = members
+          .map((m) => m as Map<String, dynamic>)
+          .firstWhere((m) => m['user_id'] == _user!['id'],
+              orElse: () => <String, dynamic>{})['role'] as String? ??
+          '';
+      final canManageInvite = myRole == 'owner' || myRole == 'admin';
       if (!mounted) return;
       await showModalBottomSheet(
         context: context,
@@ -782,6 +863,64 @@ class _HomePageState extends State<HomePage> {
               Text('Members (${members.length})',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
+              // Invite link (Telegram-style): owners/admins create one
+              // link anyone can join with; revoke it to close the door.
+              if (canManageInvite) ...[
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.link),
+                  title: const Text('Invite link'),
+                  subtitle: Text(activeInvite == null
+                      ? 'No active link — create one to let people join'
+                      : activeInvite['link'] as String? ?? ''),
+                  trailing: activeInvite == null
+                      ? FilledButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            try {
+                              await _api.createInvite(chatId);
+                              await _showMembers();
+                            } catch (e) {
+                              setState(() => _error = e.toString());
+                            }
+                          },
+                          child: const Text('Create'),
+                        )
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.copy),
+                              tooltip: 'Copy link',
+                              onPressed: () async {
+                                await Clipboard.setData(ClipboardData(
+                                    text: activeInvite['link'] as String));
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Invite link copied')),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              tooltip: 'Revoke link',
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                try {
+                                  await _api.revokeInvite(
+                                      chatId, activeInvite['token'] as String);
+                                  await _showMembers();
+                                } catch (e) {
+                                  setState(() => _error = e.toString());
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                ),
+                const Divider(),
+              ],
               Flexible(
                 child: ListView(
                   shrinkWrap: true,
@@ -2868,6 +3007,14 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 _createGroupOrChannel();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.link),
+              title: const Text('Join via invite link'),
+              onTap: () {
+                Navigator.pop(context);
+                _joinViaInvite();
               },
             ),
           ],

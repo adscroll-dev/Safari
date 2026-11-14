@@ -224,6 +224,27 @@ class ApiClient {
           String chatId, String userId, String role) =>
       _req('POST', '/api/chats/$chatId/members/$userId/role', {'role': role});
 
+  /// Invite links for groups/channels (Telegram-style).
+  Future<Map<String, dynamic>> createInvite(String chatId) =>
+      _req('POST', '/api/chats/$chatId/invites');
+  Future<List<dynamic>> listInvites(String chatId) =>
+      _getList('/api/chats/$chatId/invites');
+  Future<Map<String, dynamic>> revokeInvite(String chatId, String token) =>
+      _req('DELETE', '/api/chats/$chatId/invites/$token');
+  Future<Map<String, dynamic>> previewInvite(String token) =>
+      _req('GET', '/api/invites/$token');
+  Future<Map<String, dynamic>> joinViaInvite(String token) =>
+      _req('POST', '/api/invites/$token/join');
+
+  /// Pull the invite token out of a pasted link
+  /// (https://…/join/<token>) or a bare token.
+  static String extractInviteToken(String input) {
+    final s = input.trim();
+    final idx = s.lastIndexOf('/join/');
+    if (idx >= 0) return s.substring(idx + 6).trim();
+    return s;
+  }
+
   /// v0.6 parity: stories (post + list scheduled + cancel scheduled).
   Future<Map<String, dynamic>> createStory(String mediaUrl,
           {String caption = ''}) =>
