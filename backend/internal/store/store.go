@@ -126,6 +126,13 @@ type StoreIface interface {
 	SavePendingUser(p *models.PendingUser) error
 	GetPendingUser(email string) (*models.PendingUser, error)
 	DeletePendingUser(email string) error
+
+	// Invite links for groups/channels (Telegram-style). A token is
+	// unique; revoking keeps the row so old links fail closed.
+	CreateInvite(inv *models.ChatInvite) error
+	InviteByToken(token string) (*models.ChatInvite, error)
+	ListInvites(chatID string) []*models.ChatInvite
+	RevokeInvite(token string) error
 }
 
 // MemoryStore is a thread-safe in-memory StoreIface.
@@ -157,6 +164,8 @@ type MemoryStore struct {
 	// v0.7 state: email verification codes and pending registrations.
 	emailCodes   map[string]*models.EmailCode   // lower(email) + "|" + purpose
 	pendingUsers map[string]*models.PendingUser // lower(email) -> pending registration
+	// Invite links for groups/channels (Telegram-style).
+	invites map[string]*models.ChatInvite // token -> invite
 }
 
 type receipt struct {
@@ -191,6 +200,7 @@ func NewMemoryStore() *MemoryStore {
 		fcmTokens:       map[string][]push.FCMToken{},
 		emailCodes:      map[string]*models.EmailCode{},
 		pendingUsers:    map[string]*models.PendingUser{},
+		invites:         map[string]*models.ChatInvite{},
 	}
 }
 

@@ -153,6 +153,18 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.SetChatSetting(w, r, "unarchive")
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/folder"):
 				h.SetChatSetting(w, r, "folder")
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/invites"):
+				if method == http.MethodPost {
+					h.CreateInvite(w, r)
+				} else {
+					h.ListInvites(w, r)
+				}
+			case strings.HasPrefix(path, "/api/chats/") && strings.Contains(path, "/invites/"):
+				h.RevokeInvite(w, r)
+			case strings.HasPrefix(path, "/api/invites/") && strings.HasSuffix(path, "/join"):
+				h.JoinViaInvite(w, r)
+			case strings.HasPrefix(path, "/api/invites/"):
+				h.PreviewInvite(w, r)
 			case path == "/api/stories":
 				if method == http.MethodPost {
 					h.CreateStory(w, r)

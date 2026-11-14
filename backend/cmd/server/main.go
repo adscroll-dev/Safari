@@ -257,6 +257,22 @@ func main() {
 			default:
 				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 			}
+		case strings.HasSuffix(path, "/invites"):
+			// Group/channel invite links (Telegram-style).
+			switch r.Method {
+			case http.MethodGet:
+				h.ListInvites(w, r)
+			case http.MethodPost:
+				h.CreateInvite(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+		case strings.Contains(path, "/invites/"):
+			if r.Method == http.MethodDelete {
+				h.RevokeInvite(w, r)
+			} else {
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
 		case strings.HasSuffix(path, "/pin"):
 			h.SetChatSetting(w, r, "pin")
 		case strings.HasSuffix(path, "/unpin"):
@@ -272,6 +288,23 @@ func main() {
 		}
 	})))
 	mux.Handle("/api/messages/search", authMW(http.HandlerFunc(h.SearchMessages)))
+	// Invite-link preview/join (Telegram-style): /api/invites/{token}
+	// and /api/invites/{token}/join.
+	mux.Handle("/api/invites/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/join") {
+			if r.Method == http.MethodPost {
+				h.JoinViaInvite(w, r)
+			} else {
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+			return
+		}
+		if r.Method == http.MethodGet {
+			h.PreviewInvite(w, r)
+		} else {
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
 	mux.Handle("/api/messages/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/reactions") {
 			switch r.Method {

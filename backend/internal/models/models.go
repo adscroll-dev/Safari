@@ -84,6 +84,20 @@ type ChatMember struct {
 	JoinedAt time.Time `json:"joined_at"`
 }
 
+// ChatInvite is a Telegram-style invite link for a group or channel.
+// Anyone with the token can preview the chat and join it; the owner or
+// an admin can revoke the link, after which the token stops working.
+// The shareable link is https://vyro-web-8p4l.onrender.com/join/<token>
+// (the token is what the app needs; the web page is only a landing
+// page until a join page exists there).
+type ChatInvite struct {
+	Token     string    `json:"token"`
+	ChatID    string    `json:"chat_id"`
+	CreatedBy string    `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+	Revoked   bool      `json:"revoked"`
+}
+
 // Message is a single chat message. Content is the plaintext only in the
 // current (non-E2EE) dev build — see docs/SECURITY.md. In the E2EE build
 // Content will carry the ciphertext envelope and ContentType will be
