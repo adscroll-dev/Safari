@@ -66,6 +66,9 @@ var migration008SQL string
 //go:embed migrations/009_invites.sql
 var migration009SQL string
 
+//go:embed migrations/010_privacy.sql
+var migration010SQL string
+
 // The embedded migration is a copy of backend/migrations/001_init.sql
 // (go:embed cannot reach outside the package directory).
 // TestMigrationMatchesFile fails if the two ever drift apart.
@@ -139,6 +142,10 @@ func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, 
 	if _, err := pool.Exec(ctx, migration009SQL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("apply migration 009_invites.sql: %w", err)
+	}
+	if _, err := pool.Exec(ctx, migration010SQL); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("apply migration 010_privacy.sql: %w", err)
 	}
 	return &PostgresStore{pool: pool}, nil
 }

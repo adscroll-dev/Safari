@@ -268,9 +268,13 @@ class ApiClient {
         'mime_type': up['mime_type'],
       });
 
-  /// v0.6: presence of a user (online / last seen).
+  /// Last-seen privacy (Telegram/WhatsApp-style).
   Future<Map<String, dynamic>> getPresence(String userId) =>
       _req('GET', '/api/users/$userId/presence');
+  Future<Map<String, dynamic>> getPrivacy() =>
+      _req('GET', '/api/users/me/privacy');
+  Future<Map<String, dynamic>> setPrivacy(String visibility) =>
+      _req('PUT', '/api/users/me/privacy', {'last_seen_visibility': visibility});
 
   /// v0.6 E2EE key management (public keys only — private keys never
   /// leave the device).

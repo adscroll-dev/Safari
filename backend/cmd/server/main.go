@@ -165,6 +165,16 @@ func main() {
 	mux.Handle("/api/uploads", authMW(http.HandlerFunc(h.Upload)))
 	mux.Handle("/uploads/", authMW(http.HandlerFunc(h.ServeUpload)))
 	mux.Handle("/api/users/me", authMW(http.HandlerFunc(h.Me)))
+	mux.Handle("/api/users/me/privacy", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetPrivacy(w, r)
+		case http.MethodPut:
+			h.SetPrivacy(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
 	mux.Handle("/api/users", authMW(http.HandlerFunc(h.ListUsers)))
 	mux.Handle("/api/users/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/presence") {

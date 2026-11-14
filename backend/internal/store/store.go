@@ -133,6 +133,12 @@ type StoreIface interface {
 	InviteByToken(token string) (*models.ChatInvite, error)
 	ListInvites(chatID string) []*models.ChatInvite
 	RevokeInvite(token string) error
+
+	// Last-seen privacy (Telegram/WhatsApp-style): "everyone"
+	// (default) or "nobody". When "nobody", other users see neither
+	// the online state nor the last-seen time.
+	GetLastSeenVisibility(userID string) string
+	SetLastSeenVisibility(userID, visibility string) error
 }
 
 // MemoryStore is a thread-safe in-memory StoreIface.
@@ -166,6 +172,9 @@ type MemoryStore struct {
 	pendingUsers map[string]*models.PendingUser // lower(email) -> pending registration
 	// Invite links for groups/channels (Telegram-style).
 	invites map[string]*models.ChatInvite // token -> invite
+	// Last-seen privacy: user id -> "everyone" | "nobody" (default
+	// "everyone" when absent).
+	lastSeenVisibility map[string]string
 }
 
 type receipt struct {
@@ -183,24 +192,25 @@ func NewMemoryStore() *MemoryStore {
 		users: map[string]*models.User{}, byEmail: map[string]string{},
 		byName: map[string]string{}, chats: map[string]*models.Chat{},
 		messages: map[string]*models.Message{}, chatMsgs: map[string][]string{},
-		blocks:          map[string]map[string]bool{},
-		memberRoles:     map[string]map[string]string{},
-		receipts:        map[string]map[string]*receipt{},
-		presence:        map[string]presenceInfo{},
-		stories:         map[string]*models.Story{},
-		scheduled:       map[string]*models.ScheduledMessage{},
-		bots:            map[string]*models.Bot{},
-		botsByToken:     map[string]string{},
-		identityKeys:    map[string]*models.IdentityKey{},
-		prekeys:         map[string][]*models.OneTimePreKey{},
-		chatSettings:    map[string]models.ChatSettings{},
-		groupSenderKeys: map[string]*models.GroupSenderKey{},
-		devices:         map[string]*models.Device{},
-		pushSubs:        map[string][]push.Subscription{},
-		fcmTokens:       map[string][]push.FCMToken{},
-		emailCodes:      map[string]*models.EmailCode{},
-		pendingUsers:    map[string]*models.PendingUser{},
-		invites:         map[string]*models.ChatInvite{},
+		blocks:             map[string]map[string]bool{},
+		memberRoles:        map[string]map[string]string{},
+		receipts:           map[string]map[string]*receipt{},
+		presence:           map[string]presenceInfo{},
+		stories:            map[string]*models.Story{},
+		scheduled:          map[string]*models.ScheduledMessage{},
+		bots:               map[string]*models.Bot{},
+		botsByToken:        map[string]string{},
+		identityKeys:       map[string]*models.IdentityKey{},
+		prekeys:            map[string][]*models.OneTimePreKey{},
+		chatSettings:       map[string]models.ChatSettings{},
+		groupSenderKeys:    map[string]*models.GroupSenderKey{},
+		devices:            map[string]*models.Device{},
+		pushSubs:           map[string][]push.Subscription{},
+		fcmTokens:          map[string][]push.FCMToken{},
+		emailCodes:         map[string]*models.EmailCode{},
+		pendingUsers:       map[string]*models.PendingUser{},
+		invites:            map[string]*models.ChatInvite{},
+		lastSeenVisibility: map[string]string{},
 	}
 }
 

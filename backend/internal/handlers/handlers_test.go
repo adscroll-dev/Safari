@@ -219,6 +219,12 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				}
 			case path == "/api/push/test":
 				h.TestPush(w, r)
+			case path == "/api/users/me/privacy":
+				if method == http.MethodPut {
+					h.SetPrivacy(w, r)
+				} else {
+					h.GetPrivacy(w, r)
+				}
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/presence"):
 				h.Presence(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/devices"):

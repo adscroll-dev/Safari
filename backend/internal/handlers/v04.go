@@ -113,6 +113,15 @@ func (h *Handler) Presence(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusNotFound, "user not found")
 		return
 	}
+	// Last-seen privacy: "nobody" hides online state and last-seen
+	// time from everyone except the user themself.
+	if id != middleware.UserID(r) &&
+		h.Store.GetLastSeenVisibility(id) == store.LastSeenNobody {
+		middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
+			"user_id": id, "is_online": false, "last_seen_at": nil,
+		})
+		return
+	}
 	online, lastSeen := h.Store.GetPresence(id)
 	middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"user_id": id, "is_online": online, "last_seen_at": lastSeen,

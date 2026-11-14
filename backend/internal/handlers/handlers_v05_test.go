@@ -256,7 +256,7 @@ func TestV05CallSignaling(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := r.URL.Query().Get("user")
 		chat := r.URL.Query().Get("chat")
-		h.Hub.Serve(w, r, user, []string{chat}, nil)
+		h.Hub.Serve(w, r, user, []string{chat}, nil, nil)
 	}))
 	defer srv.Close()
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")

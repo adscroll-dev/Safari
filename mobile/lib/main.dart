@@ -143,6 +143,9 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> _searchResults = [];
   bool _searching = false;
   bool _dataSaver = true;
+  // Last-seen privacy (Telegram/WhatsApp-style): "everyone" or
+  // "nobody". Loaded from the server after login.
+  String _lastSeenVisibility = 'everyone';
   // Downloaded media bytes, keyed by file_url (Data Saver: only after
   // the user taps Download, or when Data Saver is off).
   final Map<String, Uint8List> _downloaded = {};
@@ -220,6 +223,21 @@ class _HomePageState extends State<HomePage> {
       _dataSaver = on;
       _api.dataSaver = on;
     });
+  }
+
+  /// Last-seen privacy (Telegram/WhatsApp-style): save the choice on
+  /// the server; the previous value stays if saving fails.
+  Future<void> _setLastSeenVisibility(String v) async {
+    final previous = _lastSeenVisibility;
+    setState(() => _lastSeenVisibility = v);
+    try {
+      await _api.setPrivacy(v);
+    } catch (e) {
+      setState(() {
+        _lastSeenVisibility = previous;
+        _error = e.toString();
+      });
+    }
   }
 
   @override
@@ -354,6 +372,14 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() {});
     });
     await _refreshChats();
+    // Last-seen privacy: load the server setting for the Settings page.
+    try {
+      final privacy = await _api.getPrivacy();
+      if (mounted) {
+        setState(() => _lastSeenVisibility =
+            privacy['last_seen_visibility'] as String? ?? 'everyone');
+      }
+    } catch (_) {}
     try {
       final stories = await _api.listStories();
       setState(() => _stories = stories);
@@ -2692,6 +2718,34 @@ class _HomePageState extends State<HomePage> {
               ? 'Ready on this device (device $_deviceId). Private keys '
                   'never leave the device.'
               : 'Not set up yet — log in to generate keys.'),
+        ),
+        const Divider(),
+        Text('Privacy', style: Theme.of(context).textTheme.titleMedium),
+        const Text(
+          'Who can see when you were last online. "Nobody" hides your '
+          'online status and last seen from everyone — just like '
+          'Telegram and WhatsApp.',
+          style: TextStyle(fontSize: 13),
+        ),
+        RadioListTile<String>(
+          title: const Text('Everyone'),
+          subtitle:
+              const Text('Anyone can see your online status and last seen.'),
+          value: 'everyone',
+          groupValue: _lastSeenVisibility,
+          onChanged: (v) {
+            if (v != null) _setLastSeenVisibility(v);
+          },
+        ),
+        RadioListTile<String>(
+          title: const Text('Nobody'),
+          subtitle: const Text(
+              'Nobody can see your online status or last seen.'),
+          value: 'nobody',
+          groupValue: _lastSeenVisibility,
+          onChanged: (v) {
+            if (v != null) _setLastSeenVisibility(v);
+          },
         ),
         const Divider(),
         Text('Chat lock', style: Theme.of(context).textTheme.titleMedium),

@@ -863,5 +863,5 @@ func (h *Handler) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Hub.Serve(w, r, me, chatIDs, func(userID string, online bool) {
 		_ = h.Store.SetPresence(userID, online, time.Now().UTC())
-	})
+	}, h.presenceVisible)
 }

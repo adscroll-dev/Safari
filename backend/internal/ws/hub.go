@@ -206,7 +206,9 @@ func (h *Hub) relayToRoomLocked(room string, sender *websocket.Conn, toUserID st
 // Serve upgrades the HTTP request and registers the client in the rooms
 // of chatIDs. onPresence, when set, is called with (userID, online) on
 // connect and disconnect so the store can record presence / last-seen.
-func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatIDs []string, onPresence func(userID string, online bool)) {
+// presenceVisible, when set, gates the presence broadcast: a user who
+// hid their last-seen (privacy "nobody") is never broadcast as online.
+func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatIDs []string, onPresence func(userID string, online bool), presenceVisible func(userID string) bool) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("ws upgrade: %v", err)
@@ -221,7 +223,9 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatI
 	if onPresence != nil {
 		onPresence(userID, true)
 	}
-	h.Broadcast(Event{Type: "presence", UserID: userID, Online: true})
+	if presenceVisible == nil || presenceVisible(userID) {
+		h.Broadcast(Event{Type: "presence", UserID: userID, Online: true})
+	}
 	defer func() {
 		h.mu.Lock()
 		h.removeLocked(conn)
@@ -229,7 +233,9 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatI
 		if onPresence != nil {
 			onPresence(userID, false)
 		}
-		h.Broadcast(Event{Type: "presence", UserID: userID, Online: false})
+		if presenceVisible == nil || presenceVisible(userID) {
+			h.Broadcast(Event{Type: "presence", UserID: userID, Online: false})
+		}
 	}()
 	// Read loop: typing / subscribe / call-signaling frames from this client.
 	for {
