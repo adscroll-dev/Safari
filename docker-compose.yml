@@ -1,0 +1,86 @@
+# VYRO dev stack — same as backend/docker-compose.yml (root entry point).
+# Usage: docker compose up --build   (from this directory)
+# See backend/docker-compose.yml for the full commented definition.
+services:
+  web:
+    build: ./web
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://localhost:8080"
+      # WebRTC TURN (v0.6): empty/default = STUN-only calls. When the
+      # `turn` service below runs, the client also uses it as a relay.
+      # The web client reads these at build/runtime (see
+      # turn/web-ice-wiring.patch — web/ is owned by another agent).
+      NEXT_PUBLIC_TURN_URL: "${NEXT_PUBLIC_TURN_URL:-turn:localhost:3478}"
+      NEXT_PUBLIC_TURN_USERNAME: "${NEXT_PUBLIC_TURN_USERNAME:-vyro}"
+      NEXT_PUBLIC_TURN_CREDENTIAL: "${NEXT_PUBLIC_TURN_CREDENTIAL:-${TURN_PASSWORD:-vyro-turn-dev-secret}}"
+    depends_on:
+      - backend
+    restart: unless-stopped
+  # Self-hosted TURN (coturn, free/open-source, v0.6). Relays call media
+  # only when peers cannot connect directly. No paid service, no account.
+  # Override the dev defaults with a .env file: TURN_PASSWORD (strong
+  # secret), TURN_REALM, TURN_EXTERNAL_IP (public IP/DNS in production).
+  turn:
+    image: coturn/coturn:4.6.2
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478"
+      - "5349:5349/udp"
+      - "5349:5349"
+      - "49152-49200:49152-49200/udp"
+    volumes:
+      - ./turn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    # Credential from the environment so no secret lives in the config
+    # file; external-ip from env too (127.0.0.1 = local dev only).
+    command:
+      - "-c"
+      - "/etc/coturn/turnserver.conf"
+      - "-u"
+      - "vyro:${TURN_PASSWORD:-vyro-turn-dev-secret}"
+      - "--external-ip=${TURN_EXTERNAL_IP:-127.0.0.1}"
+      - "--realm=${TURN_REALM:-vyro.local}"
+    restart: unless-stopped
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      JWT_SECRET: "${JWT_SECRET:-vyro-dev-secret-change-me-in-production}"
+      DATABASE_URL: "postgres://vyro:vyro@postgres:5432/vyro?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      CORS_ALLOW_ORIGINS: "http://localhost:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vyro
+      POSTGRES_PASSWORD: vyro
+      POSTGRES_DB: vyro
+    ports:
+      - "5432:5432"
+    volumes:
+      - vyro_pgdata:/var/lib/postgresql/data
+      - ./backend/migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vyro -d vyro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vyro_redisdata:/data
+volumes:
+  vyro_pgdata:
+  vyro_redisdata:

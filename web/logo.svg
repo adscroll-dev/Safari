@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="VYRO logo">
+  <defs>
+    <linearGradient id="vyroGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563EB"/>
+      <stop offset="55%" stop-color="#5B4DEF"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <linearGradient id="vyroGradSoft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA"/>
+      <stop offset="100%" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded chat bubble -->
+  <rect x="56" y="72" width="400" height="320" rx="96" fill="url(#vyroGrad)"/>
+  <!-- Tail -->
+  <path d="M120 392 L96 472 L196 392 Z" fill="#5B4DEF"/>
+  <!-- V mark: two strokes forming a V, with a signal dot -->
+  <path d="M156 176 L256 316 L356 176" fill="none" stroke="#FFFFFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="256" cy="348" r="14" fill="#FFFFFF" opacity="0.9"/>
+  <!-- Orbit dots: beyond limits -->
+  <circle cx="416" cy="120" r="16" fill="url(#vyroGradSoft)"/>
+  <circle cx="448" cy="208" r="10" fill="#7C3AED"/>
+  <circle cx="72" cy="176" r="10" fill="#2563EB"/>
+</svg>

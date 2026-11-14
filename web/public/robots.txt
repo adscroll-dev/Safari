@@ -1,0 +1,7 @@
+# VYRO robots.txt — placeholder domain https://vyro.example; replace before going live.
+User-agent: *
+Allow: /
+Allow: /landing
+Disallow: /api/
+
+Sitemap: https://vyro.example/sitemap.xml

@@ -1,0 +1,25 @@
+{
+  "alice_dh_priv": "jpMZfP4jTBB/HYOJOLcW3iY07OASRHewl/1F5tNKqAw=",
+  "alice_dh_pub": "7ipOISkKcVnAb1GH6OgiWzoTvN/P4kLE1i/UnmLSmxA=",
+  "alice_sign_pub": "p4ZZH/2FWGR680lMdz1HvMdYWk1YbL+uyVPU5Y/5bts=",
+  "bob_dh_priv": "ePf/8bFYyo+/fFvzGS0UR9bAJdJ2m9lFR36lVMF3oEY=",
+  "bob_dh_pub": "/t0bKKNEG+XEsmxhy8j39ia94mnrpqkYWT3fBSIhw1c=",
+  "bob_opk_priv": "3RYGxBmW7LjigrKcn5//NsBEL6+x2oYFEva9DT4W1sg=",
+  "bob_opk_pub": "YjlvaSR8EPKdmkbISOwbYuEgn+vuBqyrZ5CPv5C5OE0=",
+  "bob_sign_priv": "uHjWV99YDk6eS/XusGfct4PIcebKAro0mNRCWSGvmkCl7b0AkCtx/YpzVPEGx+k2sCLy+/ZdEq9y9ZxnI2uZZw==",
+  "bob_sign_pub": "pe29AJArcf2Kc1TxBsfpNrAi8vv2XRKvcvWcZyNrmWc=",
+  "bob_spk_priv": "sO/YjzjKWzA5bc3Xx4lemRTALqwI8pjhAEIRD5fAqG8=",
+  "bob_spk_pub": "42VtSKcU6fUhaDNOrkgJU80UnZ2ZWRov9KPhxWfDnAo=",
+  "envelope": {
+    "v": 1,
+    "ik": "7ipOISkKcVnAb1GH6OgiWzoTvN/P4kLE1i/UnmLSmxA=",
+    "ek": "oBtQzU740NF/D6i2P+AUY4yCazce/GQTE0Fd3qY6ijo=",
+    "opk": 7,
+    "dh": "07g2sAgAt6KXGt6uf5ialrBuoZn+jg9ZJYDKw1rSo2A=",
+    "pn": 0,
+    "n": 0,
+    "nonce": "qvG1L7Csuwoa0SdB",
+    "ct": "cm1GgclFSnaaGBrotqJDAOEqi4x/CCxqYI2lrl4MtKTxSeX34Ob+9h3MCA=="
+  },
+  "plaintext": "سلام VYRO — E2EE test"
+}

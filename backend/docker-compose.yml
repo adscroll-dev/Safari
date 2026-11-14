@@ -1,0 +1,53 @@
+# VYRO dev stack — 100% free / open-source images only.
+# Usage:  cd backend && docker compose up --build
+# Backend: http://localhost:8080/health
+# Postgres: localhost:5432 (vyro/vyro) — schema NOT yet wired to the
+#   Go server in v0.1 (in-memory store); the DB runs so you can inspect
+#   and apply migrations/001_init.sql manually. See README.
+# Redis: localhost:6379 — reserved for future rate-limit / presence.
+services:
+  backend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      JWT_SECRET: "${JWT_SECRET:-vyro-dev-secret-change-me-in-production}"
+      DATABASE_URL: "postgres://vyro:vyro@postgres:5432/vyro?sslmode=disable"
+      REDIS_ADDR: "redis:6379"
+      CORS_ALLOW_ORIGINS: "http://localhost:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vyro
+      POSTGRES_PASSWORD: vyro
+      POSTGRES_DB: vyro
+    ports:
+      - "5432:5432"
+    volumes:
+      - vyro_pgdata:/var/lib/postgresql/data
+      - ./migrations/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vyro -d vyro"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - vyro_redisdata:/data
+
+volumes:
+  vyro_pgdata:
+  vyro_redisdata:

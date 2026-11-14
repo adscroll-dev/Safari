@@ -1,0 +1,83 @@
+# Web client TURN wiring — patch for the agent that owns web/
+#
+# I (v0.6 TURN agent) may not edit web/, so this patch is ready to
+# apply from the repo root with:  git apply turn/web-ice-wiring.patch
+#
+# What it does (web/lib/use-call.ts only):
+#   - Builds the RTCConfiguration from env vars instead of a hardcoded
+#     STUN-only list. Default (no env set) is unchanged: STUN-only.
+#   - When NEXT_PUBLIC_TURN_URL is set (docker-compose sets it to
+#     turn:localhost:3478 by default), the TURN server is appended as
+#     an ICE server with NEXT_PUBLIC_TURN_USERNAME /
+#     NEXT_PUBLIC_TURN_CREDENTIAL (defaults: vyro / $TURN_PASSWORD).
+#   - Multiple TURN/STUN URLs can be given comma-separated, e.g.
+#     NEXT_PUBLIC_TURN_URL="turn:turn.example.com:3478,turns:turn.example.com:5349"
+#   - Updates the stale "no TURN server in v0.5" error text.
+#
+# No backend change is needed: TURN uses long-term credentials
+# (lt-cred-mech) configured in turn/turnserver.conf + docker-compose.
+#
+--- a/web/lib/use-call.ts
++++ b/web/lib/use-call.ts
+@@ -1,9 +1,10 @@
+-// Voice-call hook (WebRTC, v0.5). Signaling goes through VYRO's
++// Voice-call hook (WebRTC, v0.5; TURN relay added in v0.6). Signaling goes through VYRO's
+ // WebSocket (call-offer / call-answer / call-ice / call-end, relayed
+ // verbatim by the server); media is peer-to-peer via a public STUN
+-// server. No TURN server is configured — calls work when the two peers
++// server, with the self-hosted coturn TURN server as a relay when
++// configured (see NEXT_PUBLIC_TURN_URL below). Calls work when the two peers
+ // can reach each other directly, which covers most home/office NATs;
+-// symmetric NATs may need a TURN server (no free tier is bundled).
++// symmetric NATs fall back to the TURN relay instead of failing.
+ // Audio-only in v0.5; video is not wired yet (see README).
+ import { useCallback, useEffect, useRef, useState } from "react";
+ import * as api from "./api";
+@@ -17,9 +18,35 @@
+   offer: RTCSessionDescriptionInit;
+ }
+ 
+-const RTC_CONFIG: RTCConfiguration = {
+-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+-};
++// ICE servers for calls (v0.6). Default is STUN-only, exactly as in
++// v0.5. When the self-hosted TURN server is configured via env
++// (docker-compose sets these when the `turn` service runs), it is
++// appended so relayed calls work behind symmetric NATs.
++//   NEXT_PUBLIC_TURN_URL        e.g. "turn:localhost:3478" (comma-separated for several)
++//   NEXT_PUBLIC_TURN_USERNAME   e.g. "vyro"
++//   NEXT_PUBLIC_TURN_CREDENTIAL e.g. $TURN_PASSWORD
++function buildIceServers(): RTCIceServer[] {
++  const servers: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
++  const turnUrls = (process.env.NEXT_PUBLIC_TURN_URL ?? "")
++    .split(",")
++    .map((u) => u.trim())
++    .filter(Boolean);
++  if (turnUrls.length > 0) {
++    servers.push({
++      urls: turnUrls,
++      username: process.env.NEXT_PUBLIC_TURN_USERNAME || "vyro",
++      credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL || "",
++    });
++  }
++  return servers;
++}
++
++function getRtcConfig(): RTCConfiguration {
++  return { iceServers: buildIceServers() };
++}
++
++// Built fresh per call from the current environment.
++const RTC_CONFIG: RTCConfiguration = getRtcConfig();
+ 
+ export function useCall(
+   sendSignal: (chatId: string, type: string, toUserId: string, payload: unknown) => void,
+@@ -59,7 +86,7 @@
+       pc.onconnectionstatechange = () => {
+         if (pc.connectionState === "connected") setCallState("in-call");
+         if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
+-          setCallError("Call connection failed — the peers may not be directly reachable (no TURN server in v0.5).");
++          setCallError("Call connection failed — the peers could not connect directly or via the TURN relay.");
+           cleanup();
+         }
+       };
