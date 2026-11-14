@@ -14,6 +14,13 @@ class ApiClient {
       : baseUrl = baseUrl ?? _defaultBaseUrl();
 
   static String _defaultBaseUrl() {
+    // Release builds can bake in the public API URL, e.g.:
+    //   flutter build apk --dart-define=VYRO_API_URL=https://vyro-api-xxxx.onrender.com
+    // Empty (dev default) keeps the emulator/localhost behaviour, so the
+    // web build screenshotted against localhost:8080 is unaffected.
+    const override =
+        String.fromEnvironment('VYRO_API_URL', defaultValue: '');
+    if (override.isNotEmpty) return override;
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8080';
     }
