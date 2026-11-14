@@ -188,44 +188,12 @@ export default function LandingPage() {
         </section>
       ))}
 
-      <section
-        style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 16,
-        }}
-      >
-        <p style={{ margin: "0 0 4px", fontSize: 17, fontWeight: 700 }}>
-          VYRO 0.6.0 — all devices (fallback)
-        </p>
-        <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: 14 }}>
-          One big file that works on every Android phone · Size: 96.3 MB
-          (101,011,626 bytes). Use this only if none of the small builds
-          above installs on your phone.
-        </p>
-        <p style={{ margin: "0 0 12px" }}>
-          <a href="/downloads/vyro-0.6.0.apk" style={buttonStyle}>
-            Download VYRO 0.6.0 (all devices)
-          </a>
-        </p>
-        <p style={{ margin: "0 0 4px", fontSize: 13, color: "#374151" }}>
-          Verify the download (SHA-256):
-        </p>
-        <code
-          style={{
-            display: "block",
-            fontSize: 12,
-            wordBreak: "break-all",
-            background: "#ffffff",
-            border: "1px solid #dbeafe",
-            borderRadius: 8,
-            padding: 10,
-          }}
-        >
-          8a717aa83b26cf916b4f109aa16a2a3b27a84bd93a0fdf41e2b8ca6bc97fc592
-        </code>
-      </section>
+      {/*
+        Fallback "all devices" APK removed 2026-11-14: the 96.3 MB fat APK
+        (vyro-0.6.0.apk) is over GitHub's 100 MB file limit and is not in
+        the repo, so its button would 404 on the live site. The three
+        per-device builds above are the downloads.
+      */}
 
       <p
         style={{
