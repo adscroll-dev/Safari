@@ -1,4 +1,4 @@
-// Translations for the VYRO download page. English is the default.
+// Translations for the Safari download page. English is the default.
 // The visitor picks a language from the switcher; the whole page
 // (headings, download section, features, warning, footer) switches
 // to it, and the choice is remembered in localStorage.
@@ -62,12 +62,12 @@ export const translations: Record<LangCode, Strings> = {
   en: {
     tagline: "Connect Beyond Limits",
     intro:
-      "VYRO is a fast, secure messenger for Android: private and group chat, channels, voice calls, stories, bots, and end-to-end encryption for one-to-one messages. This is a beta — some features are still on the way. The messenger lives only inside the app — download it below to start chatting.",
-    downloadTitle: "Download VYRO for Android",
+      "Safari is a fast, secure messenger for Android: private and group chat, channels, voice calls, stories, bots, and end-to-end encryption for one-to-one messages. This is a beta — some features are still on the way. The messenger lives only inside the app — download it below to start chatting.",
+    downloadTitle: "Download Safari for Android",
     versionLine:
       "Version 0.6.0 (Beta) · Requires Android 6.0+ (API 23) · The site detects your phone automatically and downloads the build made for it — just tap the button below. Signed with the development key for this first test build; a proper release signature comes before wide distribution.",
     warning:
-      "Download VYRO only from this official website. APKs from other sites are not safe and should not be installed.",
+      "Download Safari only from this official website. APKs from other sites are not safe and should not be installed.",
     featuresTitle: "Features",
     features: [
       { title: "Private & group chat", desc: "Direct messages, groups and channels with admin roles." },
@@ -82,18 +82,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Local AI assistant", desc: "On-device assistant, dictionary translation and smart replies — no cloud AI, no data leaves your device." },
     ],
     footer:
-      "Free and open-source only, until VYRO reaches 10,000 registered users. The Android beta APK is available above; iOS is coming later.",
-    aboutTitle: "About VYRO",
+      "Free and open-source only, until Safari reaches 10,000 registered users. The Android beta APK is available above; iOS is coming later.",
+    aboutTitle: "About Safari",
     languageLabel: "Language",
-    forYourPhone: "VYRO 0.6.0 — for your phone",
+    forYourPhone: "Safari 0.6.0 — for your phone",
     detected: "Detected for your phone:",
-    downloadButton: "Download VYRO for Android",
+    downloadButton: "Download Safari for Android",
     verify: "Verify the download (SHA-256):",
     category: "Communication",
     free: "Free",
     updated: "Updated Nov 14, 2026",
     requires: "Requires Android 6.0+",
-    offeredBy: "Offered by VYRO Team",
+    offeredBy: "Offered by Safari Team",
     screenshotsTitle: "Preview",
     slowTitle: "Built for slow internet",
     slowDesc: "Small downloads that resume. Data Saver is on by default: voice calls at 12 kbps, compressed photos, tap-to-download media.",
@@ -104,12 +104,12 @@ export const translations: Record<LangCode, Strings> = {
   fa: {
     tagline: "اتصال فراتر از محدودیت‌ها",
     intro:
-      "VYRO یک پیام‌رسان سریع و امن برای اندروید است: چت خصوصی و گروهی، کانال، تماس صوتی، استوری، ربات و رمزنگاری سرتاسری برای پیام‌های خصوصی. این نسخه هنوز آزمایشی (بتا) است و بعضی قابلیت‌ها هنوز در راه‌اند. پیام‌رسان فقط داخل اپ موبایل است — برای شروع، اپ را از پایین همین صفحه دانلود کنید.",
-    downloadTitle: "دانلود VYRO برای اندروید",
+      "Safari یک پیام‌رسان سریع و امن برای اندروید است: چت خصوصی و گروهی، کانال، تماس صوتی، استوری، ربات و رمزنگاری سرتاسری برای پیام‌های خصوصی. این نسخه هنوز آزمایشی (بتا) است و بعضی قابلیت‌ها هنوز در راه‌اند. پیام‌رسان فقط داخل اپ موبایل است — برای شروع، اپ را از پایین همین صفحه دانلود کنید.",
+    downloadTitle: "دانلود Safari برای اندروید",
     versionLine:
       "نسخه 0.6.0 (بتا) · نیازمند اندروید ۶٫۰ به بالا (API 23) · سایت گوشی شما را به‌صورت خودکار تشخیص می‌دهد و نسخه مناسب آن را دانلود می‌کند — فقط دکمه زیر را بزنید. با کلید آزمایشی برای این نسخه اول امضا شده است؛ پیش از انتشار گسترده، امضای رسمی خواهد داشت.",
     warning:
-      "VYRO را فقط از همین وب‌سایت رسمی دانلود کنید. فایل‌های APK از سایت‌های دیگر امن نیستند و نباید نصب شوند.",
+      "Safari را فقط از همین وب‌سایت رسمی دانلود کنید. فایل‌های APK از سایت‌های دیگر امن نیستند و نباید نصب شوند.",
     featuresTitle: "قابلیت‌ها",
     features: [
       { title: "چت خصوصی و گروه", desc: "گفت‌وگوی خصوصی، گروه و کانال با مدیریت مدیران." },
@@ -124,18 +124,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "دستیار هوش مصنوعی محلی", desc: "دستیار روی دستگاه، ترجمه با فرهنگ لغت و پاسخ‌های هوشمند — بدون هوش مصنوعی ابری، بدون خروج داده از دستگاه شما." },
     ],
     footer:
-      "رایگان و متن‌باز، تا زمانی که VYRO به ۱۰٬۰۰۰ کاربر ثبت‌شده برسد. نسخه بتای اندروید در بالا در دسترس است؛ نسخه iOS بعداً می‌آید.",
+      "رایگان و متن‌باز، تا زمانی که Safari به ۱۰٬۰۰۰ کاربر ثبت‌شده برسد. نسخه بتای اندروید در بالا در دسترس است؛ نسخه iOS بعداً می‌آید.",
     aboutTitle: "درباره وایرو",
     languageLabel: "زبان",
-    forYourPhone: "VYRO 0.6.0 — برای گوشی شما",
+    forYourPhone: "Safari 0.6.0 — برای گوشی شما",
     detected: "برای گوشی شما تشخیص داده شد:",
-    downloadButton: "دانلود VYRO برای اندروید",
+    downloadButton: "دانلود Safari برای اندروید",
     verify: "بررسی دانلود (SHA-256):",
     category: "ارتباطات",
     free: "رایگان",
     updated: "به‌روز شده ۱۴ نوامبر ۲۰۲۶",
     requires: "نیاز به اندروید ۶٫۰ به بالا",
-    offeredBy: "ارائه‌دهنده: تیم VYRO",
+    offeredBy: "ارائه‌دهنده: تیم Safari",
     screenshotsTitle: "پیش‌نمایش",
     slowTitle: "ساخته‌شده برای انترنت کم‌سرعت",
     slowDesc: "دانلودهای کم‌حجم که ادامه می‌یابند. صرفه‌جویی در مصرف داده به‌صورت پیش‌فرض روشن است: تماس صوتی با ۱۲ کیلوبیت بر ثانیه، عکس‌های فشرده، دانلود با لمس.",
@@ -146,12 +146,12 @@ export const translations: Record<LangCode, Strings> = {
   ar: {
     tagline: "تواصل بلا حدود",
     intro:
-      "VYRO مراسل سريع وآمن لأندرويد: دردشة خاصة وجماعية، قنوات، مكالمات صوتية، قصص، بوتات، وتشفير كامل للرسائل الخاصة. هذه نسخة تجريبية — بعض الميزات ما زالت قادمة. المراسل يعيش داخل التطبيق فقط — حمّله من الأسفل لبدء الدردشة.",
-    downloadTitle: "تنزيل VYRO لأندرويد",
+      "Safari مراسل سريع وآمن لأندرويد: دردشة خاصة وجماعية، قنوات، مكالمات صوتية، قصص، بوتات، وتشفير كامل للرسائل الخاصة. هذه نسخة تجريبية — بعض الميزات ما زالت قادمة. المراسل يعيش داخل التطبيق فقط — حمّله من الأسفل لبدء الدردشة.",
+    downloadTitle: "تنزيل Safari لأندرويد",
     versionLine:
       "الإصدار 0.6.0 (تجريبي) · يتطلب أندرويد 6.0+ (API 23) · يكتشف الموقع هاتفك تلقائيًا وينزّل النسخة المناسبة له — فقط اضغط الزر أدناه. موقّع بمفتاح تطوير لهذا الإصدار التجريبي الأول؛ وسيحصل على توقيع رسمي قبل الانتشار الواسع.",
     warning:
-      "حمّل VYRO من هذا الموقع الرسمي فقط. ملفات APK من مواقع أخرى غير آمنة ويجب عدم تثبيتها.",
+      "حمّل Safari من هذا الموقع الرسمي فقط. ملفات APK من مواقع أخرى غير آمنة ويجب عدم تثبيتها.",
     featuresTitle: "الميزات",
     features: [
       { title: "دردشة خاصة وجماعية", desc: "رسائل مباشرة ومجموعات وقنوات مع أدوار للمشرفين." },
@@ -166,18 +166,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "مساعد ذكاء اصطناعي محلي", desc: "مساعد على الجهاز، وترجمة بالقاموس وردود ذكية — بلا ذكاء اصطناعي سحابي، ولا تغادر بياناتك جهازك." },
     ],
     footer:
-      "مجاني ومفتوح المصدر فقط، حتى يصل VYRO إلى 10,000 مستخدم مسجّل. نسخة أندرويد التجريبية متاحة أعلاه؛ ونسخة iOS قادمة لاحقًا.",
-    aboutTitle: "عن VYRO",
+      "مجاني ومفتوح المصدر فقط، حتى يصل Safari إلى 10,000 مستخدم مسجّل. نسخة أندرويد التجريبية متاحة أعلاه؛ ونسخة iOS قادمة لاحقًا.",
+    aboutTitle: "عن Safari",
     languageLabel: "اللغة",
-    forYourPhone: "VYRO 0.6.0 — لهاتفك",
+    forYourPhone: "Safari 0.6.0 — لهاتفك",
     detected: "تم الكشف لهاتفك:",
-    downloadButton: "تنزيل VYRO لأندرويد",
+    downloadButton: "تنزيل Safari لأندرويد",
     verify: "تحقق من التنزيل (SHA-256):",
     category: "الاتصالات",
     free: "مجاني",
     updated: "تم التحديث في 14 نوفمبر 2026",
     requires: "يتطلب Android 6.0+",
-    offeredBy: "مقدَّم من فريق VYRO",
+    offeredBy: "مقدَّم من فريق Safari",
     screenshotsTitle: "معاينة",
     slowTitle: "مصمَّم لإنترنت بطيء",
     slowDesc: "تنزيلات صغيرة قابلة للاستئناف. توفير البيانات مفعَّل افتراضيًا: مكالمات صوتية بسرعة 12 كيلوبت/ث، صور مضغوطة، تنزيل باللمس.",
@@ -188,12 +188,12 @@ export const translations: Record<LangCode, Strings> = {
   ur: {
     tagline: "حدود سے آگے جڑیں",
     intro:
-      "VYRO اینڈرائیڈ کے لیے ایک تیز اور محفوظ میسنجر ہے: نجی اور گروپ چیٹ، چینلز، وائس کالز، اسٹوریز، بوٹس، اور نجی پیغامات کے لیے مکمل خفیہ کاری۔ یہ بیٹا ورژن ہے — کچھ فیچرز ابھی آ رہے ہیں۔ میسنجر صرف ایپ کے اندر ہے — چیٹ شروع کرنے کے لیے نیچے سے ڈاؤن لوڈ کریں۔",
-    downloadTitle: "اینڈرائیڈ کے لیے VYRO ڈاؤن لوڈ کریں",
+      "Safari اینڈرائیڈ کے لیے ایک تیز اور محفوظ میسنجر ہے: نجی اور گروپ چیٹ، چینلز، وائس کالز، اسٹوریز، بوٹس، اور نجی پیغامات کے لیے مکمل خفیہ کاری۔ یہ بیٹا ورژن ہے — کچھ فیچرز ابھی آ رہے ہیں۔ میسنجر صرف ایپ کے اندر ہے — چیٹ شروع کرنے کے لیے نیچے سے ڈاؤن لوڈ کریں۔",
+    downloadTitle: "اینڈرائیڈ کے لیے Safari ڈاؤن لوڈ کریں",
     versionLine:
       "ورژن 0.6.0 (بیٹا) · اینڈرائیڈ 6.0+ (API 23) درکار ہے · سائٹ آپ کے فون کو خود بخود پہچانتی ہے اور اس کے لیے بنائی گئی بلڈ ڈاؤن لوڈ کرتی ہے — بس نیچے والا بٹن دبائیں۔ اس پہلی ٹیسٹ بلڈ پر ڈیولپمنٹ کی دستخط ہے؛ وسیع تقسیم سے پہلے باقاعدہ دستخط آئے گا۔",
     warning:
-      "VYRO صرف اسی سرکاری ویب سائٹ سے ڈاؤن لوڈ کریں۔ دوسری سائٹس کی APK فائلیں محفوظ نہیں ہیں اور انہیں انسٹال نہیں کرنا چاہیے۔",
+      "Safari صرف اسی سرکاری ویب سائٹ سے ڈاؤن لوڈ کریں۔ دوسری سائٹس کی APK فائلیں محفوظ نہیں ہیں اور انہیں انسٹال نہیں کرنا چاہیے۔",
     featuresTitle: "خصوصیات",
     features: [
       { title: "نجی اور گروپ چیٹ", desc: "ڈائریکٹ میسجز، گروپس اور چینلز، ایڈمن کرداروں کے ساتھ۔" },
@@ -208,18 +208,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "مقامی AI اسسٹنٹ", desc: "ڈیوائس پر اسسٹنٹ، لغت ترجمہ اور سمارٹ جوابات — کوئی کلاؤڈ AI نہیں، آپ کا ڈیٹا ڈیوائس نہیں چھوڑتا۔" },
     ],
     footer:
-      "صرف مفت اور اوپن سورس، جب تک VYRO 10,000 رجسٹرڈ صارفین تک نہ پہنچے۔ اینڈرائیڈ بیٹا APK اوپر دستیاب ہے؛ iOS بعد میں آئے گا۔",
-    aboutTitle: "VYRO کے بارے میں",
+      "صرف مفت اور اوپن سورس، جب تک Safari 10,000 رجسٹرڈ صارفین تک نہ پہنچے۔ اینڈرائیڈ بیٹا APK اوپر دستیاب ہے؛ iOS بعد میں آئے گا۔",
+    aboutTitle: "Safari کے بارے میں",
     languageLabel: "زبان",
-    forYourPhone: "VYRO 0.6.0 — آپ کے فون کے لیے",
+    forYourPhone: "Safari 0.6.0 — آپ کے فون کے لیے",
     detected: "آپ کے فون کے لیے پہچانا گیا:",
-    downloadButton: "اینڈرائیڈ کے لیے VYRO ڈاؤن لوڈ کریں",
+    downloadButton: "اینڈرائیڈ کے لیے Safari ڈاؤن لوڈ کریں",
     verify: "ڈاؤن لوڈ کی تصدیق کریں (SHA-256):",
     category: "مواصلات",
     free: "مفت",
     updated: "اپ ڈیٹ: 14 نومبر 2026",
     requires: "Android 6.0+ درکار ہے",
-    offeredBy: "VYRO ٹیم کی پیشکش",
+    offeredBy: "Safari ٹیم کی پیشکش",
     screenshotsTitle: "جھلک",
     slowTitle: "سست انٹرنیٹ کے لیے بنایا گیا",
     slowDesc: "چھوٹے ڈاؤن لوڈ جو جاری رہتے ہیں۔ ڈیٹا سیور بطور پیش فرض آن ہے: 12 kbps پر وائس کالز، کمپریس شدہ تصاویر، ٹیپ کر کے ڈاؤن لوڈ۔",
@@ -230,12 +230,12 @@ export const translations: Record<LangCode, Strings> = {
   tr: {
     tagline: "Sınırların Ötesinde Bağlanın",
     intro:
-      "VYRO, Android için hızlı ve güvenli bir mesajlaşma uygulamasıdır: özel ve grup sohbetleri, kanallar, sesli aramalar, hikâyeler, botlar ve bire bir mesajlar için uçtan uca şifreleme. Bu bir beta sürümüdür — bazı özellikler henüz yolda. Mesajlaşma yalnızca uygulamanın içindedir — sohbete başlamak için aşağıdan indirin.",
-    downloadTitle: "Android için VYRO'yu indirin",
+      "Safari, Android için hızlı ve güvenli bir mesajlaşma uygulamasıdır: özel ve grup sohbetleri, kanallar, sesli aramalar, hikâyeler, botlar ve bire bir mesajlar için uçtan uca şifreleme. Bu bir beta sürümüdür — bazı özellikler henüz yolda. Mesajlaşma yalnızca uygulamanın içindedir — sohbete başlamak için aşağıdan indirin.",
+    downloadTitle: "Android için Safari'yu indirin",
     versionLine:
       "Sürüm 0.6.0 (Beta) · Android 6.0+ (API 23) gerekir · Site telefonunuzu otomatik olarak algılar ve ona uygun sürümü indirir — aşağıdaki düğmeye dokunmanız yeterli. Bu ilk test sürümü geliştirici anahtarıyla imzalanmıştır; geniş dağıtımdan önce resmi imza gelecektir.",
     warning:
-      "VYRO'yu yalnızca bu resmî web sitesinden indirin. Diğer sitelerdeki APK'lar güvenli değildir ve yüklenmemelidir.",
+      "Safari'yu yalnızca bu resmî web sitesinden indirin. Diğer sitelerdeki APK'lar güvenli değildir ve yüklenmemelidir.",
     featuresTitle: "Özellikler",
     features: [
       { title: "Özel ve grup sohbeti", desc: "Yönetici rolleriyle doğrudan mesajlar, gruplar ve kanallar." },
@@ -250,18 +250,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Yerel yapay zekâ asistanı", desc: "Cihaz içi asistan, sözlük çevirisi ve akıllı yanıtlar — bulut yapay zekâsı yok, verileriniz cihazınızdan çıkmaz." },
     ],
     footer:
-      "Yalnızca ücretsiz ve açık kaynak, VYRO 10.000 kayıtlı kullanıcıya ulaşana kadar. Android beta APK'sı yukarıda mevcuttur; iOS daha sonra gelecektir.",
-    aboutTitle: "VYRO Hakkında",
+      "Yalnızca ücretsiz ve açık kaynak, Safari 10.000 kayıtlı kullanıcıya ulaşana kadar. Android beta APK'sı yukarıda mevcuttur; iOS daha sonra gelecektir.",
+    aboutTitle: "Safari Hakkında",
     languageLabel: "Dil",
-    forYourPhone: "VYRO 0.6.0 — telefonunuz için",
+    forYourPhone: "Safari 0.6.0 — telefonunuz için",
     detected: "Telefonunuz için algılandı:",
-    downloadButton: "Android için VYRO'yu indirin",
+    downloadButton: "Android için Safari'yu indirin",
     verify: "İndirmeyi doğrulayın (SHA-256):",
     category: "İletişim",
     free: "Ücretsiz",
     updated: "Güncellendi: 14 Kasım 2026",
     requires: "Android 6.0+ gerekir",
-    offeredBy: "Sunucu: VYRO Ekibi",
+    offeredBy: "Sunucu: Safari Ekibi",
     screenshotsTitle: "Önizleme",
     slowTitle: "Yavaş internet için tasarlandı",
     slowDesc: "Devam eden küçük indirmeler. Veri Tasarrufu varsayılan olarak açık: 12 kbps sesli aramalar, sıkıştırılmış fotoğraflar, dokunarak indirme.",
@@ -272,12 +272,12 @@ export const translations: Record<LangCode, Strings> = {
   ru: {
     tagline: "Связь без границ",
     intro:
-      "VYRO — быстрый и безопасный мессенджер для Android: личные и групповые чаты, каналы, голосовые звонки, истории, боты и сквозное шифрование личных сообщений. Это бета-версия — некоторые функции ещё в пути. Мессенджер живёт только внутри приложения — скачайте его ниже, чтобы начать общение.",
-    downloadTitle: "Скачать VYRO для Android",
+      "Safari — быстрый и безопасный мессенджер для Android: личные и групповые чаты, каналы, голосовые звонки, истории, боты и сквозное шифрование личных сообщений. Это бета-версия — некоторые функции ещё в пути. Мессенджер живёт только внутри приложения — скачайте его ниже, чтобы начать общение.",
+    downloadTitle: "Скачать Safari для Android",
     versionLine:
       "Версия 0.6.0 (бета) · Требуется Android 6.0+ (API 23) · Сайт автоматически определяет ваш телефон и скачивает подходящую для него сборку — просто нажмите кнопку ниже. Подписано ключом разработчика для этой первой тестовой сборки; перед широким распространением будет официальная подпись.",
     warning:
-      "Скачивайте VYRO только с этого официального сайта. APK-файлы с других сайтов небезопасны, их нельзя устанавливать.",
+      "Скачивайте Safari только с этого официального сайта. APK-файлы с других сайтов небезопасны, их нельзя устанавливать.",
     featuresTitle: "Возможности",
     features: [
       { title: "Личные и групповые чаты", desc: "Личные сообщения, группы и каналы с ролями администраторов." },
@@ -292,18 +292,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Локальный ИИ-ассистент", desc: "Ассистент на устройстве, словарный перевод и умные ответы — без облачного ИИ, данные не покидают устройство." },
     ],
     footer:
-      "Бесплатно и с открытым исходным кодом, пока VYRO не наберёт 10 000 зарегистрированных пользователей. Бета-версия APK для Android доступна выше; iOS появится позже.",
-    aboutTitle: "О VYRO",
+      "Бесплатно и с открытым исходным кодом, пока Safari не наберёт 10 000 зарегистрированных пользователей. Бета-версия APK для Android доступна выше; iOS появится позже.",
+    aboutTitle: "О Safari",
     languageLabel: "Язык",
-    forYourPhone: "VYRO 0.6.0 — для вашего телефона",
+    forYourPhone: "Safari 0.6.0 — для вашего телефона",
     detected: "Определено для вашего телефона:",
-    downloadButton: "Скачать VYRO для Android",
+    downloadButton: "Скачать Safari для Android",
     verify: "Проверьте загрузку (SHA-256):",
     category: "Связь",
     free: "Бесплатно",
     updated: "Обновлено: 14 ноября 2026 г.",
     requires: "Требуется Android 6.0+",
-    offeredBy: "Разработчик: команда VYRO",
+    offeredBy: "Разработчик: команда Safari",
     screenshotsTitle: "Предпросмотр",
     slowTitle: "Сделано для медленного интернета",
     slowDesc: "Небольшие загрузки, которые можно продолжить. Экономия трафика включена по умолчанию: голосовые звонки 12 кбит/с, сжатые фото, загрузка по касанию.",
@@ -314,12 +314,12 @@ export const translations: Record<LangCode, Strings> = {
   es: {
     tagline: "Conecta más allá de los límites",
     intro:
-      "VYRO es un mensajero rápido y seguro para Android: chats privados y de grupo, canales, llamadas de voz, historias, bots y cifrado de extremo a extremo para mensajes individuales. Esta es una beta: algunas funciones aún están en camino. El mensajero vive solo dentro de la app: descárgala abajo para empezar a chatear.",
-    downloadTitle: "Descargar VYRO para Android",
+      "Safari es un mensajero rápido y seguro para Android: chats privados y de grupo, canales, llamadas de voz, historias, bots y cifrado de extremo a extremo para mensajes individuales. Esta es una beta: algunas funciones aún están en camino. El mensajero vive solo dentro de la app: descárgala abajo para empezar a chatear.",
+    downloadTitle: "Descargar Safari para Android",
     versionLine:
       "Versión 0.6.0 (beta) · Requiere Android 6.0+ (API 23) · El sitio detecta tu teléfono automáticamente y descarga la versión hecha para él: solo toca el botón de abajo. Firmado con la clave de desarrollo para esta primera versión de prueba; habrá una firma oficial antes de la distribución amplia.",
     warning:
-      "Descarga VYRO solo desde este sitio web oficial. Los APK de otros sitios no son seguros y no deben instalarse.",
+      "Descarga Safari solo desde este sitio web oficial. Los APK de otros sitios no son seguros y no deben instalarse.",
     featuresTitle: "Funciones",
     features: [
       { title: "Chat privado y de grupo", desc: "Mensajes directos, grupos y canales con roles de administrador." },
@@ -334,18 +334,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Asistente de IA local", desc: "Asistente en el dispositivo, traducción por diccionario y respuestas inteligentes: sin IA en la nube, tus datos no salen del dispositivo." },
     ],
     footer:
-      "Gratis y de código abierto, hasta que VYRO llegue a 10.000 usuarios registrados. La APK beta de Android está arriba; iOS llegará después.",
-    aboutTitle: "Acerca de VYRO",
+      "Gratis y de código abierto, hasta que Safari llegue a 10.000 usuarios registrados. La APK beta de Android está arriba; iOS llegará después.",
+    aboutTitle: "Acerca de Safari",
     languageLabel: "Idioma",
-    forYourPhone: "VYRO 0.6.0 — para tu teléfono",
+    forYourPhone: "Safari 0.6.0 — para tu teléfono",
     detected: "Detectado para tu teléfono:",
-    downloadButton: "Descargar VYRO para Android",
+    downloadButton: "Descargar Safari para Android",
     verify: "Verifica la descarga (SHA-256):",
     category: "Comunicación",
     free: "Gratis",
     updated: "Actualizado: 14 de noviembre de 2026",
     requires: "Requiere Android 6.0+",
-    offeredBy: "Ofrecido por el equipo de VYRO",
+    offeredBy: "Ofrecido por el equipo de Safari",
     screenshotsTitle: "Vista previa",
     slowTitle: "Hecho para internet lento",
     slowDesc: "Descargas pequeñas que se reanudan. Ahorro de datos activado por defecto: llamadas de voz a 12 kbps, fotos comprimidas, descarga al tocar.",
@@ -356,12 +356,12 @@ export const translations: Record<LangCode, Strings> = {
   fr: {
     tagline: "Connectez-vous au-delà des limites",
     intro:
-      "VYRO est une messagerie rapide et sécurisée pour Android : discussions privées et de groupe, chaînes, appels vocaux, stories, bots et chiffrement de bout en bout pour les messages privés. C'est une version bêta — certaines fonctionnalités sont encore en route. La messagerie vit uniquement dans l'application — téléchargez-la ci-dessous pour commencer à discuter.",
-    downloadTitle: "Télécharger VYRO pour Android",
+      "Safari est une messagerie rapide et sécurisée pour Android : discussions privées et de groupe, chaînes, appels vocaux, stories, bots et chiffrement de bout en bout pour les messages privés. C'est une version bêta — certaines fonctionnalités sont encore en route. La messagerie vit uniquement dans l'application — téléchargez-la ci-dessous pour commencer à discuter.",
+    downloadTitle: "Télécharger Safari pour Android",
     versionLine:
       "Version 0.6.0 (bêta) · Nécessite Android 6.0+ (API 23) · Le site détecte automatiquement votre téléphone et télécharge la version faite pour lui — touchez simplement le bouton ci-dessous. Signé avec la clé de développement pour cette première version de test ; une signature officielle viendra avant la large diffusion.",
     warning:
-      "Téléchargez VYRO uniquement depuis ce site officiel. Les APK d'autres sites ne sont pas sûrs et ne doivent pas être installés.",
+      "Téléchargez Safari uniquement depuis ce site officiel. Les APK d'autres sites ne sont pas sûrs et ne doivent pas être installés.",
     featuresTitle: "Fonctionnalités",
     features: [
       { title: "Discussions privées et de groupe", desc: "Messages directs, groupes et chaînes avec des rôles d'administrateur." },
@@ -376,18 +376,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Assistant IA local", desc: "Assistant sur l'appareil, traduction par dictionnaire et réponses intelligentes — pas d'IA cloud, vos données ne quittent pas l'appareil." },
     ],
     footer:
-      "Gratuit et open source uniquement, jusqu'à ce que VYRO atteigne 10 000 utilisateurs inscrits. L'APK bêta Android est disponible ci-dessus ; iOS viendra plus tard.",
-    aboutTitle: "À propos de VYRO",
+      "Gratuit et open source uniquement, jusqu'à ce que Safari atteigne 10 000 utilisateurs inscrits. L'APK bêta Android est disponible ci-dessus ; iOS viendra plus tard.",
+    aboutTitle: "À propos de Safari",
     languageLabel: "Langue",
-    forYourPhone: "VYRO 0.6.0 — pour votre téléphone",
+    forYourPhone: "Safari 0.6.0 — pour votre téléphone",
     detected: "Détecté pour votre téléphone :",
-    downloadButton: "Télécharger VYRO pour Android",
+    downloadButton: "Télécharger Safari pour Android",
     verify: "Vérifiez le téléchargement (SHA-256) :",
     category: "Communication",
     free: "Gratuit",
     updated: "Mis à jour : 14 novembre 2026",
     requires: "Nécessite Android 6.0+",
-    offeredBy: "Proposé par l'équipe VYRO",
+    offeredBy: "Proposé par l'équipe Safari",
     screenshotsTitle: "Aperçu",
     slowTitle: "Conçu pour internet lent",
     slowDesc: "Petits téléchargements qui reprennent. Économie de données activée par défaut : appels vocaux à 12 kbps, photos compressées, téléchargement au toucher.",
@@ -398,12 +398,12 @@ export const translations: Record<LangCode, Strings> = {
   de: {
     tagline: "Verbinde dich über Grenzen hinaus",
     intro:
-      "VYRO ist ein schneller, sicherer Messenger für Android: private und Gruppenchats, Kanäle, Sprachanrufe, Stories, Bots und Ende-zu-Ende-Verschlüsselung für private Nachrichten. Dies ist eine Beta — einige Funktionen sind noch unterwegs. Der Messenger lebt nur in der App — lade sie unten herunter, um zu chatten.",
-    downloadTitle: "VYRO für Android herunterladen",
+      "Safari ist ein schneller, sicherer Messenger für Android: private und Gruppenchats, Kanäle, Sprachanrufe, Stories, Bots und Ende-zu-Ende-Verschlüsselung für private Nachrichten. Dies ist eine Beta — einige Funktionen sind noch unterwegs. Der Messenger lebt nur in der App — lade sie unten herunter, um zu chatten.",
+    downloadTitle: "Safari für Android herunterladen",
     versionLine:
       "Version 0.6.0 (Beta) · Erfordert Android 6.0+ (API 23) · Die Website erkennt dein Telefon automatisch und lädt die dafür gemachte Version herunter — tippe einfach auf die Schaltfläche unten. Mit dem Entwicklungsschlüssel für diesen ersten Test-Build signiert; vor der breiten Verteilung kommt eine offizielle Signatur.",
     warning:
-      "Lade VYRO nur von dieser offiziellen Website herunter. APKs von anderen Websites sind nicht sicher und sollten nicht installiert werden.",
+      "Lade Safari nur von dieser offiziellen Website herunter. APKs von anderen Websites sind nicht sicher und sollten nicht installiert werden.",
     featuresTitle: "Funktionen",
     features: [
       { title: "Private und Gruppenchats", desc: "Direktnachrichten, Gruppen und Kanäle mit Admin-Rollen." },
@@ -418,18 +418,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "Lokaler KI-Assistent", desc: "Assistent auf dem Gerät, Wörterbuch-Übersetzung und intelligente Antworten — keine Cloud-KI, deine Daten verlassen das Gerät nicht." },
     ],
     footer:
-      "Nur kostenlos und Open Source, bis VYRO 10.000 registrierte Nutzer erreicht. Die Android-Beta-APK ist oben verfügbar; iOS kommt später.",
-    aboutTitle: "Über VYRO",
+      "Nur kostenlos und Open Source, bis Safari 10.000 registrierte Nutzer erreicht. Die Android-Beta-APK ist oben verfügbar; iOS kommt später.",
+    aboutTitle: "Über Safari",
     languageLabel: "Sprache",
-    forYourPhone: "VYRO 0.6.0 — für dein Telefon",
+    forYourPhone: "Safari 0.6.0 — für dein Telefon",
     detected: "Für dein Telefon erkannt:",
-    downloadButton: "VYRO für Android herunterladen",
+    downloadButton: "Safari für Android herunterladen",
     verify: "Download überprüfen (SHA-256):",
     category: "Kommunikation",
     free: "Kostenlos",
     updated: "Aktualisiert: 14. November 2026",
     requires: "Erfordert Android 6.0+",
-    offeredBy: "Angeboten vom VYRO-Team",
+    offeredBy: "Angeboten vom Safari-Team",
     screenshotsTitle: "Vorschau",
     slowTitle: "Für langsames Internet gemacht",
     slowDesc: "Kleine Downloads, die fortgesetzt werden. Datensparmodus standardmäßig an: Sprachanrufe mit 12 kbps, komprimierte Fotos, Download per Tippen.",
@@ -440,12 +440,12 @@ export const translations: Record<LangCode, Strings> = {
   hi: {
     tagline: "सीमाओं से परे जुड़ें",
     intro:
-      "VYRO Android के लिए एक तेज़ और सुरक्षित मैसेंजर है: निजी और ग्रुप चैट, चैनल, वॉइस कॉल, स्टोरीज़, बॉट्स और निजी संदेशों के लिए एंड-टू-एंड एन्क्रिप्शन। यह बीटा है — कुछ सुविधाएँ अभी आ रही हैं। मैसेंजर सिर्फ ऐप के अंदर है — चैट शुरू करने के लिए नीचे से डाउनलोड करें।",
-    downloadTitle: "Android के लिए VYRO डाउनलोड करें",
+      "Safari Android के लिए एक तेज़ और सुरक्षित मैसेंजर है: निजी और ग्रुप चैट, चैनल, वॉइस कॉल, स्टोरीज़, बॉट्स और निजी संदेशों के लिए एंड-टू-एंड एन्क्रिप्शन। यह बीटा है — कुछ सुविधाएँ अभी आ रही हैं। मैसेंजर सिर्फ ऐप के अंदर है — चैट शुरू करने के लिए नीचे से डाउनलोड करें।",
+    downloadTitle: "Android के लिए Safari डाउनलोड करें",
     versionLine:
       "संस्करण 0.6.0 (बीटा) · Android 6.0+ (API 23) आवश्यक है · साइट आपके फ़ोन को अपने आप पहचानती है और उसके लिए बना बिल्ड डाउनलोड करती है — बस नीचे वाला बटन दबाएँ। इस पहले टेस्ट बिल्ड पर डेवलपमेंट कुंजी से हस्ताक्षर है; व्यापक वितरण से पहले आधिकारिक हस्ताक्षर आएगा।",
     warning:
-      "VYRO सिर्फ इसी आधिकारिक वेबसाइट से डाउनलोड करें। अन्य साइटों की APK सुरक्षित नहीं हैं और उन्हें इंस्टॉल नहीं करना चाहिए।",
+      "Safari सिर्फ इसी आधिकारिक वेबसाइट से डाउनलोड करें। अन्य साइटों की APK सुरक्षित नहीं हैं और उन्हें इंस्टॉल नहीं करना चाहिए।",
     featuresTitle: "सुविधाएँ",
     features: [
       { title: "निजी और ग्रुप चैट", desc: "एडमिन भूमिकाओं के साथ डायरेक्ट संदेश, ग्रुप और चैनल।" },
@@ -460,18 +460,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "स्थानीय AI सहायक", desc: "डिवाइस पर सहायक, शब्दकोश अनुवाद और स्मार्ट जवाब — कोई क्लाउड AI नहीं, आपका डेटा डिवाइस नहीं छोड़ता।" },
     ],
     footer:
-      "सिर्फ़ मुफ़्त और ओपन-सोर्स, जब तक VYRO 10,000 पंजीकृत उपयोगकर्ताओं तक न पहुँचे। Android बीटा APK ऊपर उपलब्ध है; iOS बाद में आएगा।",
-    aboutTitle: "VYRO के बारे में",
+      "सिर्फ़ मुफ़्त और ओपन-सोर्स, जब तक Safari 10,000 पंजीकृत उपयोगकर्ताओं तक न पहुँचे। Android बीटा APK ऊपर उपलब्ध है; iOS बाद में आएगा।",
+    aboutTitle: "Safari के बारे में",
     languageLabel: "भाषा",
-    forYourPhone: "VYRO 0.6.0 — आपके फ़ोन के लिए",
+    forYourPhone: "Safari 0.6.0 — आपके फ़ोन के लिए",
     detected: "आपके फ़ोन के लिए पहचाना गया:",
-    downloadButton: "Android के लिए VYRO डाउनलोड करें",
+    downloadButton: "Android के लिए Safari डाउनलोड करें",
     verify: "डाउनलोड सत्यापित करें (SHA-256):",
     category: "संचार",
     free: "निःशुल्क",
     updated: "अपडेट किया गया: 14 नवंबर 2026",
     requires: "Android 6.0+ आवश्यक",
-    offeredBy: "VYRO टीम द्वारा प्रस्तुत",
+    offeredBy: "Safari टीम द्वारा प्रस्तुत",
     screenshotsTitle: "पूर्वावलोकन",
     slowTitle: "धीमे इंटरनेट के लिए बनाया गया",
     slowDesc: "छोटे डाउनलोड जो फिर से शुरू होते हैं। डेटा सेवर डिफ़ॉल्ट रूप से चालू: 12 kbps पर वॉइस कॉल, कंप्रेस्ड फ़ोटो, टैप करके डाउनलोड।",
@@ -482,12 +482,12 @@ export const translations: Record<LangCode, Strings> = {
   ps: {
     tagline: "له حدودو هاخوا وصل شئ",
     intro:
-      "VYRO د Android لپاره یو چټک او خوندي مسینجر دی: شخصي او ډله‌ییز چیټ، چینلونه، غږیز زنګونه، کیسې، بوټان او د یو په یو پیغامونو لپاره له پایه تر پایه کوډ کول. دا یو بیټا نسخه ده — ځینې ځانګړتیاوې لا په لار دي. مسینجر یوازې د اپ دننه دی — د چیټ پیلولو لپاره یې لاندې ډاونلوډ کړئ.",
-    downloadTitle: "د Android لپاره VYRO ډاونلوډ کړئ",
+      "Safari د Android لپاره یو چټک او خوندي مسینجر دی: شخصي او ډله‌ییز چیټ، چینلونه، غږیز زنګونه، کیسې، بوټان او د یو په یو پیغامونو لپاره له پایه تر پایه کوډ کول. دا یو بیټا نسخه ده — ځینې ځانګړتیاوې لا په لار دي. مسینجر یوازې د اپ دننه دی — د چیټ پیلولو لپاره یې لاندې ډاونلوډ کړئ.",
+    downloadTitle: "د Android لپاره Safari ډاونلوډ کړئ",
     versionLine:
       "نسخه 0.6.0 (بیټا) · Android 6.0+ (API 23) ته اړتیا لري · سایټ ستاسو تلیفون په اوتومات ډول پېژني او د هغه لپاره جوړ شوی بیلډ ډاونلوډ کوي — یوازې لاندې تڼۍ کېکاږئ. د دې لومړۍ ټیسټ بیلډ لپاره د پراختیا کوونکي کیلي سره لاسلیک شوی؛ له پراخ خپرېدو وړاندې به رسمي لاسلیک ولري.",
     warning:
-      "VYRO یوازې له دې رسمي ویب‌سایټ څخه ډاونلوډ کړئ. له نورو سایټونو څخه APK خوندي نه دي او باید نصب نه شي.",
+      "Safari یوازې له دې رسمي ویب‌سایټ څخه ډاونلوډ کړئ. له نورو سایټونو څخه APK خوندي نه دي او باید نصب نه شي.",
     featuresTitle: "ځانګړتیاوې",
     features: [
       { title: "شخصي او ډله‌ییز چیټ", desc: "د مدیر رولونو سره مستقیم پیغامونه، ډلې او چینلونه." },
@@ -502,18 +502,18 @@ export const translations: Record<LangCode, Strings> = {
       { title: "ځایي AI مرستیال", desc: "په وسیله کې مرستیال، د قاموس ژباړه او هوښیار ځوابونه — هیڅ کلاوډ AI نشته، ستاسو ډاټا له وسیلې نه وځي." },
     ],
     footer:
-      "یوازې وړیا او خلاص سرچینه، تر هغه چې VYRO 10,000 راجستر شویو کاروونکو ته ورسېږي. د Android بیټا APK پورته شتون لري؛ iOS وروسته راځي.",
-    aboutTitle: "د VYRO په اړه",
+      "یوازې وړیا او خلاص سرچینه، تر هغه چې Safari 10,000 راجستر شویو کاروونکو ته ورسېږي. د Android بیټا APK پورته شتون لري؛ iOS وروسته راځي.",
+    aboutTitle: "د Safari په اړه",
     languageLabel: "ژبه",
-    forYourPhone: "VYRO 0.6.0 — ستاسو تلیفون لپاره",
+    forYourPhone: "Safari 0.6.0 — ستاسو تلیفون لپاره",
     detected: "ستاسو تلیفون لپاره وپېژندل شو:",
-    downloadButton: "د Android لپاره VYRO ډاونلوډ کړئ",
+    downloadButton: "د Android لپاره Safari ډاونلوډ کړئ",
     verify: "ډاونلوډ تایید کړئ (SHA-256):",
     category: "اړیکې",
     free: "وړیا",
     updated: "تازه شوی: نومبر ۱۴، ۲۰۲۶",
     requires: "Android 6.0+ ته اړتیا لري",
-    offeredBy: "د VYRO ټیم لخوا وړاندې شوی",
+    offeredBy: "د Safari ټیم لخوا وړاندې شوی",
     screenshotsTitle: "مخکتنه",
     slowTitle: "د کم سرعت انټرنېټ لپاره جوړ شوی",
     slowDesc: "کوچني ډاونلوډونه چې دوام مومي. ډاټا سیور په ډیفالټ فعال دی: په 12 kbps غږیز زنګونه، کمپریس شوي انځورونه، په ټچ کولو ډاونلوډ.",

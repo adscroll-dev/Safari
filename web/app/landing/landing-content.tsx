@@ -12,7 +12,7 @@ function isLangCode(value: string): value is LangCode {
 
 const GRADIENT = "linear-gradient(135deg,#2563eb,#7c3aed)";
 
-// Real screenshots of the VYRO Flutter app (captured from the actual
+// Real screenshots of the Safari Flutter app (captured from the actual
 // app running against the local test backend; see
 // mobile/integration_test/screenshots_test.dart). Shown in the same
 // phone-frame styling the CSS mockups used to have.
@@ -93,33 +93,24 @@ export default function LandingContent() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              background: GRADIENT,
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 800,
-              fontSize: 20,
-            }}
-          >
-            V
-          </div>
-          <strong style={{ fontSize: 18, letterSpacing: 1 }}>VYRO</strong>
+          <img
+            src="/safari-logo.png"
+            alt="Safari logo"
+            width={36}
+            height={36}
+            style={{ borderRadius: 10 }}
+          />
+          <strong style={{ fontSize: 18, letterSpacing: 1 }}>Safari</strong>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label
-            htmlFor="vyro-lang"
+            htmlFor="safari-lang"
             style={{ fontSize: 14, color: "#4b5563", fontWeight: 600 }}
           >
             🌐 {t.languageLabel}
           </label>
           <select
-            id="vyro-lang"
+            id="safari-lang"
             value={lang}
             onChange={(e) => changeLang(e.target.value as LangCode)}
             style={{
@@ -160,26 +151,19 @@ export default function LandingContent() {
               alignItems: "flex-start",
             }}
           >
-            <div
+            <img
+              src="/safari-logo.png"
+              alt="Safari logo"
+              width={96}
+              height={96}
               style={{
-                width: 96,
-                height: 96,
                 borderRadius: 24,
-                background: GRADIENT,
-                color: "#fff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 800,
-                fontSize: 52,
                 flexShrink: 0,
                 boxShadow: "0 12px 28px rgba(124,58,237,0.35)",
               }}
-            >
-              V
-            </div>
+            />
             <div style={{ flex: "1 1 280px", minWidth: 0 }}>
-              <h1 style={{ fontSize: 34, margin: "0 0 2px" }}>VYRO</h1>
+              <h1 style={{ fontSize: 34, margin: "0 0 2px" }}>Safari</h1>
               <p style={{ margin: "0 0 10px", color: "#4b5563", fontSize: 15 }}>
                 {t.offeredBy}
               </p>
@@ -252,15 +236,15 @@ export default function LandingContent() {
         >
           <ShotFrame
             src="/screenshots/chat-list.png"
-            alt="VYRO chat list — Your World"
+            alt="Safari chat list — Your World"
           />
           <ShotFrame
             src="/screenshots/chat.png"
-            alt="VYRO conversation"
+            alt="Safari conversation"
           />
           <ShotFrame
             src="/screenshots/stories.png"
-            alt="VYRO Stories"
+            alt="Safari Stories"
           />
         </div>
 
@@ -365,7 +349,7 @@ export default function LandingContent() {
             [t.sizeLabel, "32.6 MB · 25.7 MB · 35.1 MB"],
             [t.updated, "Nov 14, 2026"],
             [t.requires, "Android 6.0+"],
-            [t.offeredBy, "VYRO Team"],
+            [t.offeredBy, "Safari Team"],
           ].map(([label, value], i) => (
             <div
               key={label}

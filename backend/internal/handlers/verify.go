@@ -65,15 +65,15 @@ func hashCode(code string) string {
 // codeEmailBody is the plain-text body of the verification email. It
 // contains the code, its 10-minute expiry, and the never-share warning.
 func codeEmailBody(code string) string {
-	return "Your VYRO verification code is: " + code + "\n\n" +
+	return "Your Safari verification code is: " + code + "\n\n" +
 		"This code expires in 10 minutes. Never share this code with anyone — " +
-		"VYRO staff will never ask for it.\n"
+		"Safari staff will never ask for it.\n"
 }
 
 // mailerUnavailable logs the reason and answers 503. It is used by
 // every endpoint that must send a code when no SMTP is configured.
 func (h *Handler) mailerUnavailable(w http.ResponseWriter) {
-	log.Println("VYRO email: not configured — verification codes cannot be sent")
+	log.Println("Safari email: not configured — verification codes cannot be sent")
 	middleware.WriteError(w, http.StatusServiceUnavailable, "email sending is not configured")
 }
 
@@ -92,7 +92,7 @@ func (h *Handler) issueCode(email, purpose string) error {
 	}); err != nil {
 		return err
 	}
-	if err := h.Mailer.Send(email, "VYRO verification code", codeEmailBody(code)); err != nil {
+	if err := h.Mailer.Send(email, "Safari verification code", codeEmailBody(code)); err != nil {
 		_ = h.Store.InvalidateEmailCode(email, purpose)
 		return err
 	}

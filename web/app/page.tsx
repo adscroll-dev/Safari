@@ -458,7 +458,7 @@ export default function Home() {
   if (!user) {
     return (
       <main dir={isRTL(lang) ? "rtl" : "ltr"} style={{ maxWidth: 420, margin: "10vh auto", padding: 24, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16 }}>
-        <h1 style={{ margin: 0, background: "linear-gradient(135deg,#2563eb,#7c3aed)", WebkitBackgroundClip: "text", color: "transparent" }}>VYRO</h1>
+        <h1 style={{ margin: 0, background: "linear-gradient(135deg,#2563eb,#7c3aed)", WebkitBackgroundClip: "text", color: "transparent" }}>Safari</h1>
         <p style={{ color: "var(--muted)" }}>{t.tagline}</p>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button onClick={() => setLang(lang === "en" ? "fa" : "en")}>{lang === "en" ? "فارسی" : "English"}</button>
@@ -498,7 +498,7 @@ export default function Home() {
   return (
     <main dir={isRTL(lang) ? "rtl" : "ltr"} style={{ display: "grid", gridTemplateColumns: "280px 1fr", height: "100vh" }}>
       <aside style={{ borderInlineEnd: "1px solid var(--border)", padding: 12, overflow: "auto", background: "var(--surface)" }}>
-        <h2 style={{ margin: "0 0 4px" }}>VYRO</h2>
+        <h2 style={{ margin: "0 0 4px" }}>Safari</h2>
         <p style={{ color: "var(--muted)", margin: "0 0 12px", fontSize: 13 }}>{user.display_name} · @{user.username}</p>
         <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
           <button onClick={openUsers}>{t.users}</button>
@@ -641,7 +641,7 @@ export default function Home() {
               <div style={{ padding: 10, marginBottom: 8, border: "1px solid var(--border)", borderRadius: 12, background: "var(--surface)" }}>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>🤖 {t.assistant} — {t.assistantNote}</div>
                 <div style={{ maxHeight: 180, overflow: "auto", display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-                  {assistantLog.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Ask how to use VYRO — e.g. “how do voice messages work?”</div>}
+                  {assistantLog.length === 0 && <div style={{ fontSize: 13, color: "var(--muted)" }}>Ask how to use Safari — e.g. “how do voice messages work?”</div>}
                   {assistantLog.map((entry, i) => (
                     <div key={i} style={{ fontSize: 13 }}>
                       <div><b>You:</b> {entry.q}</div>

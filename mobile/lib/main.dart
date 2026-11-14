@@ -33,7 +33,7 @@ void main() async {
   runApp(const VyroApp());
 }
 
-/// VYRO — Connect Beyond Limits.
+/// Safari — Connect Beyond Limits.
 /// v0.6 mobile: real auth + chat list + text/location/voice messages,
 /// delivery/read ticks, typing indicator, 24h stories (view + post),
 /// pin/archive/folders, disappearing and scheduled messages, groups
@@ -81,7 +81,7 @@ class _VyroAppState extends State<VyroApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'VYRO',
+      title: 'Safari',
       themeMode: _mode,
       theme: vyroLightTheme(),
       darkTheme: vyroDarkTheme(),
@@ -122,6 +122,9 @@ class _HomePageState extends State<HomePage> {
   final _searchCtrl = TextEditingController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
+  // Users by id, loaded with the chat list so a DM can show the other
+  // person's name instead of the literal type ("dm").
+  Map<String, Map<String, dynamic>> _usersById = {};
   List<dynamic> _messages = [];
   List<dynamic> _stories = [];
   Map<String, dynamic>? _activeChat;
@@ -482,6 +485,41 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       setState(() => _error = e.toString());
     }
+    // Best-effort user directory for DM titles (never blocks the list).
+    try {
+      final users = await _api.listUsers();
+      final map = <String, Map<String, dynamic>>{};
+      for (final u in users) {
+        final m = u as Map<String, dynamic>;
+        final id = m['id'] as String?;
+        if (id != null) map[id] = m;
+      }
+      if (mounted) setState(() => _usersById = map);
+    } catch (_) {}
+  }
+
+  /// Display title for a chat: its own title, else — for a DM — the
+  /// other person's display name (Telegram/WhatsApp show the person,
+  /// never the literal word "dm").
+  String _chatTitle(Map<String, dynamic> chat) {
+    final t = (chat['title'] as String?)?.trim();
+    if (t != null && t.isNotEmpty) return t;
+    if (chat['type'] == 'dm') {
+      final me = _user?['id'] as String?;
+      final members =
+          (chat['member_ids'] as List?)?.map((m) => '$m').toList() ??
+              const <String>[];
+      final peerId =
+          members.firstWhere((m) => m != me, orElse: () => '');
+      final peer = _usersById[peerId];
+      if (peer != null) {
+        final name = (peer['display_name'] as String?)?.trim();
+        if (name != null && name.isNotEmpty) return name;
+        final uname = (peer['username'] as String?)?.trim();
+        if (uname != null && uname.isNotEmpty) return '@$uname';
+      }
+    }
+    return (chat['type'] as String?) ?? 'dm';
   }
 
   /// Decrypt an E2EE message in place (stores plaintext in
@@ -1258,9 +1296,7 @@ class _HomePageState extends State<HomePage> {
                 itemCount: _chats.length,
                 itemBuilder: (context, i) {
                   final c = _chats[i] as Map<String, dynamic>;
-                  final title = (c['title'] as String?)?.isNotEmpty == true
-                      ? c['title'] as String
-                      : c['type'] as String;
+                  final title = _chatTitle(c);
                   return ListTile(
                     leading: GradientAvatar(
                         label: title,
@@ -1450,7 +1486,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  /// Local VYRO assistant (on-device, rule-based — not a cloud AI).
+  /// Local Safari assistant (on-device, rule-based — not a cloud AI).
   /// Clearly labeled as such in the UI.
   void _showAssistant() {
     final input = TextEditingController();
@@ -1469,11 +1505,11 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('🤖 VYRO Assistant',
+              Text('🤖 Safari Assistant',
                   style: Theme.of(context).textTheme.titleMedium),
               const Text(
                 'Local assistant — runs on your device, rule-based. '
-                'Not a cloud AI; it only knows how VYRO works.',
+                'Not a cloud AI; it only knows how Safari works.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 12),
@@ -1482,7 +1518,7 @@ class _HomePageState extends State<HomePage> {
                   child: TextField(
                     controller: input,
                     decoration:
-                        const InputDecoration(hintText: 'Ask how to use VYRO…'),
+                        const InputDecoration(hintText: 'Ask how to use Safari…'),
                     onSubmitted: (_) {
                       final r = assistantReply(input.text);
                       setSheetState(() => answer = r.text);
@@ -1811,27 +1847,33 @@ class _HomePageState extends State<HomePage> {
                 child: Column(
                   children: [
                     Container(
-                      width: 84,
-                      height: 84,
+                      width: 88,
+                      height: 88,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                            color: Colors.white.withOpacity(0.5), width: 2),
+                            color: Colors.white.withOpacity(0.6), width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x33000000),
+                            blurRadius: 16,
+                            offset: Offset(0, 6),
+                          ),
+                        ],
                       ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'V',
-                        style: TextStyle(
-                          fontSize: 44,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: Image.asset(
+                          'assets/safari-logo.png',
+                          width: 88,
+                          height: 88,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'VYRO',
+                      'Safari',
                       style: TextStyle(
                         fontSize: 34,
                         fontWeight: FontWeight.w900,
@@ -1871,7 +1913,7 @@ class _HomePageState extends State<HomePage> {
                           const SizedBox(width: 10),
                           const Expanded(
                             child: Text(
-                              'Download VYRO only from the official VYRO '
+                              'Download Safari only from the official Safari '
                               'website. APKs from other sites are not safe '
                               '— do not install them.',
                               style: TextStyle(fontSize: 13),
@@ -1937,7 +1979,7 @@ class _HomePageState extends State<HomePage> {
                             setState(() => _registerMode = !_registerMode),
                         child: Text(_registerMode
                             ? 'Already have an account? Log in'
-                            : 'New to VYRO? Create an account')),
+                            : 'New to Safari? Create an account')),
                     TextButton(
                         onPressed: widget.onToggleLang,
                         child: const Text('فارسی / English')),
@@ -1955,13 +1997,12 @@ class _HomePageState extends State<HomePage> {
       appBar: vyroAppBar(
         context,
         title: _activeChat == null
-            ? 'VYRO'
-            : (_activeChat!['title'] as String? ??
-                _activeChat!['type'] as String),
+            ? 'Safari'
+            : _chatTitle(_activeChat!),
         actions: [
           IconButton(
             icon: const Text('🤖', style: TextStyle(fontSize: 22)),
-            tooltip: 'VYRO assistant (local, on-device)',
+            tooltip: 'Safari assistant (local, on-device)',
             onPressed: _showAssistant,
           ),
           if (_activeChat == null) ...[
@@ -2221,9 +2262,7 @@ class _HomePageState extends State<HomePage> {
                 itemCount: _visibleChats.length,
                 itemBuilder: (context, i) {
                   final c = _visibleChats[i] as Map<String, dynamic>;
-                  final title = (c['title'] as String?)?.isNotEmpty == true
-                      ? c['title'] as String
-                      : c['type'] as String;
+                  final title = _chatTitle(c);
                   final badges = [
                     if (c['pinned'] == true) '📌',
                     if ((c['folder'] as String?)?.isNotEmpty == true)
@@ -2529,9 +2568,7 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                (chat['title'] as String?)?.isNotEmpty == true
-                    ? chat['title'] as String
-                    : chat['type'] as String,
+                _chatTitle(chat),
                 style:
                     const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
               ),
@@ -2660,7 +2697,7 @@ class _HomePageState extends State<HomePage> {
         Text('Data Saver', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4),
         const Text(
-          'VYRO uses far less data than Telegram and WhatsApp: '
+          'Safari uses far less data than Telegram and WhatsApp: '
           'voice calls use Opus at 12 kbps (~0.09 MB/min vs ~0.3-0.5 '
           'MB/min on WhatsApp), photos are compressed before upload, '
           'and nothing downloads automatically.',
@@ -2697,7 +2734,7 @@ class _HomePageState extends State<HomePage> {
         Text('Security', style: Theme.of(context).textTheme.titleMedium),
         const ListTile(
           leading: Icon(Icons.verified_user_outlined),
-          title: Text('Download VYRO only from the official VYRO website'),
+          title: Text('Download Safari only from the official Safari website'),
           subtitle: Text('Never install APKs from other sites or strangers — '
               'unofficial APKs can be modified and are not safe. Check the '
               'version and SHA-256 checksum published on the official site.'),
@@ -2784,7 +2821,7 @@ class _HomePageState extends State<HomePage> {
         const Divider(),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('VYRO 0.6 (mobile)'),
+          title: Text('Safari 0.6 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),

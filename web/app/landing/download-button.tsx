@@ -11,34 +11,35 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-14 with aapt (package app.vyro, version 0.6.0).
-// Rebuilt 2026-11-14 05:25 UTC — now includes the v0.7 code
-// (forwarding with sender name, chat folders, PIN chat lock,
-// message drafts, voice playback speed).
+// 2026-11-15 with aapt2 (package app.vyro, version 0.6.0, label
+// "Safari"). Rebuilt 2026-11-15 02:56 +0430 — the Safari rebrand:
+// swift-bird logo as app icon, Safari name, premium register screen
+// with automatic username, DM chats show the person's name,
+// live API https://vyro-api-wf4b.onrender.com.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/vyro-0.6.0-arm64-v8a.apk",
-    size: "32.6 MB",
-    bytes: "32,583,679 bytes",
+    href: "/downloads/safari-0.6.0-arm64-v8a.apk",
+    size: "33.4 MB",
+    bytes: "33,425,128 bytes",
     sha256:
-      "f04a52e5f236de2e5b244564200d25749a7da1dcaf47c87f8aae9906a4b7de7f",
+      "1c532840ac8127621f19d8ce8d8c47156552bff56338b962f87415dbfa7059f5",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/vyro-0.6.0-armeabi-v7a.apk",
-    size: "25.7 MB",
-    bytes: "25,694,715 bytes",
+    href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
+    size: "26.5 MB",
+    bytes: "26,486,997 bytes",
     sha256:
-      "7d92bd53fcc4c7c521d34ec75e663b4b0a99f1b454c2fbcc58a40dfb66600098",
+      "f1398379af01c0abe8b63a71a6a29c2629a567b2afbc6c705c287eb9a916ba4b",
   },
   {
     abi: "x86_64",
-    href: "/downloads/vyro-0.6.0-x86_64.apk",
-    size: "35.1 MB",
-    bytes: "35,119,876 bytes",
+    href: "/downloads/safari-0.6.0-x86_64.apk",
+    size: "35.9 MB",
+    bytes: "35,895,789 bytes",
     sha256:
-      "380d8628f997ff6c14ab04cb9fde6ed5b64c5b424341a5522cf0046e8db3d096",
+      "4fd04205df291368b14447aaaf959568d67ce846a3080767d1f818be1c1598b1",
   },
 ];
 
