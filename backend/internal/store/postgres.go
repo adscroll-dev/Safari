@@ -84,6 +84,15 @@ func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, 
 	if err != nil {
 		return nil, fmt.Errorf("parse DATABASE_URL: %w", err)
 	}
+	// Supabase's pooler runs in transaction mode (port 6543), which
+	// does not support prepared statements. pgx uses them by default
+	// (extended protocol), so every parameterized query failed and
+	// registration answered 500 while /health still said "postgres".
+	// The simple protocol sends each query in full and works with any
+	// pooler mode. (Startup ping and migrations use parameter-less
+	// statements, which is why the server started fine and the failure
+	// only showed up on the first real query.)
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect to PostgreSQL: %w", err)

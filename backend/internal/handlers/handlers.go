@@ -33,6 +33,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -194,10 +195,12 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		Email: req.Email, Username: req.Username, DisplayName: req.DisplayName,
 		PasswordHash: hash, ExpiresAt: now.Add(codeTTL), CreatedAt: now,
 	}); err != nil {
+		log.Printf("register: save pending user failed: %v", err)
 		middleware.WriteError(w, http.StatusInternalServerError, "could not start registration")
 		return
 	}
 	if err := h.issueCode(req.Email, purposeRegister); err != nil {
+		log.Printf("register: send verification code failed: %v", err)
 		_ = h.Store.DeletePendingUser(req.Email)
 		middleware.WriteError(w, http.StatusInternalServerError, "could not send verification email")
 		return
@@ -456,7 +459,7 @@ type sendMessageReq struct {
 	Lat             *float64 `json:"lat"`
 	Lng             *float64 `json:"lng"`
 	LocationLabel   string   `json:"location_label"`
-	TTLSeconds      int64    `json:"ttl_seconds"` // disappearing message, 60..604800
+	TTLSeconds      int64    `json:"ttl_seconds"`       // disappearing message, 60..604800
 	ForwardedFrom   string   `json:"forwarded_from"`    // original sender display name (forwarding)
 	ForwardedFromID string   `json:"forwarded_from_id"` // original sender user id (forwarding)
 }
