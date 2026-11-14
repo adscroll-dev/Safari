@@ -56,14 +56,26 @@ func main() {
 	}
 	hub := ws.NewHub()
 	h := handlers.New(s, hub, cfg.JWTSecret, cfg.JWTExpiry)
-	// Email verification (v0.7): SMTP via env (defaults to Gmail's
-	// relay, smtp.gmail.com:587). No SMTP_FROM/SMTP_USER means email
-	// is not configured: register/login answer 503 and never fake a
-	// code. SMTP_ALLOW_NOAUTH=true skips SMTP AUTH (local test sink).
-	h.Mailer = mail.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom, cfg.SMTPAllowNoAuth)
-	if h.Mailer != nil {
-		log.Printf("VYRO email: configured (SMTP %s:%d, from %s)", cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom)
-	} else {
+	// Email verification (v0.7): Resend HTTPS API when RESEND_API_KEY
+	// is set (preferred: plain SMTP hangs from some hosts — on Render's
+	// free tier an SMTP dial to Resend never completed, hanging every
+	// registration with no error at all), else SMTP via env (defaults
+	// to Gmail's relay, smtp.gmail.com:587). No sender means email is
+	// not configured: register/login answer 503 and never fake a code.
+	// SMTP_ALLOW_NOAUTH=true skips SMTP AUTH (local test sink).
+	if cfg.ResendAPIKey != "" {
+		h.Mailer = mail.NewResend(cfg.ResendAPIKey, cfg.SMTPFrom)
+		if h.Mailer != nil {
+			log.Printf("VYRO email: configured (Resend API, from %s)", cfg.SMTPFrom)
+		}
+	}
+	if h.Mailer == nil {
+		h.Mailer = mail.NewSMTP(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPFrom, cfg.SMTPAllowNoAuth)
+		if h.Mailer != nil {
+			log.Printf("VYRO email: configured (SMTP %s:%d, from %s)", cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPFrom)
+		}
+	}
+	if h.Mailer == nil {
 		log.Println("VYRO email: not configured — verification codes cannot be sent")
 	}
 	// Web Push (VAPID, RFC 8292): free, no FCM/APNs account. Keys from

@@ -1,22 +1,48 @@
 // Package mail sends VYRO verification emails.
 //
 // The only mail VYRO sends today is the 6-digit verification code used
-// by registration and login (see internal/handlers/verify.go). The
-// sender is plain net/smtp against any SMTP server; the default
-// configuration is Gmail's SMTP relay (smtp.gmail.com:587, STARTTLS),
-// but any host works, including a local test sink. No credentials are
-// stored in the repo — see SMTP_* in backend/.env.example.
+// by registration and login (see internal/handlers/verify.go).
+//
+// Two senders exist:
+//   - SMTPSender: plain net/smtp against any SMTP server (default
+//     configuration is Gmail's SMTP relay, smtp.gmail.com:587,
+//     STARTTLS).
+//   - ResendSender: the Resend HTTPS API (api.resend.com). Use it when
+//     outbound SMTP is unreliable on the host: on Render's free tier an
+//     SMTP dial to smtp.resend.com:587 never completed, hanging every
+//     registration with no error at all, while HTTPS works fine. Set
+//     RESEND_API_KEY and the server prefers this sender over SMTP.
+//
+// Every send is bounded by sendTimeout: a hung mail server must fail
+// fast (HTTP 500, retryable) instead of blocking a registration
+// forever. Verification codes are useless if they arrive minutes late.
+//
+// No credentials are stored in the repo — see SMTP_* / RESEND_API_KEY
+// in backend/.env.example.
 //
 // A nil Sender means "email is not configured": handlers must return
 // HTTP 503 and never pretend a code was sent.
 package mail
 
 import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"net/smtp"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// sendTimeout bounds any single email send (SMTP dial + greeting +
+// conversation, or one Resend HTTPS request). It is a variable so
+// tests can shorten it.
+var sendTimeout = 20 * time.Second
 
 // Sender delivers one plain-text email. Implementations must never log
 // the body (it contains the verification code).
@@ -77,8 +103,135 @@ func (s *SMTPSender) Send(to, subject, body string) error {
 	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
 	b.WriteString("\r\n")
 	b.WriteString(body)
-	if err := smtp.SendMail(addr, auth, s.From, []string{to}, []byte(b.String())); err != nil {
+	// Dial with a timeout: net/smtp's SendMail dials without one, so a
+	// blackholed SMTP server used to hang registration forever.
+	d := net.Dialer{Timeout: sendTimeout}
+	conn, err := d.Dial("tcp", addr)
+	if err != nil {
 		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	defer conn.Close()
+	// Bound the greeting and the whole conversation too: a server that
+	// accepts the connection but never answers must not block the
+	// request either.
+	_ = conn.SetDeadline(time.Now().Add(sendTimeout))
+	c, err := smtp.NewClient(conn, s.Host)
+	if err != nil {
+		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	defer c.Close()
+	if err := sendViaClient(c, auth, s.Host, s.From, to, b.String()); err != nil {
+		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	return nil
+}
+
+// sendViaClient runs the SMTP conversation: STARTTLS when advertised,
+// AUTH when offered and configured, then MAIL/RCPT/DATA.
+func sendViaClient(c *smtp.Client, auth smtp.Auth, host, from, to, msg string) error {
+	if ok, _ := c.Extension("STARTTLS"); ok {
+		if err := c.StartTLS(&tls.Config{ServerName: host}); err != nil {
+			return err
+		}
+	}
+	if auth != nil {
+		if ok, _ := c.Extension("AUTH"); ok {
+			if err := c.Auth(auth); err != nil {
+				return err
+			}
+		}
+	}
+	if err := c.Mail(from); err != nil {
+		return err
+	}
+	if err := c.Rcpt(to); err != nil {
+		return err
+	}
+	w, err := c.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write([]byte(msg)); err != nil {
+		return err
+	}
+	return w.Close()
+}
+
+// --- Resend HTTPS API sender ---
+
+// ResendSender delivers mail through the Resend HTTP API
+// (POST https://api.resend.com/emails). It exists because plain SMTP
+// is not reliable everywhere the server runs: on Render's free tier an
+// SMTP dial to smtp.resend.com:587 never completed, hanging every
+// registration with no error at all, while HTTPS works fine. The API
+// key is a Resend API key (re_...); the From address must be a sender
+// Resend accepts — onboarding@resend.dev works with no domain setup.
+type ResendSender struct {
+	APIKey  string
+	From    string
+	BaseURL string // https://api.resend.com; overridden in tests
+	Client  *http.Client
+}
+
+// NewResend returns a sender, or nil when no API key (or no From) is given.
+func NewResend(apiKey, from string) Sender {
+	if strings.TrimSpace(apiKey) == "" || strings.TrimSpace(from) == "" {
+		return nil
+	}
+	return &ResendSender{
+		APIKey:  apiKey,
+		From:    from,
+		BaseURL: "https://api.resend.com",
+		Client:  &http.Client{Timeout: sendTimeout},
+	}
+}
+
+type resendEmailRequest struct {
+	From    string   `json:"from"`
+	To      []string `json:"to"`
+	Subject string   `json:"subject"`
+	Text    string   `json:"text"`
+}
+
+// Send delivers one plain-text email via the Resend API. A nil receiver
+// reports "not configured" instead of panicking, like SMTPSender.
+func (s *ResendSender) Send(to, subject, body string) error {
+	if s == nil {
+		return fmt.Errorf("mail sender not configured")
+	}
+	payload, err := json.Marshal(resendEmailRequest{
+		From:    s.From,
+		To:      []string{to},
+		Subject: subject,
+		Text:    body,
+	})
+	if err != nil {
+		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	base := s.BaseURL
+	if base == "" {
+		base = "https://api.resend.com"
+	}
+	client := s.Client
+	if client == nil {
+		client = &http.Client{Timeout: sendTimeout}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), sendTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(base, "/")+"/emails", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+s.APIKey)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("send mail to %s: %w", to, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		detail, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("send mail to %s: resend API error %d: %s", to, resp.StatusCode, strings.TrimSpace(string(detail)))
 	}
 	return nil
 }
