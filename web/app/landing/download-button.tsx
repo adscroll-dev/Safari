@@ -65,7 +65,16 @@ function detectAbiFromUserAgent(): string {
   return "arm64-v8a";
 }
 
-export default function DownloadButton() {
+export default function DownloadButton({
+  strings,
+}: {
+  strings: {
+    forYourPhone: string;
+    detected: string;
+    downloadButton: string;
+    verify: string;
+  };
+}) {
   const [abi, setAbi] = useState("arm64-v8a");
 
   useEffect(() => {
@@ -109,18 +118,18 @@ export default function DownloadButton() {
       }}
     >
       <p style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>
-        VYRO 0.6.0 — for your phone
+        {strings.forYourPhone}
       </p>
       <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: 14 }}>
-        Detected for your phone: {apk.abi} · Size: {apk.size} ({apk.bytes})
+        {strings.detected} {apk.abi} · Size: {apk.size} ({apk.bytes})
       </p>
       <p style={{ margin: "0 0 12px" }}>
         <a href={apk.href} style={buttonStyle}>
-          Download VYRO for Android
+          {strings.downloadButton}
         </a>
       </p>
       <p style={{ margin: "0 0 4px", fontSize: 13, color: "#374151" }}>
-        Verify the download (SHA-256):
+        {strings.verify}
       </p>
       <code
         style={{
