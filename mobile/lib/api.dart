@@ -315,6 +315,22 @@ class ApiClient {
         'platform': 'android',
       });
 
+  /// FCM push: register this device's Firebase token so the server can
+  /// wake the app when a message arrives while it is closed. Best
+  /// effort — the caller swallows failures (push must never break
+  /// login). The server answers 503 when FCM is not configured.
+  Future<Map<String, dynamic>> registerFcmToken(
+          String token, String deviceId) =>
+      _req('POST', '/api/push/fcm-token', {
+        'token': token,
+        'device_id': deviceId,
+        'platform': 'android',
+      });
+
+  /// FCM push: unregister a token (e.g. on logout).
+  Future<Map<String, dynamic>> unregisterFcmToken(String token) =>
+      _req('DELETE', '/api/push/fcm-token', {'token': token});
+
   /// Download an uploaded file's bytes with auth (Data Saver:
   /// only called after the user taps Download, or when Data Saver
   /// is off). Returns the raw bytes; the caller records usage.

@@ -24,9 +24,12 @@ type Config struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string
-	// SMTP for verification-code email (v0.7). Empty host/user = not
-	// configured; the server then returns 503 from the endpoints that
-	// must send a code, and never fakes one.
+	// FCM (Firebase Cloud Messaging) for the mobile app (v0.6.x).
+	// Credentials come ONLY from the environment (raw JSON or a file
+	// path); empty = FCM disabled, Web Push still works. A set but
+	// invalid credential must fail loudly at startup, never silently.
+	FirebaseServiceAccountJSON  string
+	FirebaseServiceAccountPath string
 	SMTPHost        string
 	SMTPPort        int
 	SMTPUser        string
@@ -57,6 +60,8 @@ func Load() Config {
 		VAPIDPublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:    getenv("VAPID_SUBJECT", "mailto:vyro@example.invalid"),
+		FirebaseServiceAccountJSON:  os.Getenv("FIREBASE_SERVICE_ACCOUNT_JSON"),
+		FirebaseServiceAccountPath: os.Getenv("FIREBASE_SERVICE_ACCOUNT_PATH"),
 		SMTPHost:        getenv("SMTP_HOST", "smtp.gmail.com"),
 		SMTPPort:        smtpPort,
 		SMTPUser:        os.Getenv("SMTP_USER"),

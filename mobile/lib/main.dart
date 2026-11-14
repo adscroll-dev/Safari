@@ -18,12 +18,20 @@ import 'call.dart';
 import 'chat_extras.dart';
 import 'data_saver.dart';
 import 'e2ee_client.dart';
+import 'fcm_push.dart';
 import 'local_ai.dart';
 import 'sponsored_stories.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
 
-void main() => runApp(const VyroApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Firebase (FCM push) on mobile only: the web build uses Web Push
+  // (VAPID) and has no Firebase options. Failures are swallowed inside
+  // initFirebaseForMain — the app works without push.
+  await FcmPush.initFirebaseForMain();
+  runApp(const VyroApp());
+}
 
 /// VYRO — Connect Beyond Limits.
 /// v0.6 mobile: real auth + chat list + text/location/voice messages,
@@ -34,8 +42,9 @@ void main() => runApp(const VyroApp());
 /// Keys), voice/video calls (Opus capped at 12 kbps), and Data Saver
 /// (default ON) with a visible data-usage meter.
 /// No fake features: file picking, calls and push are only shown when
-/// they are really wired; push notifications are NOT available on
-/// mobile yet (no Firebase project — FCM is not set up).
+/// they are really wired; push notifications on mobile use FCM
+/// (Firebase Cloud Messaging) — see lib/fcm_push.dart. Real delivery
+/// to a phone is untested until a phone test.
 class VyroApp extends StatefulWidget {
   const VyroApp({super.key});
   @override
@@ -345,6 +354,28 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {}
     await _refreshSponsoredCap();
     _connectWs();
+    // FCM push: register this device's token so the server can wake
+    // the app when a message arrives while it is closed. Best effort:
+    // a failure here never breaks login or chat.
+    await FcmPush.init(
+      api: _api,
+      deviceId: _deviceId,
+      onOpenChat: (chatId) => _openChatById(chatId),
+      onForegroundMessage: (title, body, chatId) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$title: $body'),
+            action: chatId != null
+                ? SnackBarAction(
+                    label: 'Open',
+                    onPressed: () => _openChatById(chatId),
+                  )
+                : null,
+          ),
+        );
+      },
+    );
   }
 
   /// Re-check the sponsored-story frequency cap (daily + session).
@@ -438,6 +469,18 @@ class _HomePageState extends State<HomePage> {
     } catch (_) {
       if (mounted) {
         setState(() => _decrypted[id] = '🔒 Encrypted message (key missing)');
+      }
+    }
+  }
+
+  /// Opens a chat by id (used when the user taps an FCM notification).
+  /// Does nothing when the chat is not in the loaded list — the user
+  /// can still open it from the chat list.
+  void _openChatById(String chatId) {
+    for (final c in _chats) {
+      if (c is Map<String, dynamic> && c['id'] == chatId) {
+        unawaited(_openChat(c));
+        return;
       }
     }
   }
@@ -2531,7 +2574,7 @@ class _HomePageState extends State<HomePage> {
           leading: Icon(Icons.info_outline),
           title: Text('VYRO 0.6 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
-              'Push notifications are not available on mobile yet.'),
+              'Push notifications on mobile use FCM (Firebase).'),
         ),
       ],
     );

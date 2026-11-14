@@ -44,6 +44,9 @@ func TestMigrationMatchesFile(t *testing.T) {
 	if strings.TrimSpace(migration007SQL) != strings.TrimSpace(mustRead(t, "../../migrations/007_forward.sql")) {
 		t.Fatal("embedded migration 007 differs from backend/migrations/007_forward.sql — copy the canonical file into internal/store/migrations/")
 	}
+	if strings.TrimSpace(migration008SQL) != strings.TrimSpace(mustRead(t, "../../migrations/008_fcm.sql")) {
+		t.Fatal("embedded migration 008 differs from backend/migrations/008_fcm.sql — copy the canonical file into internal/store/migrations/")
+	}
 }
 
 func mustRead(t *testing.T, path string) string {

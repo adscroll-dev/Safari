@@ -27,6 +27,12 @@ dependencies:
   flutter_webrtc: ^0.12.5
   video_player: ^2.9.5
   path_provider: ^2.1.5
+  # FCM push (Firebase Cloud Messaging): the app registers its device
+  # token with the backend after login so the server can wake it when a
+  # message arrives while it is closed. google-services.json (Android)
+  # is already in android/app/; see lib/fcm_push.dart.
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.0
 
 dev_dependencies:
   flutter_test:

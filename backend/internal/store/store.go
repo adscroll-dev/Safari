@@ -106,6 +106,14 @@ type StoreIface interface {
 	ListPushSubscriptions(userID string) []push.Subscription
 	DeletePushSubscription(userID, endpoint string) error
 
+	// FCM tokens (mobile push, Firebase Cloud Messaging): one token
+	// per (user, device). Same shape as the Web Push subscriptions
+	// above, but the token is an FCM registration token, not a
+	// browser endpoint.
+	SaveFCMToken(userID string, tok push.FCMToken) error
+	ListFCMTokens(userID string) []push.FCMToken
+	DeleteFCMToken(userID, token string) error
+
 	// v0.7: email verification with 6-digit codes. Only the SHA-256
 	// hash of a code is stored, never the code itself. A code row is
 	// keyed by (email, purpose); saving a new code replaces the old
@@ -145,6 +153,7 @@ type MemoryStore struct {
 	groupSenderKeys map[string]*models.GroupSenderKey // distribution key, see v06.go
 	devices         map[string]*models.Device         // userID + "/" + deviceID
 	pushSubs        map[string][]push.Subscription    // userID -> subscriptions
+	fcmTokens       map[string][]push.FCMToken        // userID -> FCM tokens
 	// v0.7 state: email verification codes and pending registrations.
 	emailCodes   map[string]*models.EmailCode   // lower(email) + "|" + purpose
 	pendingUsers map[string]*models.PendingUser // lower(email) -> pending registration
@@ -179,6 +188,7 @@ func NewMemoryStore() *MemoryStore {
 		groupSenderKeys: map[string]*models.GroupSenderKey{},
 		devices:         map[string]*models.Device{},
 		pushSubs:        map[string][]push.Subscription{},
+		fcmTokens:       map[string][]push.FCMToken{},
 		emailCodes:      map[string]*models.EmailCode{},
 		pendingUsers:    map[string]*models.PendingUser{},
 	}

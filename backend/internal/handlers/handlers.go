@@ -73,6 +73,10 @@ type Handler struct {
 	VAPIDPublicKey  string
 	VAPIDPrivateKey string
 	VAPIDSubject    string
+	// FCM is the Firebase Cloud Messaging registry for the mobile app
+	// (see internal/push/fcm.go). Nil = FCM not configured; Web Push
+	// still works without it.
+	FCM *push.FCMRegistry
 	// Mailer sends verification-code emails (v0.7). Nil = email is not
 	// configured: register/login return 503 instead of faking a code.
 	Mailer mail.Sender
@@ -119,8 +123,17 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	}
 	middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"status": "ok", "service": "vyro-backend", "version": "0.6.0",
-		"store": storeName, "time": time.Now().UTC().Format(time.RFC3339),
+		"store": storeName, "fcm": h.fcmStatus(),
+		"time": time.Now().UTC().Format(time.RFC3339),
 	})
+}
+
+// fcmStatus reports whether FCM push is available for the health check.
+func (h *Handler) fcmStatus() string {
+	if h.FCM != nil && h.FCM.Available() {
+		return "enabled"
+	}
+	return "disabled"
 }
 
 // --- Auth ---
@@ -595,7 +608,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	h.Hub.BroadcastToUser(me, ws.Event{Type: "message_sync", ChatID: chatID, Message: msg})
 	// Best-effort Web Push to members who are offline (not on the
 	// WebSocket). The payload never contains message content.
-	h.notifyOfflinePush(chatID, me, kind, delivered)
+	h.notifyOfflinePush(r.Context(), chatID, me, kind, delivered)
 	// If the other side of a DM is a bot, notify its webhook (best effort).
 	for _, memberID := range h.chatMemberIDs(chatID) {
 		if memberID == me {

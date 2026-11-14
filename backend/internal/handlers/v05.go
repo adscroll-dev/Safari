@@ -13,6 +13,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -139,9 +140,19 @@ func (h *Handler) UnsubscribePush(w http.ResponseWriter, r *http.Request) {
 }
 
 // TestPush serves POST /api/push/test: sends a test notification to the
-// caller's own subscriptions so the client can verify delivery.
+// caller's own subscriptions so the client can verify delivery. When
+// FCM is configured it also sends a test notification to the caller's
+// FCM tokens and reports fcm_sent/fcm_failed.
 func (h *Handler) TestPush(w http.ResponseWriter, r *http.Request) {
 	if h.Push == nil || h.VAPIDPublicKey == "" || h.VAPIDPrivateKey == "" {
+		// Web Push is unavailable, but FCM alone is still testable.
+		if h.FCM != nil && h.FCM.Available() {
+			sent, failed := h.FCM.SendToUser(r.Context(), middleware.UserID(r), "VYRO", "Test notification — VYRO push is working.", map[string]string{"type": "test"})
+			middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
+				"sent": 0, "failed": 0, "fcm_sent": sent, "fcm_failed": failed,
+			})
+			return
+		}
 		middleware.WriteError(w, http.StatusServiceUnavailable, "push not configured on this server")
 		return
 	}
@@ -150,9 +161,14 @@ func (h *Handler) TestPush(w http.ResponseWriter, r *http.Request) {
 		"body":  "Test notification — VYRO push is working.",
 	})
 	sent, failed := h.Push.SendToAll(middleware.UserID(r), body, h.VAPIDPublicKey, h.VAPIDPrivateKey, h.VAPIDSubject)
-	middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"sent": sent, "failed": failed,
-	})
+	}
+	if h.FCM != nil && h.FCM.Available() {
+		fcmSent, fcmFailed := h.FCM.SendToUser(r.Context(), middleware.UserID(r), "VYRO", "Test notification — VYRO push is working.", map[string]string{"type": "test"})
+		resp["fcm_sent"], resp["fcm_failed"] = fcmSent, fcmFailed
+	}
+	middleware.WriteJSON(w, http.StatusOK, resp)
 }
 
 // notifyOfflinePush sends a content-free push to the chat members who
@@ -162,8 +178,12 @@ func (h *Handler) TestPush(w http.ResponseWriter, r *http.Request) {
 // neither the push service nor anyone intercepting it learns the
 // content. For E2EE messages even the sender's name is omitted
 // ("New encrypted message"), so the push leaks nothing at all about
-// the conversation.
-func (h *Handler) notifyOfflinePush(chatID, senderID string, kind string, delivered []string) {
+// the conversation. Web Push (VAPID) and FCM are independent paths:
+// either may be configured without the other.
+func (h *Handler) notifyOfflinePush(ctx context.Context, chatID, senderID string, kind string, delivered []string) {
+	// FCM first: it needs no VAPID keys, so it must still fire when
+	// Web Push is unconfigured.
+	h.notifyOfflineFCM(ctx, chatID, senderID, kind, delivered)
 	if h.Push == nil || h.VAPIDPublicKey == "" || h.VAPIDPrivateKey == "" {
 		return
 	}

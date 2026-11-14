@@ -197,6 +197,14 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 				}
+			case path == "/api/push/fcm-token":
+				if method == http.MethodPost {
+					h.RegisterFCMToken(w, r)
+				} else if method == http.MethodDelete {
+					h.UnregisterFCMToken(w, r)
+				} else {
+					middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+				}
 			case path == "/api/push/test":
 				h.TestPush(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/presence"):

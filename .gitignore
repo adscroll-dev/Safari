@@ -30,3 +30,8 @@ mobile/.packages
 /tmp/
 web/public/downloads/vyro-0.6.0.apk
 web/tsconfig.tsbuildinfo
+
+# Firebase client config (contains project keys, keep out of the public repo)
+mobile/android/app/google-services.json
+secrets/
+firebase-service-account.json

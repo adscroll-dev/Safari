@@ -5,7 +5,9 @@
 //
 //	REDIS_URL / REDIS_ADDR, CORS_ALLOW_ORIGINS, UPLOAD_DIR,
 //	SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM /
-//	SMTP_ALLOW_NOAUTH (email verification, v0.7).
+//	SMTP_ALLOW_NOAUTH (email verification, v0.7),
+//	FIREBASE_SERVICE_ACCOUNT_JSON / FIREBASE_SERVICE_ACCOUNT_PATH
+//	(FCM push for the mobile app; empty = FCM disabled).
 //
 // In v0.2+ the store is PostgreSQL when DATABASE_URL is set: data survives
 // a restart. Without DATABASE_URL it stays in-memory (dev only).
@@ -87,6 +89,26 @@ func main() {
 			// by generating a pair out-of-band instead.
 			log.Printf("VYRO push: ephemeral VAPID public key: %s", pub)
 		}
+	}
+	// FCM push for the mobile app (Firebase Cloud Messaging): the
+	// service-account JSON comes only from the environment —
+	// FIREBASE_SERVICE_ACCOUNT_JSON (raw JSON, e.g. a Render env var)
+	// or FIREBASE_SERVICE_ACCOUNT_PATH (a secret file). When neither
+	// is set FCM stays disabled and the server behaves exactly as
+	// before (Web Push only). A set but invalid credential fails the
+	// startup loudly: a half-configured push path must not fail
+	// silently and then surprise users with missing notifications.
+	// Tokens are persisted in the store (PostgreSQL when DATABASE_URL
+	// is set), so they survive a restart.
+	fcmClient, err := push.NewFCMClientFromEnv(context.Background())
+	if err != nil {
+		log.Fatalf("FCM configuration failed: %v", err)
+	}
+	if fcmClient != nil {
+		h.FCM = push.NewFCMRegistry(s, fcmClient)
+		log.Println("VYRO push: FCM enabled")
+	} else {
+		log.Println("VYRO push: FCM not configured — set FIREBASE_SERVICE_ACCOUNT_JSON (or FIREBASE_SERVICE_ACCOUNT_PATH) to enable mobile push")
 	}
 	// Redis-backed login rate limiting when REDIS_URL is set and Redis
 	// answers; otherwise the in-memory limiter stays in place. Redis
@@ -325,6 +347,17 @@ func main() {
 			h.SubscribePush(w, r)
 		case http.MethodDelete:
 			h.UnsubscribePush(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
+	// FCM token registration for the mobile app.
+	mux.Handle("/api/push/fcm-token", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			h.RegisterFCMToken(w, r)
+		case http.MethodDelete:
+			h.UnregisterFCMToken(w, r)
 		default:
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
