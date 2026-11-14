@@ -32,6 +32,10 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_driver:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
 
 # VYRO fork of flutter_webrtc (Android only, in plugins/flutter_webrtc):
 # no released version implements the SurfaceProducer.Callback shape of

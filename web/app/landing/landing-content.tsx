@@ -12,171 +12,32 @@ function isLangCode(value: string): value is LangCode {
 
 const GRADIENT = "linear-gradient(135deg,#2563eb,#7c3aed)";
 
-function PhoneFrame({ children }: { children: React.ReactNode }) {
+// Real screenshots of the VYRO Flutter app (captured from the actual
+// app running against the local test backend; see
+// mobile/integration_test/screenshots_test.dart). Shown in the same
+// phone-frame styling the CSS mockups used to have.
+function ShotFrame({ src, alt }: { src: string; alt: string }) {
   return (
     <div
       style={{
         flex: "0 0 220px",
-        height: 420,
         borderRadius: 28,
         border: "6px solid #111827",
         background: "#f8fafc",
         overflow: "hidden",
         boxShadow: "0 10px 30px rgba(37,99,235,0.15)",
-        display: "flex",
-        flexDirection: "column",
       }}
     >
-      {children}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        style={{ display: "block", width: "100%", height: "auto" }}
+      />
     </div>
   );
 }
 
-function Avatar({ label, bg }: { label: string; bg: string }) {
-  return (
-    <div
-      style={{
-        width: 38,
-        height: 38,
-        borderRadius: "50%",
-        background: bg,
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 15,
-        fontWeight: 700,
-        flexShrink: 0,
-      }}
-    >
-      {label}
-    </div>
-  );
-}
-
-function ChatRow({
-  label,
-  bg,
-  name,
-  preview,
-  time,
-  unread,
-}: {
-  label: string;
-  bg: string;
-  name: string;
-  preview: string;
-  time: string;
-  unread?: number;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 12px",
-        borderBottom: "1px solid #eef2f7",
-      }}
-    >
-      <Avatar label={label} bg={bg} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            color: "#111827",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {name}
-        </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "#6b7280",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {preview}
-        </div>
-      </div>
-      <div style={{ textAlign: "end", flexShrink: 0 }}>
-        <div style={{ fontSize: 11, color: "#9ca3af" }}>{time}</div>
-        {unread ? (
-          <div
-            style={{
-              marginTop: 4,
-              marginInlineStart: "auto",
-              width: 18,
-              height: 18,
-              borderRadius: "50%",
-              background: GRADIENT,
-              color: "#fff",
-              fontSize: 11,
-              fontWeight: 700,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {unread}
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function Bubble({
-  text,
-  out,
-  time,
-}: {
-  text: string;
-  out?: boolean;
-  time: string;
-}) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: out ? "flex-end" : "flex-start",
-        margin: "6px 12px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "80%",
-          padding: "8px 12px",
-          borderRadius: 16,
-          borderBottomRightRadius: 4,
-          background: out ? GRADIENT : "#ffffff",
-          color: out ? "#ffffff" : "#111827",
-          fontSize: 13,
-          lineHeight: 1.5,
-          boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
-        }}
-      >
-        {text}
-        <span
-          style={{
-            fontSize: 10,
-            opacity: 0.7,
-            marginInlineStart: 8,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {time}
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export default function LandingContent() {
   const [lang, setLang] = useState<LangCode>("en");
@@ -389,256 +250,18 @@ export default function LandingContent() {
             paddingBottom: 8,
           }}
         >
-          <PhoneFrame>
-            <div
-              style={{
-                background: GRADIENT,
-                color: "#fff",
-                padding: "14px 14px 10px",
-                fontWeight: 700,
-                fontSize: 16,
-              }}
-            >
-              VYRO
-            </div>
-            <div style={{ padding: "10px 12px 4px" }}>
-              <div
-                style={{
-                  background: "#e5e7eb",
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  fontSize: 12,
-                  color: "#6b7280",
-                }}
-              >
-                🔍 Search
-              </div>
-            </div>
-            <ChatRow
-              label="A"
-              bg="#2563eb"
-              name="Amina"
-              preview="See you tomorrow! 👋"
-              time="16:20"
-              unread={2}
-            />
-            <ChatRow
-              label="S"
-              bg="#7c3aed"
-              name="Sara"
-              preview="✓✓ The photos are here"
-              time="15:41"
-            />
-            <ChatRow
-              label="F"
-              bg="#0891b2"
-              name="Family ❤️"
-              preview="Mom: dinner at 7"
-              time="14:02"
-              unread={5}
-            />
-            <ChatRow
-              label="W"
-              bg="#db2777"
-              name="Work"
-              preview="Ali: file sent 📎"
-              time="11:18"
-            />
-          </PhoneFrame>
-
-          <PhoneFrame>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "12px",
-                borderBottom: "1px solid #eef2f7",
-                background: "#fff",
-              }}
-            >
-              <Avatar label="A" bg="#2563eb" />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>Amina</div>
-                <div style={{ fontSize: 11, color: "#059669" }}>● online</div>
-              </div>
-              <span style={{ fontSize: 18 }}>📞</span>
-              <span style={{ fontSize: 18 }}>📹</span>
-            </div>
-            <div style={{ flex: 1, paddingTop: 10, overflow: "hidden" }}>
-              <Bubble text="Hi! Did you try VYRO?" time="16:18" />
-              <Bubble
-                text="Yes — so fast, and it uses almost no data! 🚀"
-                out
-                time="16:19 ✓✓"
-              />
-              <Bubble text="The voice call was so clear" time="16:20" />
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  margin: "6px 12px",
-                }}
-              >
-                <div
-                  style={{
-                    background: GRADIENT,
-                    borderRadius: 16,
-                    borderBottomRightRadius: 4,
-                    padding: "10px 12px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <span style={{ color: "#fff", fontSize: 14 }}>▶</span>
-                  <span
-                    style={{
-                      display: "flex",
-                      gap: 2,
-                      alignItems: "center",
-                    }}
-                  >
-                    {[6, 12, 9, 15, 8, 13, 7].map((h, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          width: 3,
-                          height: h,
-                          borderRadius: 2,
-                          background: "#fff",
-                          opacity: 0.85,
-                        }}
-                      />
-                    ))}
-                  </span>
-                  <span style={{ color: "#fff", fontSize: 11 }}>0:24</span>
-                </div>
-              </div>
-            </div>
-            <div
-              style={{
-                margin: 10,
-                background: "#fff",
-                border: "1px solid #e5e7eb",
-                borderRadius: 999,
-                padding: "8px 14px",
-                fontSize: 13,
-                color: "#9ca3af",
-              }}
-            >
-              Message…
-            </div>
-          </PhoneFrame>
-
-          <PhoneFrame>
-            <div
-              style={{
-                padding: "14px 12px 6px",
-                fontWeight: 700,
-                fontSize: 15,
-                background: "#fff",
-              }}
-            >
-              Stories
-            </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                padding: "8px 12px 14px",
-                background: "#fff",
-                borderBottom: "1px solid #eef2f7",
-              }}
-            >
-              {["You", "Sara", "Ali", "Mina"].map((n, i) => (
-                <div
-                  key={n}
-                  style={{ textAlign: "center", flexShrink: 0 }}
-                >
-                  <div
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: "50%",
-                      padding: 3,
-                      background:
-                        i === 0 ? "#e5e7eb" : GRADIENT,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        borderRadius: "50%",
-                        background: "#fff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 18,
-                      }}
-                    >
-                      {i === 0 ? "＋" : "🙂"}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>{n}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ padding: 12 }}>
-              <div
-                style={{
-                  background: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 16,
-                  padding: 14,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  📞 Voice call
-                </div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                  Amina · 12:34
-                </div>
-                <div
-                  style={{
-                    marginTop: 10,
-                    height: 6,
-                    borderRadius: 999,
-                    background: "#e5e7eb",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "35%",
-                      height: "100%",
-                      background: GRADIENT,
-                    }}
-                  />
-                </div>
-                <div style={{ fontSize: 11, color: "#059669", marginTop: 6 }}>
-                  ● Data Saver on — 12 kbps
-                </div>
-              </div>
-              <div
-                style={{
-                  marginTop: 12,
-                  background: "#fff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 16,
-                  padding: 14,
-                }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 700 }}>
-                  🔒 End-to-end encrypted
-                </div>
-                <div style={{ fontSize: 12, color: "#6b7280" }}>
-                  Only you and Amina can read this chat.
-                </div>
-              </div>
-            </div>
-          </PhoneFrame>
+          <ShotFrame
+            src="/screenshots/chat-list.png"
+            alt="VYRO chat list — Your World"
+          />
+          <ShotFrame
+            src="/screenshots/chat.png"
+            alt="VYRO conversation"
+          />
+          <ShotFrame
+            src="/screenshots/stories.png"
+            alt="VYRO Stories"
+          />
         </div>
 
         {/* Download */}
