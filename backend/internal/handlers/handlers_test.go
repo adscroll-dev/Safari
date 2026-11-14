@@ -326,14 +326,14 @@ func TestRegisterLoginAndMessageFlow(t *testing.T) {
 
 	// Duplicate registration is a conflict.
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": "alice@example.com", "username": "alice2", "password": "password-123",
+		"email": "alice@example.com", "username": "alice2", "password": "password-123", "display_name": "Alice Two",
 	}, "")
 	if rec.Code != http.StatusConflict {
 		t.Fatalf("duplicate register: expected 409, got %d", rec.Code)
 	}
 	// Short password is rejected.
 	rec = doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": "c@example.com", "username": "carol", "password": "short",
+		"email": "c@example.com", "username": "carol", "password": "short", "display_name": "Carol",
 	}, "")
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("short password: expected 400, got %d", rec.Code)

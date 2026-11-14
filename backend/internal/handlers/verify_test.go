@@ -34,12 +34,13 @@ func TestVerifyHappyPath(t *testing.T) {
 		Purpose          string `json:"purpose"`
 		ExpiresInSeconds int    `json:"expires_in_seconds"`
 		Token            string `json:"token"`
+		Username         string `json:"username"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&sent); err != nil {
 		t.Fatalf("decode register: %v", err)
 	}
 	if sent.Status != "code_sent" || sent.Email != email || sent.Purpose != "register" ||
-		sent.ExpiresInSeconds != 600 || sent.Token != "" {
+		sent.ExpiresInSeconds != 600 || sent.Token != "" || sent.Username != "verify" {
 		t.Fatalf("unexpected register response: %+v", sent)
 	}
 	if _, err := h.Store.UserByEmail(email); err == nil {
@@ -86,7 +87,7 @@ func TestVerifyHappyPath(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&verified); err != nil {
 		t.Fatalf("decode verify-register: %v", err)
 	}
-	if verified.Token == "" || verified.User.Email != email || verified.User.Username != "verifyuser" {
+	if verified.Token == "" || verified.User.Email != email || verified.User.Username != "verify" {
 		t.Fatalf("unexpected verify-register response: %+v", verified)
 	}
 	rec = doJSON(t, h, http.MethodPost, "/api/auth/verify-register", map[string]string{
@@ -143,7 +144,7 @@ func TestVerifyWrongCodeRejected(t *testing.T) {
 	h := newTestHandler()
 	email := "wrongcode@example.com"
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": email, "username": "wrongcode", "password": "password-123",
+		"email": email, "username": "wrongcode", "password": "password-123", "display_name": "Wrong Code",
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
@@ -175,7 +176,7 @@ func TestVerifyExpiredCodeRejected(t *testing.T) {
 	h := newTestHandler()
 	email := "expired@example.com"
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": email, "username": "expired", "password": "password-123",
+		"email": email, "username": "expired", "password": "password-123", "display_name": "Expired",
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
@@ -202,7 +203,7 @@ func TestVerifyFiveWrongAttemptsInvalidateCode(t *testing.T) {
 	h := newTestHandler()
 	email := "attempts@example.com"
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": email, "username": "attempts", "password": "password-123",
+		"email": email, "username": "attempts", "password": "password-123", "display_name": "Attempts",
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
@@ -244,7 +245,7 @@ func TestResendCooldownAndInvalidation(t *testing.T) {
 	h := newTestHandler()
 	email := "resend@example.com"
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": email, "username": "resend", "password": "password-123",
+		"email": email, "username": "resend", "password": "password-123", "display_name": "Resend",
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())
@@ -338,7 +339,7 @@ func TestVerifyWithoutMailerIs503(t *testing.T) {
 	h := New(store.NewMemoryStore(), ws.NewHub(), "test-secret", time.Hour)
 	// No Mailer set: the server must say so, never fake a code.
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": "nomail@example.com", "username": "nomail", "password": "password-123",
+		"email": "nomail@example.com", "username": "nomail", "password": "password-123", "display_name": "No Mail",
 	}, "")
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("register without mailer: expected 503, got %d %s", rec.Code, rec.Body.String())
@@ -378,7 +379,7 @@ func TestRegisterWithUnconfiguredSMTPIs503(t *testing.T) {
 		t.Fatal("NewSMTP with no host/from must return a nil Sender")
 	}
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": "nomail2@example.com", "username": "nomail2", "password": "password-123",
+		"email": "nomail2@example.com", "username": "nomail2", "password": "password-123", "display_name": "No Mail Two",
 	}, "")
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("register with unconfigured SMTP: expected 503, got %d %s", rec.Code, rec.Body.String())
@@ -427,7 +428,7 @@ func TestPendingUserExpiry(t *testing.T) {
 	h := newTestHandler()
 	email := "pendingexp@example.com"
 	rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
-		"email": email, "username": "pendingexp", "password": "password-123",
+		"email": email, "username": "pendingexp", "password": "password-123", "display_name": "Pending Exp",
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register: %d %s", rec.Code, rec.Body.String())

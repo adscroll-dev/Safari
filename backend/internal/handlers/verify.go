@@ -132,6 +132,16 @@ func codeSentResponse(w http.ResponseWriter, status int, email, purpose string) 
 	})
 }
 
+// codeSentResponseWithUsername is codeSentResponse plus the username
+// the system generated for this registration, so the client can show
+// it to the user on the code screen.
+func codeSentResponseWithUsername(w http.ResponseWriter, status int, email, purpose, username string) {
+	middleware.WriteJSON(w, status, map[string]interface{}{
+		"status": "code_sent", "email": email, "purpose": purpose,
+		"expires_in_seconds": codeExpirySeconds, "username": username,
+	})
+}
+
 type verifyReq struct {
 	Email string `json:"email"`
 	Code  string `json:"code"`

@@ -116,7 +116,7 @@ class _HomePageState extends State<HomePage> {
   final _api = ApiClient();
   final _usage = DataUsageTracker();
   final _email = TextEditingController();
-  final _username = TextEditingController();
+  final _displayName = TextEditingController();
   final _password = TextEditingController();
   final _draft = TextEditingController();
   final _searchCtrl = TextEditingController();
@@ -231,7 +231,7 @@ class _HomePageState extends State<HomePage> {
     _draftSaveTimer?.cancel();
     _codeCtrl.dispose();
     _email.dispose();
-    _username.dispose();
+    _displayName.dispose();
     _password.dispose();
     _draft.dispose();
     _searchCtrl.dispose();
@@ -242,6 +242,7 @@ class _HomePageState extends State<HomePage> {
   // 6-digit code; no token is issued until the code is verified.
   bool _codeStep = false;
   String _codeEmail = '';
+  String _assignedUsername = '';
   String _codePurpose = 'login'; // 'register' | 'login'
   int _resendIn = 0;
   Timer? _resendTimer;
@@ -252,13 +253,18 @@ class _HomePageState extends State<HomePage> {
     try {
       final out = _registerMode
           ? await _api.register(
-              _email.text.trim(), _username.text.trim(), _password.text)
+              _email.text.trim(), _displayName.text.trim(), _password.text)
           : await _api.login(_email.text.trim(), _password.text);
       if (out['status'] == 'code_sent') {
         // No token yet: the user must enter the emailed 6-digit code.
+        // On registration the server also tells us the username it
+        // chose from the user's name; show it on the code screen.
         setState(() {
           _codeEmail = _email.text.trim();
           _codePurpose = _registerMode ? 'register' : 'login';
+          _assignedUsername = _registerMode
+              ? (out['username'] as String? ?? '')
+              : '';
           _codeStep = true;
         });
         _startResendTimer();
@@ -1567,6 +1573,14 @@ class _HomePageState extends State<HomePage> {
                       'It expires in 10 minutes. Never share it with anyone.',
                       style: const TextStyle(fontSize: 14),
                     ),
+                    if (_assignedUsername.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Your username: @$_assignedUsername',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                     const SizedBox(height: 20),
                     TextField(
                       controller: _codeCtrl,
@@ -1711,10 +1725,15 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 12),
                     if (_registerMode) ...[
                       TextField(
-                          controller: _username,
+                          controller: _displayName,
                           decoration: const InputDecoration(
-                              labelText: 'Username',
+                              labelText: 'Your name',
                               prefixIcon: Icon(Icons.person_outline))),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Your username is chosen automatically from your name.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
                       const SizedBox(height: 12),
                     ],
                     TextField(

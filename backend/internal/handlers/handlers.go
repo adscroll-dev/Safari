@@ -140,17 +140,22 @@ func (h *Handler) fcmStatus() string {
 // --- Auth ---
 
 type registerReq struct {
-	Email       string `json:"email"`
-	Username    string `json:"username"`
+	Email    string `json:"email"`
+	Username string `json:"username"` // Ignored: the system always
+	// generates the username from the display name (user direction
+	// 2026-11-14). Kept so older clients can still send it.
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
 }
 
 // Register starts a registration (v0.7): it validates the input,
-// checks the email/username are free, stores a pending registration,
-// and emails a 6-digit verification code. No user is created and no
-// token is issued until POST /api/auth/verify-register confirms the
-// code. Returns 503 when email sending is not configured.
+// checks the email is free, generates the username from the user's
+// name (the user never picks a custom username), stores a pending
+// registration, and emails a 6-digit verification code. No user is
+// created and no token is issued until POST /api/auth/verify-register
+// confirms the code. Returns 503 when email sending is not configured.
+// The response includes the generated "username" so the client can
+// show it to the user.
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -161,18 +166,20 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
-	req.Username = strings.TrimSpace(req.Username)
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	if !emailRe.MatchString(req.Email) {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid email")
 		return
 	}
-	if len(req.Username) < 3 || len(req.Username) > 32 {
-		middleware.WriteError(w, http.StatusBadRequest, "username must be 3-32 characters")
+	if req.DisplayName == "" {
+		middleware.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	if req.DisplayName == "" {
-		req.DisplayName = req.Username
-	}
+	// The username is chosen by the system from the user's name.
+	username := generateUsername(req.DisplayName, req.Email, func(u string) bool {
+		_, err := h.Store.UserByUsername(u)
+		return err == nil
+	})
 	hash, err := auth.HashPassword(req.Password)
 	if err != nil {
 		middleware.WriteError(w, http.StatusBadRequest, err.Error())
@@ -182,17 +189,13 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusConflict, "email or username already registered")
 		return
 	}
-	if _, err := h.Store.UserByUsername(req.Username); err == nil {
-		middleware.WriteError(w, http.StatusConflict, "email or username already registered")
-		return
-	}
 	if h.Mailer == nil {
 		h.mailerUnavailable(w)
 		return
 	}
 	now := time.Now().UTC()
 	if err := h.Store.SavePendingUser(&models.PendingUser{
-		Email: req.Email, Username: req.Username, DisplayName: req.DisplayName,
+		Email: req.Email, Username: username, DisplayName: req.DisplayName,
 		PasswordHash: hash, ExpiresAt: now.Add(codeTTL), CreatedAt: now,
 	}); err != nil {
 		log.Printf("register: save pending user failed: %v", err)
@@ -205,7 +208,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not send verification email")
 		return
 	}
-	codeSentResponse(w, http.StatusCreated, req.Email, purposeRegister)
+	codeSentResponseWithUsername(w, http.StatusCreated, req.Email, purposeRegister, username)
 }
 
 type loginReq struct {

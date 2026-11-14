@@ -77,13 +77,16 @@ class ApiClient {
   /// code; the token is issued by the verify step. register/login
   /// return the raw response: {"status":"code_sent", ...} or, on an
   /// older server, {"user":..., "token":...}.
+  ///
+  /// The username is chosen by the server from the display name
+  /// (user direction 2026-11-14): the user never picks one. The
+  /// register response carries the generated "username".
   Future<Map<String, dynamic>> register(
-      String email, String username, String password) async {
+      String email, String displayName, String password) async {
     final out = await _req('POST', '/api/auth/register', {
       'email': email,
-      'username': username,
       'password': password,
-      'display_name': username,
+      'display_name': displayName,
     });
     if (out['token'] != null) _token = out['token'] as String;
     return out;
