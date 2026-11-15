@@ -585,6 +585,51 @@ func (s *PostgresStore) MessagesForChat(chatID string, limit, offset int) []*mod
 	return out
 }
 
+// LastMessageForChat returns the newest non-deleted, non-expired
+// message in the chat, or nil when there is none.
+func (s *PostgresStore) LastMessageForChat(chatID string) *models.Message {
+	if !isUUID(chatID) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	m, err := scanMessage(s.pool.QueryRow(ctx,
+		`SELECT `+messageColumns+` FROM messages
+		 WHERE chat_id = $1 AND deleted_at IS NULL
+		   AND (expires_at IS NULL OR expires_at > now())
+		 ORDER BY created_at DESC, id DESC LIMIT 1`, chatID))
+	if err != nil {
+		return nil
+	}
+	// Receipts give the preview its tick status (sent/delivered/read).
+	s.loadReceipts(ctx, []*models.Message{m})
+	return m
+}
+
+// UnreadCountForChat counts messages from other members that userID
+// has not read yet (no 'read' receipt for that user).
+func (s *PostgresStore) UnreadCountForChat(chatID, userID string) int {
+	if !isUUID(chatID) || !isUUID(userID) {
+		return 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var n int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM messages m
+		 WHERE m.chat_id = $1 AND m.sender_id != $2
+		   AND m.deleted_at IS NULL
+		   AND (m.expires_at IS NULL OR m.expires_at > now())
+		   AND NOT EXISTS (
+		     SELECT 1 FROM message_receipts r
+		     WHERE r.message_id = m.id AND r.user_id = $2
+		       AND r.read_at IS NOT NULL)`,
+		chatID, userID).Scan(&n); err != nil {
+		return 0
+	}
+	return n
+}
+
 func escapeLike(q string) string {
 	r := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 	return r.Replace(q)

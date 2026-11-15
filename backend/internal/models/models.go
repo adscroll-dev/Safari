@@ -59,11 +59,27 @@ type Chat struct {
 	// handlers from chat_members; empty in older callers.
 	Roles map[string]string `json:"roles,omitempty"`
 	// Per-user settings for the requesting user (pin/archive/folder).
-	Pinned    bool      `json:"pinned,omitempty"`
-	Archived  bool      `json:"archived,omitempty"`
-	Folder    string    `json:"folder,omitempty"`
+	Pinned   bool   `json:"pinned,omitempty"`
+	Archived bool   `json:"archived,omitempty"`
+	Folder   string `json:"folder,omitempty"`
+	// WhatsApp-style list data for the requesting user, populated by
+	// ListChats only: the latest message preview and how many messages
+	// from others the user has not read yet.
+	LastMessage *LastMessagePreview `json:"last_message,omitempty"`
+	UnreadCount int                 `json:"unread_count,omitempty"`
+	CreatedAt   time.Time           `json:"created_at"`
+	UpdatedAt   time.Time           `json:"updated_at"`
+}
+
+// LastMessagePreview is the chat-list preview of the latest message.
+// Content is empty for E2EE messages (ciphertext is never a preview);
+// the client shows "Encrypted message" for kind "e2ee" instead.
+type LastMessagePreview struct {
+	Content   string    `json:"content,omitempty"`
+	Kind      string    `json:"kind"`
+	SenderID  string    `json:"sender_id"`
+	Status    string    `json:"status,omitempty"` // sent | delivered | read
 	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // ChatSettings are per-user, per-chat preferences (Telegram-style pin /
@@ -103,30 +119,30 @@ type ChatInvite struct {
 // Content will carry the ciphertext envelope and ContentType will be
 // "e2ee" instead of "text".
 type Message struct {
-	ID            string              `json:"id"`
-	ChatID        string              `json:"chat_id"`
-	SenderID      string              `json:"sender_id"`
-	Content       string              `json:"content"`
-	Kind          string              `json:"kind"` // text | image | video | file | voice | location | sticker
-	FileURL       string              `json:"file_url,omitempty"`
-	FileName      string              `json:"file_name,omitempty"`
-	FileSize      int64               `json:"file_size,omitempty"`
-	MimeType      string              `json:"mime_type,omitempty"`
-	ReplyToID     string              `json:"reply_to_id,omitempty"`
+	ID              string              `json:"id"`
+	ChatID          string              `json:"chat_id"`
+	SenderID        string              `json:"sender_id"`
+	Content         string              `json:"content"`
+	Kind            string              `json:"kind"` // text | image | video | file | voice | location | sticker
+	FileURL         string              `json:"file_url,omitempty"`
+	FileName        string              `json:"file_name,omitempty"`
+	FileSize        int64               `json:"file_size,omitempty"`
+	MimeType        string              `json:"mime_type,omitempty"`
+	ReplyToID       string              `json:"reply_to_id,omitempty"`
 	ForwardedFrom   string              `json:"forwarded_from,omitempty"`    // display name of the original sender (message forwarding)
 	ForwardedFromID string              `json:"forwarded_from_id,omitempty"` // user id of the original sender
-	Lat           *float64            `json:"lat,omitempty"`
-	Lng           *float64            `json:"lng,omitempty"`
-	LocationLabel string              `json:"location_label,omitempty"`
-	DeliveredTo   []string            `json:"delivered_to,omitempty"`
-	ReadBy        []string            `json:"read_by,omitempty"`
-	Status        string              `json:"status"`
-	ExpiresAt     *time.Time          `json:"expires_at,omitempty"`
-	EditedAt      *time.Time          `json:"edited_at,omitempty"`
-	DeletedAt     *time.Time          `json:"deleted_at,omitempty"`
-	Reactions     map[string][]string `json:"reactions,omitempty"` // emoji -> user ids
-	CreatedAt     time.Time           `json:"created_at"`
-	UpdatedAt     time.Time           `json:"updated_at"`
+	Lat             *float64            `json:"lat,omitempty"`
+	Lng             *float64            `json:"lng,omitempty"`
+	LocationLabel   string              `json:"location_label,omitempty"`
+	DeliveredTo     []string            `json:"delivered_to,omitempty"`
+	ReadBy          []string            `json:"read_by,omitempty"`
+	Status          string              `json:"status"`
+	ExpiresAt       *time.Time          `json:"expires_at,omitempty"`
+	EditedAt        *time.Time          `json:"edited_at,omitempty"`
+	DeletedAt       *time.Time          `json:"deleted_at,omitempty"`
+	Reactions       map[string][]string `json:"reactions,omitempty"` // emoji -> user ids
+	CreatedAt       time.Time           `json:"created_at"`
+	UpdatedAt       time.Time           `json:"updated_at"`
 }
 
 // StatusFor computes the WhatsApp-style tick status from receipts and the

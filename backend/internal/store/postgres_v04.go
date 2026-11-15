@@ -198,9 +198,14 @@ func (s *PostgresStore) MarkRead(messageID, userID string) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	// WhatsApp semantics: reading a message marks every earlier
+	// message from others in the same chat as read too.
 	_, err := s.pool.Exec(ctx,
 		`INSERT INTO message_receipts (message_id, user_id, delivered_at, read_at)
-		 VALUES ($1, $2, now(), now())
+		 SELECT m.id, $2, now(), now() FROM messages m
+		 WHERE m.chat_id = (SELECT chat_id FROM messages WHERE id = $1)
+		   AND m.created_at <= (SELECT created_at FROM messages WHERE id = $1)
+		   AND m.sender_id != $2 AND m.deleted_at IS NULL
 		 ON CONFLICT (message_id, user_id) DO UPDATE
 		   SET delivered_at = COALESCE(message_receipts.delivered_at, now()), read_at = now()`,
 		messageID, userID)

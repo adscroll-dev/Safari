@@ -177,6 +177,9 @@ def main():
         "SMTP_HOST": "127.0.0.1", "SMTP_PORT": "1025",
         "SMTP_FROM": "safari@test.local", "SMTP_ALLOW_NOAUTH": "true",
     })
+    # Fresh sink log per run: stale codes from earlier runs would
+    # otherwise be picked up as the "latest" code by the test.
+    open(LOG, "w").close()
     sink = subprocess.Popen(
         [sys.executable, os.path.join(ROOT, "smtp_sink.py"), "1025"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

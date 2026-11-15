@@ -1,57 +1,97 @@
-// VYRO premium theme (v0.6).
+// Safari theme — WhatsApp-style (v0.7).
 //
-// Blue-to-purple brand gradient (#2563EB -> #7C3AED), clean
-// typography, generous spacing, rounded everything. Layout stays
-// familiar (Telegram/WhatsApp-like chat list + bubbles) but visibly
-// more polished. Light and dark themes are both first-class.
-import 'dart:math' as math;
-import 'dart:ui';
-
+// WhatsApp look: teal-green header (#008069), bright green accent
+// (#25D366), white / dark navy surfaces, plain chat background
+// (#ECE5DD light, #0B141A dark), green outgoing bubbles (#D9FDD3
+// light, #005C4B dark). The Safari swift logo and name stay Safari;
+// the layout, colors and shapes follow WhatsApp.
 import 'package:flutter/material.dart';
 
 class VyroColors {
-  static const Color blue = Color(0xFF2563EB);
-  static const Color purple = Color(0xFF7C3AED);
-  static const Color blueDeep = Color(0xFF1E40AF);
-  static const Color purpleDeep = Color(0xFF6D28D9);
+  // WhatsApp greens (kept under the old names so existing widgets
+  // keep working — they now render in WhatsApp colors).
+  static const Color blue = Color(0xFF008069); // header teal
+  static const Color purple = Color(0xFF25D366); // accent green
+  static const Color blueDeep = Color(0xFF075E54);
+  static const Color purpleDeep = Color(0xFF00A884);
+
+  static const Color teal = Color(0xFF008069);
+  static const Color tealDeep = Color(0xFF075E54);
+  static const Color green = Color(0xFF25D366);
+  static const Color greenDark = Color(0xFF00A884);
+  static const Color readBlue = Color(0xFF53BDEB);
 
   static const LinearGradient brandGradient = LinearGradient(
-    colors: [blue, purple],
+    colors: [teal, green],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient brandGradientDark = LinearGradient(
-    colors: [blueDeep, purpleDeep],
+    colors: [tealDeep, greenDark],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
-  /// Story ring: the same gradient, used as a border around avatars.
+  /// Story ring: WhatsApp green, used as a border around avatars
+  /// with unviewed status updates.
   static const LinearGradient storyRing = LinearGradient(
-    colors: [Color(0xFF38BDF8), blue, purple, Color(0xFFC084FC)],
+    colors: [green, greenDark],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 }
 
+/// Full WhatsApp palette, light and dark.
+class WaColors {
+  // Light.
+  static const Color lightHeader = Color(0xFF008069);
+  static const Color lightBackground = Colors.white;
+  static const Color lightChatBackground = Color(0xFFECE5DD);
+  static const Color lightBubbleOut = Color(0xFFD9FDD3);
+  static const Color lightBubbleIn = Colors.white;
+  static const Color lightText = Color(0xFF111B21);
+  static const Color lightTextSecondary = Color(0xFF667781);
+  static const Color lightDivider = Color(0xFFE9EDEF);
+  static const Color lightInputBackground = Colors.white;
+  static const Color lightIcon = Color(0xFF54656F);
+  // Dark.
+  static const Color darkHeader = Color(0xFF1F2C34);
+  static const Color darkBackground = Color(0xFF0B141A);
+  static const Color darkChatBackground = Color(0xFF0B141A);
+  static const Color darkBubbleOut = Color(0xFF005C4B);
+  static const Color darkBubbleIn = Color(0xFF202C33);
+  static const Color darkText = Color(0xFFE9EDEF);
+  static const Color darkTextSecondary = Color(0xFF8696A0);
+  static const Color darkDivider = Color(0xFF222D34);
+  static const Color darkInputBackground = Color(0xFF1F2C34);
+  static const Color darkIcon = Color(0xFF8696A0);
+  // Shared.
+  static const Color accent = Color(0xFF25D366);
+  static const Color accentDark = Color(0xFF00A884);
+  static const Color readBlue = Color(0xFF53BDEB);
+  static const Color unreadBadge = Color(0xFF25D366);
+  static const Color fabLight = Color(0xFF25D366);
+  static const Color fabDark = Color(0xFF00A884);
+}
+
 ThemeData vyroLightTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: VyroColors.blue,
+    seedColor: WaColors.lightHeader,
     brightness: Brightness.light,
   );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    scaffoldBackgroundColor: const Color(0xFFF6F7FB),
+    scaffoldBackgroundColor: WaColors.lightBackground,
     fontFamily: 'Roboto',
     appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
+      backgroundColor: WaColors.lightHeader,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
-        fontSize: 21,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
         color: Colors.white,
         letterSpacing: 0.2,
@@ -59,7 +99,7 @@ ThemeData vyroLightTheme() {
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: Colors.white,
-      indicatorColor: VyroColors.blue.withOpacity(0.14),
+      indicatorColor: const Color(0xFFE7F8E9),
       labelTextStyle: WidgetStateProperty.all(
         const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
@@ -78,32 +118,32 @@ ThemeData vyroLightTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
-        borderSide: const BorderSide(color: VyroColors.blue, width: 1.6),
+        borderSide: const BorderSide(color: WaColors.lightHeader, width: 1.6),
       ),
     ),
     cardTheme: CardTheme(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: VyroColors.blue,
+        backgroundColor: WaColors.accent,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
         ),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: VyroColors.purple,
+      backgroundColor: WaColors.fabLight,
       foregroundColor: Colors.white,
       elevation: 4,
     ),
-    dividerTheme: DividerThemeData(color: Colors.grey.shade200),
+    dividerTheme: const DividerThemeData(color: WaColors.lightDivider),
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     ),
@@ -112,36 +152,36 @@ ThemeData vyroLightTheme() {
 
 ThemeData vyroDarkTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: VyroColors.purple,
+    seedColor: WaColors.darkHeader,
     brightness: Brightness.dark,
   );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
-    scaffoldBackgroundColor: const Color(0xFF0F1115),
+    scaffoldBackgroundColor: WaColors.darkBackground,
     fontFamily: 'Roboto',
     appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
+      backgroundColor: WaColors.darkHeader,
       foregroundColor: Colors.white,
       elevation: 0,
       centerTitle: false,
       titleTextStyle: TextStyle(
-        fontSize: 21,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
         color: Colors.white,
         letterSpacing: 0.2,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF17191F),
-      indicatorColor: VyroColors.purple.withOpacity(0.25),
+      backgroundColor: WaColors.darkHeader,
+      indicatorColor: const Color(0xFF1A3A34),
       labelTextStyle: WidgetStateProperty.all(
         const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFF1E2128),
+      fillColor: WaColors.darkInputBackground,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
@@ -153,32 +193,32 @@ ThemeData vyroDarkTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
-        borderSide: const BorderSide(color: VyroColors.purple, width: 1.6),
+        borderSide: const BorderSide(color: WaColors.accentDark, width: 1.6),
       ),
     ),
     cardTheme: CardTheme(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(12),
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: VyroColors.purple,
+        backgroundColor: WaColors.accentDark,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24),
         ),
         textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
-      backgroundColor: VyroColors.purple,
+      backgroundColor: WaColors.fabDark,
       foregroundColor: Colors.white,
       elevation: 4,
     ),
-    dividerTheme: const DividerThemeData(color: Color(0xFF23262E)),
+    dividerTheme: const DividerThemeData(color: WaColors.darkDivider),
     listTileTheme: const ListTileThemeData(
       contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     ),
@@ -288,188 +328,86 @@ class GradientIconButton extends StatelessWidget {
   }
 }
 
-/// AppBar with the brand gradient (light or dark variant).
+/// WhatsApp-style avatar: a solid muted color (deterministic per
+/// name) with the first letter — no photo needed. Set [ring] for the
+/// green status ring around unviewed updates.
+class WaAvatar extends StatelessWidget {
+  const WaAvatar(
+      {super.key, required this.label, this.radius = 26, this.ring = false});
+
+  final String label;
+  final double radius;
+  final bool ring;
+
+  static const List<Color> _colors = [
+    Color(0xFF008069),
+    Color(0xFF00A884),
+    Color(0xFF54656F),
+    Color(0xFF075E54),
+    Color(0xFF128C7E),
+    Color(0xFF25D366),
+    Color(0xFF8696A0),
+    Color(0xFF53BDEB),
+  ];
+
+  static Color colorFor(String label) {
+    var h = 0;
+    for (var i = 0; i < label.length; i++) {
+      h = (h * 31 + label.codeUnitAt(i)) & 0x7fffffff;
+    }
+    return _colors[h % _colors.length];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = label.isEmpty ? '?' : label.substring(0, 1).toUpperCase();
+    final avatar = CircleAvatar(
+      radius: radius,
+      backgroundColor: colorFor(label),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: radius * 0.75,
+        ),
+      ),
+    );
+    if (!ring) return avatar;
+    return Container(
+      padding: const EdgeInsets.all(2.5),
+      decoration: const BoxDecoration(
+        color: WaColors.accent,
+        shape: BoxShape.circle,
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          shape: BoxShape.circle,
+        ),
+        child: avatar,
+      ),
+    );
+  }
+}
+
+/// WhatsApp-style app bar: solid teal (light) / dark header (dark),
+/// white title. Pass [titleWidget] for a custom title (e.g. the chat
+/// header with avatar + name + status).
 PreferredSizeWidget vyroAppBar(
   BuildContext context, {
-  required String title,
+  String? title,
+  Widget? titleWidget,
   required List<Widget> actions,
   Widget? leading,
+  PreferredSizeWidget? bottom,
 }) {
-  final dark = Theme.of(context).brightness == Brightness.dark;
   return AppBar(
     leading: leading,
-    title: Text(title),
+    title: titleWidget ?? (title == null ? null : Text(title)),
     actions: actions,
-    flexibleSpace: Container(
-      decoration: BoxDecoration(
-        gradient:
-            dark ? VyroColors.brandGradientDark : VyroColors.brandGradient,
-      ),
-    ),
+    bottom: bottom,
   );
 }
 
-/// --- VYRO "virtual world" layer -------------------------------------
-/// The world feel: a slowly drifting animated gradient sky, glassy
-/// translucent cards, and one "atmosphere" (gradient pair) per chat /
-/// space, derived deterministically from its id — so every group or
-/// channel feels like its own little world, and the same chat always
-/// has the same atmosphere. All of it is decoration over the real
-/// chat list: no fake chats, no fake buttons.
-
-/// One atmosphere: a pair of colors for a space's gradient.
-class Atmosphere {
-  const Atmosphere(this.a, this.b, this.label);
-  final Color a;
-  final Color b;
-  final String label;
-}
-
-const List<Atmosphere> _atmospheres = [
-  Atmosphere(Color(0xFF0EA5E9), Color(0xFF7C3AED), 'Ocean Nebula'),
-  Atmosphere(Color(0xFFF59E0B), Color(0xFFEC4899), 'Sunset Dunes'),
-  Atmosphere(Color(0xFF10B981), Color(0xFF0EA5E9), 'Emerald Lagoon'),
-  Atmosphere(Color(0xFF8B5CF6), Color(0xFFEC4899), 'Violet Bloom'),
-  Atmosphere(Color(0xFF6366F1), Color(0xFF22D3EE), 'Aurora Sky'),
-  Atmosphere(Color(0xFFF43F5E), Color(0xFFF59E0B), 'Ember Valley'),
-];
-
-/// Deterministic atmosphere for a chat/space id.
-Atmosphere atmosphereFor(String id) {
-  var h = 0;
-  for (var i = 0; i < id.length; i++) {
-    h = (h * 31 + id.codeUnitAt(i)) & 0x7fffffff;
-  }
-  return _atmospheres[h % _atmospheres.length];
-}
-
-LinearGradient atmosphereGradient(String id) {
-  final at = atmosphereFor(id);
-  return LinearGradient(
-    colors: [at.a, at.b],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
-
-/// Animated world sky: a deep gradient with three slowly drifting
-/// glowing orbs. Pure decoration, driven by one repeating controller.
-class WorldBackground extends StatefulWidget {
-  const WorldBackground({super.key, this.child});
-
-  final Widget? child;
-
-  @override
-  State<WorldBackground> createState() => _WorldBackgroundState();
-}
-
-class _WorldBackgroundState extends State<WorldBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 24),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, _) {
-        final t = _ctrl.value * 2 * math.pi;
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: dark
-                  ? const [Color(0xFF14102A), Color(0xFF0F1115)]
-                  : const [Color(0xFFE8EFFF), Color(0xFFF6F7FB)],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Stack(
-            children: [
-              _orb(0.15 + 0.06 * math.sin(t), 0.10, 220,
-                  VyroColors.blue.withOpacity(dark ? 0.35 : 0.25)),
-              _orb(0.75 + 0.05 * math.cos(t * 0.8), 0.30, 180,
-                  VyroColors.purple.withOpacity(dark ? 0.35 : 0.22)),
-              _orb(0.45 + 0.07 * math.sin(t * 0.6 + 2), 0.75, 200,
-                  const Color(0xFF38BDF8).withOpacity(dark ? 0.28 : 0.18)),
-              if (widget.child != null) widget.child!,
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _orb(double fx, double fy, double size, Color color) {
-    return Positioned(
-      left: fx * 400 - size / 2,
-      top: fy * 300,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withOpacity(0)],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Glassy translucent card (frosted glass) for world surfaces.
-class GlassCard extends StatelessWidget {
-  const GlassCard({super.key, required this.child, this.padding});
-
-  final Widget child;
-  final EdgeInsetsGeometry? padding;
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: dark
-                ? Colors.white.withOpacity(0.07)
-                : Colors.white.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: dark
-                  ? Colors.white.withOpacity(0.14)
-                  : Colors.white.withOpacity(0.8),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}

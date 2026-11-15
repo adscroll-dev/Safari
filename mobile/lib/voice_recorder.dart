@@ -22,6 +22,7 @@ import 'api.dart';
 import 'chat_extras.dart';
 import 'data_saver.dart';
 import 'recording_bytes.dart';
+import 'theme.dart';
 
 /// Mic button for the chat input row. Tap to start, tap again to stop
 /// and send the recording as a voice message.
@@ -169,6 +170,7 @@ class _VoiceRecordButtonState extends State<VoiceRecordButton> {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -178,16 +180,24 @@ class _VoiceRecordButtonState extends State<VoiceRecordButton> {
             child: Text('● $_label',
                 style: const TextStyle(color: Colors.red, fontSize: 13)),
           ),
-        IconButton(
-          icon: Icon(
-            _recording ? Icons.stop_circle_outlined : Icons.mic_outlined,
-            color: _recording ? Colors.red : null,
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: dark ? WaColors.accentDark : WaColors.accent,
+            shape: BoxShape.circle,
           ),
-          tooltip: _recording
-              ? 'Stop and send voice message'
-              : 'Record voice message',
-          iconSize: 28,
-          onPressed: _busy ? null : _toggle,
+          child: IconButton(
+            icon: Icon(
+              _recording ? Icons.stop_circle_outlined : Icons.mic_outlined,
+              color: Colors.white,
+            ),
+            tooltip: _recording
+                ? 'Stop and send voice message'
+                : 'Record voice message',
+            iconSize: 28,
+            onPressed: _busy ? null : _toggle,
+          ),
         ),
         if (_error != null)
           const Icon(Icons.error_outline, color: Colors.red, size: 18),

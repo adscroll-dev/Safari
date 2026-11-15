@@ -438,3 +438,67 @@ func TestV04BotsAndKeys(t *testing.T) {
 		t.Fatalf("get identity key: %d %s", rec.Code, rec.Body.String())
 	}
 }
+
+// TestChatListPreviewAndUnread: ListChats carries the latest message
+// preview and a per-user unread count (WhatsApp-style list data).
+// The count drops to zero after the other user marks it read.
+func TestChatListPreviewAndUnread(t *testing.T) {
+	h := newTestHandler()
+	aliceTok, _ := register(t, h, "alice@example.com", "alice")
+	bobTok, bobID := register(t, h, "bob@example.com", "bob")
+	chatID := makeDM(t, h, aliceTok, bobID)
+
+	m := sendMsg(t, h, aliceTok, chatID, map[string]interface{}{"content": "سلام Bob"})
+
+	list := func(tok string) []models.Chat {
+		t.Helper()
+		rec := doJSON(t, h, http.MethodGet, "/api/chats", nil, tok)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("list chats: %d %s", rec.Code, rec.Body.String())
+		}
+		var chats []models.Chat
+		mustDecode(t, rec, &chats)
+		return chats
+	}
+	bobChats := list(bobTok)
+	if len(bobChats) != 1 {
+		t.Fatalf("bob chats = %d, want 1", len(bobChats))
+	}
+	c := bobChats[0]
+	if c.LastMessage == nil || c.LastMessage.Content != "سلام Bob" {
+		t.Fatalf("last_message = %+v, want content 'سلام Bob'", c.LastMessage)
+	}
+	if c.LastMessage.SenderID == "" {
+		t.Fatalf("last_message sender is empty")
+	}
+	if c.UnreadCount != 1 {
+		t.Fatalf("bob unread = %d, want 1", c.UnreadCount)
+	}
+	// Alice sent it: nothing unread for her.
+	if aliceChats := list(aliceTok); aliceChats[0].UnreadCount != 0 {
+		t.Fatalf("alice unread = %d, want 0", aliceChats[0].UnreadCount)
+	}
+	// Bob marks it read: his unread count drops to zero.
+	rec := doJSON(t, h, http.MethodPost, "/api/messages/"+m.ID+"/read", nil, bobTok)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("mark read: %d %s", rec.Code, rec.Body.String())
+	}
+	if bobChats := list(bobTok); bobChats[0].UnreadCount != 0 {
+		t.Fatalf("after read, bob unread = %d, want 0", bobChats[0].UnreadCount)
+	}
+	// A chat with no messages has no preview and no unread count.
+	_, carolID := register(t, h, "carol@example.com", "carol")
+	makeDM(t, h, aliceTok, carolID)
+	if aliceChats := list(aliceTok); len(aliceChats) != 2 {
+		t.Fatalf("alice chats = %d, want 2", len(aliceChats))
+	} else {
+		for _, ch := range aliceChats {
+			if ch.ID == chatID {
+				continue
+			}
+			if ch.LastMessage != nil || ch.UnreadCount != 0 {
+				t.Fatalf("empty chat preview = %+v unread = %d, want nil/0", ch.LastMessage, ch.UnreadCount)
+			}
+		}
+	}
+}

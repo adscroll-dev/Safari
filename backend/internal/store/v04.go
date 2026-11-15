@@ -133,19 +133,28 @@ func (s *MemoryStore) MarkDelivered(messageID, userID string) error {
 func (s *MemoryStore) MarkRead(messageID, userID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.messages[messageID]; !ok {
+	m, ok := s.messages[messageID]
+	if !ok {
 		return ErrNotFound
 	}
-	if s.receipts[messageID] == nil {
-		s.receipts[messageID] = map[string]*receipt{}
+	// WhatsApp semantics: reading a message marks every earlier
+	// message from others in the same chat as read too.
+	for _, id := range s.chatMsgs[m.ChatID] {
+		om, ok := s.messages[id]
+		if !ok || om.SenderID == userID || om.CreatedAt.After(m.CreatedAt) {
+			continue
+		}
+		if s.receipts[id] == nil {
+			s.receipts[id] = map[string]*receipt{}
+		}
+		r := s.receipts[id][userID]
+		if r == nil {
+			r = &receipt{}
+			s.receipts[id][userID] = r
+		}
+		r.delivered = true
+		r.read = true
 	}
-	r := s.receipts[messageID][userID]
-	if r == nil {
-		r = &receipt{}
-		s.receipts[messageID][userID] = r
-	}
-	r.delivered = true
-	r.read = true
 	return nil
 }
 

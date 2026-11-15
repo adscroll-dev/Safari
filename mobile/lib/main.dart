@@ -130,7 +130,11 @@ class _HomePageState extends State<HomePage> {
   Map<String, dynamic>? _activeChat;
   String? _error;
   bool _registerMode = false;
-  int _tabIndex = 0; // 0 = chats, 1 = stories, 2 = settings
+  int _tabIndex = 0; // 0 = chats, 1 = updates, 2 = communities, 3 = calls
+  // WhatsApp navigation: Settings lives in the ⋮ menu, not a tab.
+  bool _showSettings = false;
+  // Archived chats hide behind the "Archived" row (WhatsApp-style).
+  bool _showArchived = false;
   String _typingUser = '';
   int _ttlSeconds = 0; // disappearing-message TTL (0 = off)
   DateTime _lastTypingAt = DateTime.fromMillisecondsSinceEpoch(0);
@@ -1298,9 +1302,7 @@ class _HomePageState extends State<HomePage> {
                   final c = _chats[i] as Map<String, dynamic>;
                   final title = _chatTitle(c);
                   return ListTile(
-                    leading: GradientAvatar(
-                        label: title,
-                        gradient: atmosphereGradient(c['id'] as String)),
+                    leading: WaAvatar(label: title, radius: 22),
                     title: Text(title),
                     subtitle: Text(c['type'] as String? ?? ''),
                     onTap: () async {
@@ -1742,7 +1744,7 @@ class _HomePageState extends State<HomePage> {
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 64, 24, 36),
                 decoration: const BoxDecoration(
-                  gradient: VyroColors.brandGradient,
+                  color: WaColors.lightHeader,
                   borderRadius: BorderRadius.only(
                     bottomLeft: Radius.circular(36),
                     bottomRight: Radius.circular(36),
@@ -1832,13 +1834,14 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Brand hero: blue-to-purple gradient, logo, slogan.
+              // Welcome hero: WhatsApp-style solid teal, swift logo,
+              // Safari name, slogan.
               Container(
                 padding: const EdgeInsets.fromLTRB(24, 64, 24, 36),
                 decoration: BoxDecoration(
-                  gradient: dark
-                      ? VyroColors.brandGradientDark
-                      : VyroColors.brandGradient,
+                  color: dark
+                      ? WaColors.darkHeader
+                      : WaColors.lightHeader,
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(36),
                     bottomRight: Radius.circular(36),
@@ -1950,28 +1953,13 @@ class _HomePageState extends State<HomePage> {
                             prefixIcon: Icon(Icons.lock_outline)),
                         obscureText: true),
                     const SizedBox(height: 20),
-                    Container(
-                      decoration: const BoxDecoration(
-                        gradient: VyroColors.brandGradient,
-                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color(0x447C3AED),
-                            blurRadius: 12,
-                            offset: Offset(0, 5),
-                          ),
-                        ],
+                    FilledButton(
+                      onPressed: _auth,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: FilledButton(
-                        onPressed: _auth,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child:
-                            Text(_registerMode ? 'Create account' : 'Log in'),
-                      ),
+                      child:
+                          Text(_registerMode ? 'Create account' : 'Log in'),
                     ),
                     const SizedBox(height: 8),
                     TextButton(
@@ -1994,171 +1982,621 @@ class _HomePageState extends State<HomePage> {
       );
     }
     return Scaffold(
-      appBar: vyroAppBar(
-        context,
-        title: _activeChat == null
-            ? 'Safari'
-            : _chatTitle(_activeChat!),
-        actions: [
-          IconButton(
-            icon: const Text('🤖', style: TextStyle(fontSize: 22)),
-            tooltip: 'Safari assistant (local, on-device)',
-            onPressed: _showAssistant,
-          ),
-          if (_activeChat == null) ...[
-            IconButton(
-              icon: const Icon(Icons.search),
-              tooltip: 'Search messages',
-              onPressed: () => _showSearchSheet(),
-            ),
-          ],
-          if (_activeChat != null) ...[
-            if ((_activeChat!['type'] as String?) == 'dm') ...[
-              IconButton(
-                icon: const Icon(Icons.call),
-                tooltip: 'Voice call (Opus 12 kbps — Data Saver)',
-                onPressed: () => _startCall(video: false),
-              ),
-              IconButton(
-                icon: const Icon(Icons.videocam_outlined),
-                tooltip: 'Video call (starts low quality)',
-                onPressed: () => _startCall(video: true),
-              ),
-              IconButton(
-                icon: Icon(_e2eeChats.contains(_activeChat!['id'])
-                    ? Icons.lock
-                    : Icons.lock_open),
-                tooltip: 'End-to-end encryption',
-                onPressed: () {
-                  final id = _activeChat!['id'] as String;
-                  setState(() {
-                    if (_e2eeChats.contains(id)) {
-                      _e2eeChats.remove(id);
-                    } else {
-                      _e2eeChats.add(id);
-                    }
-                  });
-                },
-              ),
-            ] else ...[
-              IconButton(
-                icon: const Icon(Icons.group_outlined),
-                tooltip: 'Members & admins',
-                onPressed: _showMembers,
-              ),
-              IconButton(
-                icon: Icon(_e2eeChats.contains(_activeChat!['id'])
-                    ? Icons.lock
-                    : Icons.lock_open),
-                tooltip: 'End-to-end encryption (group)',
-                onPressed: () {
-                  final id = _activeChat!['id'] as String;
-                  setState(() {
-                    if (_e2eeChats.contains(id)) {
-                      _e2eeChats.remove(id);
-                    } else {
-                      _e2eeChats.add(id);
-                    }
-                  });
-                },
-              ),
-            ],
-            IconButton(
-              icon: Icon(_activeChat!['pinned'] == true
-                  ? Icons.push_pin
-                  : Icons.push_pin_outlined),
-              tooltip: 'Pin chat',
-              onPressed: () async {
-                final c = _activeChat!['pinned'] == true
-                    ? await _api.unpinChat(_activeChat!['id'] as String)
-                    : await _api.pinChat(_activeChat!['id'] as String);
-                setState(() => _activeChat = c);
-                await _refreshChats();
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.archive_outlined),
-              tooltip: 'Archive chat',
-              onPressed: () async {
-                await _api.archiveChat(_activeChat!['id'] as String);
-                setState(() => _activeChat = null);
-                await _refreshChats();
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.schedule_outlined),
-              tooltip: 'Scheduled messages',
-              onPressed: _showScheduled,
-            ),
-          ],
-          IconButton(
-              icon: const Icon(Icons.brightness_6),
-              onPressed: widget.onToggleTheme),
-          IconButton(
-              icon: const Icon(Icons.language), onPressed: widget.onToggleLang),
-        ],
-      ),
-      body: _activeChat == null ? _buildHomeBody() : _buildChatBody(),
-      bottomNavigationBar: _activeChat == null
+      appBar: _buildAppBar(),
+      body: _activeChat == null
+          ? (_showSettings ? _buildSettingsBody() : _buildHomeBody())
+          : _buildChatBody(),
+      bottomNavigationBar: _activeChat == null && !_showSettings
           ? NavigationBar(
               selectedIndex: _tabIndex,
               onDestinationSelected: (i) => setState(() => _tabIndex = i),
               destinations: const [
                 NavigationDestination(
-                    icon: Icon(Icons.chat_outlined), label: 'Chats'),
+                    icon: Icon(Icons.chat_outlined),
+                    selectedIcon: Icon(Icons.chat),
+                    label: 'Chats'),
                 NavigationDestination(
-                    icon: Icon(Icons.circle_outlined), label: 'Stories'),
+                    icon: Icon(Icons.circle_outlined),
+                    selectedIcon: Icon(Icons.circle),
+                    label: 'Updates'),
                 NavigationDestination(
-                    icon: Icon(Icons.settings_outlined), label: 'Settings'),
+                    icon: Icon(Icons.group_outlined),
+                    selectedIcon: Icon(Icons.group),
+                    label: 'Communities'),
+                NavigationDestination(
+                    icon: Icon(Icons.call_outlined),
+                    selectedIcon: Icon(Icons.call),
+                    label: 'Calls'),
               ],
             )
           : null,
-      floatingActionButton: _activeChat == null
-          ? FloatingActionButton(
-              onPressed: _tabIndex == 1
-                  ? _postStory
-                  : _tabIndex == 2
-                      ? null
-                      : _showNewChatSheet,
-              child: Icon(_tabIndex == 1 ? Icons.add_a_photo : Icons.add),
-            )
-          : FloatingActionButton.small(
-              onPressed: () => setState(() => _activeChat = null),
-              child: const Icon(Icons.arrow_back),
-            ),
+      floatingActionButton: _buildFab(),
     );
   }
 
-  Widget _buildHomeBody() {
-    if (_tabIndex == 2) return _buildSettingsBody();
-    if (_tabIndex == 1) {
-      // Stories feed: user stories with clearly-labelled sponsored
-      // stories interleaved (frequency-capped, demo inventory only).
-      final feed = buildStoryFeed(
-        _stories.length,
-        demoSponsoredStories,
-        sponsoredAvailable: _sponsoredAvailable,
+  /// WhatsApp app bar, three modes: chat header (avatar + name +
+  /// status, call icons, ⋮ menu), Settings (back + title), or the
+  /// main bar ("Safari" + search + camera + ⋮ menu).
+  PreferredSizeWidget _buildAppBar() {
+    if (_activeChat != null) return _buildChatAppBar();
+    if (_showSettings) {
+      return vyroAppBar(
+        context,
+        title: 'Settings',
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => setState(() => _showSettings = false),
+        ),
+        actions: const [],
       );
-      return ListView.builder(
-        itemCount: feed.length + 1, // +1: "Promote your business" entry
-        itemBuilder: (context, i) {
-          if (i == feed.length) {
-            return ListTile(
-              leading: const CircleAvatar(child: Icon(Icons.campaign_outlined)),
-              title: const Text('Promote your business'),
-              subtitle: const Text(
-                  'Put your business in Stories as a sponsored story.'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _showPromoteSheet,
-            );
-          }
-          final item = feed[i];
-          if (item is SponsoredStoryItem) {
-            final s = item.story;
-            return ListTile(
-              leading: StoryRing(
-                child: GradientAvatar(label: s.advertiserName, radius: 22),
+    }
+    return vyroAppBar(
+      context,
+      title: 'Safari',
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: 'Search',
+          onPressed: _showSearchSheet,
+        ),
+        IconButton(
+          icon: const Icon(Icons.camera_alt_outlined),
+          tooltip: 'Camera',
+          onPressed: _postStory,
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          onSelected: (v) {
+            switch (v) {
+              case 'new_group':
+                _showNewChatSheet();
+                break;
+              case 'settings':
+                setState(() => _showSettings = true);
+                break;
+              case 'theme':
+                widget.onToggleTheme();
+                break;
+              case 'lang':
+                widget.onToggleLang();
+                break;
+              case 'assistant':
+                _showAssistant();
+                break;
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(value: 'new_group', child: Text('New group')),
+            PopupMenuItem(value: 'settings', child: Text('Settings')),
+            PopupMenuItem(
+                value: 'assistant', child: Text('Safari assistant')),
+            PopupMenuItem(value: 'theme', child: Text('Dark mode')),
+            PopupMenuItem(value: 'lang', child: Text('فارسی / English')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Chat header: avatar + name + subtitle (typing / members /
+  /// @username), video + voice call buttons, ⋮ menu with the rest
+  /// (members, pin, archive, scheduled, E2EE, search).
+  PreferredSizeWidget _buildChatAppBar() {
+    final chat = _activeChat!;
+    final type = chat['type'] as String? ?? 'dm';
+    final title = _chatTitle(chat);
+    final isE2ee = _e2eeChats.contains(chat['id']);
+    final subtitle = _typingUser.isNotEmpty
+        ? '$_typingUser is typing…'
+        : type == 'group' || type == 'channel'
+            ? '${(chat['member_ids'] as List?)?.length ?? 0} members'
+            : _peerUsername(chat);
+    return vyroAppBar(
+      context,
+      titleWidget: InkWell(
+        onTap: type == 'dm' ? null : _showMembers,
+        child: Row(
+          children: [
+            WaAvatar(label: title, radius: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ],
+        ),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => setState(() => _activeChat = null),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.videocam_outlined),
+          tooltip: 'Video call',
+          onPressed: () => _startCall(video: true),
+        ),
+        IconButton(
+          icon: const Icon(Icons.call),
+          tooltip: 'Voice call',
+          onPressed: () => _startCall(video: false),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert),
+          onSelected: (v) async {
+            switch (v) {
+              case 'members':
+                _showMembers();
+                break;
+              case 'pin':
+                final c = chat['pinned'] == true
+                    ? await _api.unpinChat(chat['id'] as String)
+                    : await _api.pinChat(chat['id'] as String);
+                setState(() => _activeChat = c);
+                await _refreshChats();
+                break;
+              case 'archive':
+                await _api.archiveChat(chat['id'] as String);
+                setState(() => _activeChat = null);
+                await _refreshChats();
+                break;
+              case 'scheduled':
+                _showScheduled();
+                break;
+              case 'e2ee':
+                setState(() {
+                  if (isE2ee) {
+                    _e2eeChats.remove(chat['id']);
+                  } else {
+                    _e2eeChats.add(chat['id']);
+                  }
+                });
+                break;
+              case 'search':
+                _showSearchSheet();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'members',
+              child:
+                  Text(type == 'dm' ? 'View contact' : 'Members & admins'),
+            ),
+            PopupMenuItem(
+              value: 'pin',
+              child: Text(
+                  chat['pinned'] == true ? 'Unpin chat' : 'Pin chat'),
+            ),
+            const PopupMenuItem(
+                value: 'archive', child: Text('Archive chat')),
+            const PopupMenuItem(
+                value: 'scheduled', child: Text('Scheduled messages')),
+            PopupMenuItem(
+              value: 'e2ee',
+              child: Row(
+                children: [
+                  Text(isE2ee ? 'E2EE on' : 'E2EE off'),
+                  const SizedBox(width: 8),
+                  Icon(isE2ee ? Icons.lock : Icons.lock_open, size: 16),
+                ],
+              ),
+            ),
+            const PopupMenuItem(value: 'search', child: Text('Search')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// @username of the other member of a DM (chat header subtitle).
+  String _peerUsername(Map<String, dynamic> chat) {
+    final me = _user?['id'] as String?;
+    final members = chat['member_ids'] as List?;
+    if (members == null) return '';
+    for (final id in members) {
+      if (id != me) {
+        final u = _usersById[id as String? ?? ''];
+        final name = u?['username'] as String?;
+        if (name != null && name.isNotEmpty) return '@$name';
+      }
+    }
+    return '';
+  }
+
+  /// One FAB per tab, WhatsApp-style. Chats: new message. Updates:
+  /// camera (new status). Calls: new call (goes to Chats to pick a
+  /// chat). Communities: none. Inside a chat: back.
+  Widget? _buildFab() {
+    if (_activeChat != null) {
+      return FloatingActionButton.small(
+        onPressed: () => setState(() => _activeChat = null),
+        child: const Icon(Icons.arrow_back),
+      );
+    }
+    if (_showSettings) return null;
+    switch (_tabIndex) {
+      case 1:
+        return FloatingActionButton(
+          onPressed: _postStory,
+          child: const Icon(Icons.camera_alt),
+        );
+      case 2:
+        return null;
+      case 3:
+        return FloatingActionButton(
+          onPressed: () => setState(() => _tabIndex = 0),
+          child: const Icon(Icons.add_call),
+        );
+      case 0:
+      default:
+        return FloatingActionButton(
+          onPressed: _showNewChatSheet,
+          child: const Icon(Icons.message),
+        );
+    }
+  }
+
+  Widget _buildHomeBody() {
+    switch (_tabIndex) {
+      case 1:
+        return _buildUpdatesBody();
+      case 2:
+        return _buildCommunitiesBody();
+      case 3:
+        return _buildCallsBody();
+      case 0:
+      default:
+        return _buildChatsBody();
+    }
+  }
+
+  // --- Chats tab: WhatsApp-style list -------------------------------
+  // Avatar, name, last-message preview, time, green unread badge.
+  // Pinned chats show a pin; archived chats hide behind the
+  // "Archived" row at the bottom, exactly like WhatsApp.
+
+  Widget _buildChatsBody() {
+    final archived =
+        _chats.where((c) => (c as Map)['archived'] == true).toList();
+    final shown = _showArchived
+        ? archived
+        : _visibleChats
+            .where((c) => (c as Map)['archived'] != true)
+            .toList();
+    return Column(
+      children: [
+        if (_showArchived)
+          ListTile(
+            leading: const Icon(Icons.arrow_back),
+            title: const Text('Archived'),
+            subtitle: Text('${archived.length} chat(s)'),
+            onTap: () => setState(() => _showArchived = false),
+          )
+        else
+          _folderChips(),
+        Expanded(
+          child: ListView.builder(
+            itemCount:
+                shown.length + (!_showArchived && archived.isNotEmpty ? 1 : 0),
+            itemBuilder: (context, i) {
+              if (i == shown.length) {
+                return ListTile(
+                  leading: const CircleAvatar(
+                    child: Icon(Icons.archive_outlined, size: 20),
+                  ),
+                  title: const Text('Archived'),
+                  trailing: Text('${archived.length}'),
+                  onTap: () => setState(() => _showArchived = true),
+                );
+              }
+              return _chatRow(shown[i] as Map<String, dynamic>);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _chatRow(Map<String, dynamic> c) {
+    final title = _chatTitle(c);
+    final unread = _unreadCount(c);
+    final timeLabel = _chatTimeLabel(c);
+    final pinned = c['pinned'] == true;
+    final locked = _chatLock?.isLocked(c['id'] as String) == true;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final secondary = dark
+        ? WaColors.darkTextSecondary
+        : WaColors.lightTextSecondary;
+    final green = dark ? WaColors.accentDark : WaColors.accent;
+    return ListTile(
+      leading: WaAvatar(label: title, radius: 26),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight:
+                    unread > 0 ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ),
+          if (pinned)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(Icons.push_pin, size: 15, color: secondary),
+            ),
+          if (timeLabel.isNotEmpty)
+            Text(
+              timeLabel,
+              style: TextStyle(
+                fontSize: 12,
+                color: unread > 0 ? green : secondary,
+                fontWeight:
+                    unread > 0 ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+        ],
+      ),
+      subtitle: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _chatPreview(c),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                color: unread > 0
+                    ? Theme.of(context).colorScheme.onSurface
+                    : secondary,
+              ),
+            ),
+          ),
+          if (locked)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(Icons.lock, size: 14, color: secondary),
+            ),
+          if (unread > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              constraints:
+                  const BoxConstraints(minWidth: 20, minHeight: 20),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: WaColors.unreadBadge,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+      onTap: () => _openChat(c),
+      onLongPress: () => _showChatActions(c),
+    );
+  }
+
+  /// Unread count from the server (ListChats), falling back to the
+  /// live WebSocket marker for chats that got a message while open.
+  int _unreadCount(Map<String, dynamic> c) {
+    final n = c['unread_count'];
+    if (n is int) return n;
+    return _unreadChatIds.contains(c['id'] as String) ? 1 : 0;
+  }
+
+  /// WhatsApp time label: HH:MM today, "Yesterday", weekday, else date.
+  String _chatTimeLabel(Map<String, dynamic> c) {
+    final lm = c['last_message'] as Map<String, dynamic>?;
+    final raw = (lm?['created_at'] as String?) ?? (c['updated_at'] as String?);
+    if (raw == null || raw.isEmpty) return '';
+    DateTime t;
+    try {
+      t = DateTime.parse(raw).toLocal();
+    } catch (_) {
+      return raw.length >= 16 ? raw.substring(11, 16) : '';
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(t.year, t.month, t.day);
+    final hhmm =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    if (day == today) return hhmm;
+    if (day == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday';
+    }
+    if (today.difference(day).inDays < 7) {
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return weekdays[t.weekday - 1];
+    }
+    return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}';
+  }
+
+  /// Last-message preview for the chat list. E2EE messages never show
+  /// ciphertext; media kinds show their WhatsApp label.
+  String _chatPreview(Map<String, dynamic> c) {
+    final lm = c['last_message'] as Map<String, dynamic>?;
+    if (lm == null) return '';
+    final kind = lm['kind'] as String? ?? 'text';
+    String body;
+    switch (kind) {
+      case 'e2ee':
+        body = 'Encrypted message';
+        break;
+      case 'image':
+        body = 'Photo';
+        break;
+      case 'video':
+        body = 'Video';
+        break;
+      case 'voice':
+        body = 'Voice message';
+        break;
+      case 'file':
+        body = 'File';
+        break;
+      case 'location':
+        body = 'Location';
+        break;
+      case 'sticker':
+        body = 'Sticker';
+        break;
+      default:
+        body = (lm['content'] as String?) ?? '';
+    }
+    final mine = lm['sender_id'] == _user?['id'];
+    if (mine) {
+      final status = lm['status'] as String?;
+      final ticks = status == 'read' || status == 'delivered'
+          ? '✓✓ '
+          : status == 'sent'
+              ? '✓ '
+              : '';
+      return '${ticks}You: $body';
+    }
+    final type = c['type'] as String? ?? 'dm';
+    if (type == 'group' || type == 'channel') {
+      final sender = _usersById[lm['sender_id'] as String? ?? ''];
+      final name = (sender?['display_name'] as String?) ??
+          (sender?['username'] as String?) ??
+          '';
+      if (name.isNotEmpty) return '$name: $body';
+    }
+    return body;
+  }
+
+  Widget _sectionHeader(String text) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: dark
+                ? WaColors.darkTextSecondary
+                : WaColors.lightTextSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // --- Updates tab: Status + Channels (WhatsApp) --------------------
+  // My status, recent updates with the green status ring, clearly
+  // labelled sponsored stories, then channels.
+
+  Widget _buildUpdatesBody() {
+    final feed = buildStoryFeed(
+      _stories.length,
+      demoSponsoredStories,
+      sponsoredAvailable: _sponsoredAvailable,
+    );
+    final userStories = <Map<String, dynamic>>[];
+    final sponsored = <SponsoredStory>[];
+    for (final item in feed) {
+      if (item is SponsoredStoryItem) {
+        sponsored.add(item.story);
+      } else {
+        userStories.add(
+            _stories[(item as UserStoryItem).index] as Map<String, dynamic>);
+      }
+    }
+    final channels =
+        _chats.where((c) => (c as Map)['type'] == 'channel').toList();
+    final myName = (_user?['display_name'] as String?) ??
+        (_user?['username'] as String?) ??
+        'Me';
+    return ListView(
+      children: [
+        _sectionHeader('Status'),
+        ListTile(
+          leading: Stack(
+            children: [
+              WaAvatar(label: myName, radius: 26),
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: WaColors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.add, size: 14, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          title: const Text('My status'),
+          subtitle: const Text('Tap to add status update'),
+          onTap: _postStory,
+        ),
+        if (userStories.isNotEmpty) _sectionHeader('Recent updates'),
+        for (final st in userStories)
+          ListTile(
+            leading: WaAvatar(
+              label: (st['caption'] as String?)?.isNotEmpty == true
+                  ? st['caption'] as String
+                  : 'Story',
+              radius: 26,
+              ring: true,
+            ),
+            title: Text((st['caption'] as String?)?.isNotEmpty == true
+                ? st['caption'] as String
+                : 'Story'),
+            subtitle: Text(_storyTime(st)),
+            trailing: (st['media_url'] as String?) == null
+                ? null
+                : const Icon(Icons.visibility_outlined),
+            onTap: () => _viewStory(st),
+          ),
+        if (sponsored.isNotEmpty) ...[
+          _sectionHeader('Sponsored'),
+          for (final s in sponsored)
+            ListTile(
+              leading: WaAvatar(label: s.advertiserName, radius: 26),
               title: Text(s.title),
               subtitle: Text(s.advertiserName),
               trailing: Container(
@@ -2179,207 +2617,134 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               onTap: () => _viewSponsoredStory(s),
-            );
-          }
-          final st =
-              _stories[(item as UserStoryItem).index] as Map<String, dynamic>;
-          final mediaUrl = st['media_url'] as String?;
-          return ListTile(
-            leading: StoryRing(
-              child: GradientAvatar(
-                label: (st['caption'] as String?)?.isNotEmpty == true
-                    ? st['caption'] as String
-                    : 'S',
-                radius: 22,
-              ),
             ),
-            title: Text((st['caption'] as String?)?.isNotEmpty == true
-                ? st['caption'] as String
-                : 'Story'),
-            subtitle: Text('Expires: ${st['expires_at']}'),
-            trailing: mediaUrl == null
-                ? null
-                : IconButton(
-                    icon: const Icon(Icons.visibility_outlined),
-                    tooltip: 'View story',
-                    onPressed: () => _viewStory(st),
-                  ),
-          );
-        },
-      );
+        ],
+        ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.campaign_outlined)),
+          title: const Text('Promote your business'),
+          subtitle: const Text(
+              'Put your business in Stories as a sponsored story.'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showPromoteSheet,
+        ),
+        _sectionHeader('Channels'),
+        if (channels.isEmpty)
+          const ListTile(
+            title: Text('No channels yet'),
+            subtitle: Text('Channels you follow will appear here.'),
+          ),
+        for (final ch in channels)
+          ListTile(
+            leading: WaAvatar(
+                label: _chatTitle(ch as Map<String, dynamic>), radius: 26),
+            title: Text(_chatTitle(ch)),
+            subtitle: Text(
+                '${((ch as Map)['member_ids'] as List?)?.length ?? 0} followers'),
+            onTap: () => _openChat(ch),
+          ),
+        ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.add, size: 20)),
+          title: const Text('Create channel'),
+          onTap: _showNewChatSheet,
+        ),
+      ],
+    );
+  }
+
+  /// "Today, 21:51" style label for a story. The story only stores
+  /// its expiry (24h after posting), so posting time = expiry - 24h.
+  String _storyTime(Map<String, dynamic> st) {
+    final raw = st['expires_at'] as String?;
+    if (raw == null) return '';
+    DateTime t;
+    try {
+      t = DateTime.parse(raw)
+          .subtract(const Duration(hours: 24))
+          .toLocal();
+    } catch (_) {
+      return '';
     }
-    // The world view: animated sky, greeting, and every chat as a
-    // glassy "space" with its own atmosphere gradient.
-    return Stack(
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(t.year, t.month, t.day);
+    final hhmm =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    if (day == today) return 'Today, $hhmm';
+    if (day == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday, $hhmm';
+    }
+    return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}, $hhmm';
+  }
+
+  // --- Communities tab (WhatsApp) -----------------------------------
+  // A community brings related groups together. Here a community is
+  // a group: the list shows real groups, and "New community"
+  // opens the new-group flow.
+
+  Widget _buildCommunitiesBody() {
+    final groups =
+        _chats.where((c) => (c as Map)['type'] == 'group').toList();
+    return ListView(
       children: [
-        const WorldBackground(),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '🌍 Your World',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${_user?['username'] ?? 'Welcome'} · ${_chats.length} chats · ${_stories.length} stories live',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.65),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Every space has its own atmosphere.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withOpacity(0.45),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ],
-              ),
+        ListTile(
+          leading: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: WaColors.accent,
+              borderRadius: BorderRadius.circular(12),
             ),
-            // v0.7 user-created folders: filter chips above the list.
-            _folderChips(),
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 6, 14, 90),
-                itemCount: _visibleChats.length,
-                itemBuilder: (context, i) {
-                  final c = _visibleChats[i] as Map<String, dynamic>;
-                  final title = _chatTitle(c);
-                  final badges = [
-                    if (c['pinned'] == true) '📌',
-                    if ((c['folder'] as String?)?.isNotEmpty == true)
-                      '📁 ${c['folder']}',
-                    if (c['archived'] == true) '· archived',
-                    if (_chatLock?.isLocked(c['id'] as String) == true)
-                      '🔒 locked',
-                  ].join(' ');
-                  final hasUnread = _unreadChatIds.contains(c['id'] as String);
-                  final updated = (c['updated_at'] as String?) ?? '';
-                  final timeLabel =
-                      updated.length >= 16 ? updated.substring(11, 16) : '';
-                  final type = c['type'] as String? ?? 'dm';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: GlassCard(
-                      padding: const EdgeInsets.all(12),
-                      child: InkWell(
-                        onTap: () => _openChat(c),
-                        onLongPress: () => _showChatActions(c),
-                        child: Row(
-                          children: [
-                            GradientAvatar(
-                              label: title,
-                              gradient: atmosphereGradient(c['id'] as String),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (type != 'dm')
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 7, vertical: 2),
-                                          margin:
-                                              const EdgeInsets.only(right: 6),
-                                          decoration: BoxDecoration(
-                                            gradient: atmosphereGradient(
-                                                c['id'] as String),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: Text(
-                                            type.toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      if (timeLabel.isNotEmpty)
-                                        Text(
-                                          timeLabel,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: hasUnread
-                                                ? VyroColors.purple
-                                                : Colors.grey,
-                                            fontWeight: hasUnread
-                                                ? FontWeight.w700
-                                                : FontWeight.normal,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          '$type $badges'.trim(),
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade600,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      if (hasUnread)
-                                        Container(
-                                          width: 10,
-                                          height: 10,
-                                          decoration: const BoxDecoration(
-                                            gradient: VyroColors.brandGradient,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+            child: const Icon(Icons.group_add_outlined,
+                color: Colors.white, size: 28),
+          ),
+          title: const Text('New community'),
+          onTap: _showNewChatSheet,
+        ),
+        const Divider(),
+        if (groups.isEmpty)
+          const ListTile(
+            title: Text('No communities yet'),
+            subtitle: Text(
+                'Create a community to bring related groups together.'),
+          ),
+        for (final g in groups)
+          ListTile(
+            leading: WaAvatar(
+                label: _chatTitle(g as Map<String, dynamic>), radius: 26),
+            title: Text(_chatTitle(g)),
+            subtitle: Text(
+                '${((g as Map)['member_ids'] as List?)?.length ?? 0} members'),
+            onTap: () => _openChat(g),
+          ),
+      ],
+    );
+  }
+
+  // --- Calls tab (WhatsApp) -----------------------------------------
+  // No call history is stored yet, so the tab honestly shows the
+  // empty state until the first call happens.
+
+  Widget _buildCallsBody() {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+      children: [
+        const Icon(Icons.call_outlined, size: 72, color: Colors.grey),
+        const SizedBox(height: 16),
+        const Text(
+          'No calls yet',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'To make a call, open a chat and tap the call button.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, color: Colors.grey),
+        ),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: () => setState(() => _tabIndex = 0),
+          child: const Text('Start a call'),
         ),
       ],
     );
@@ -2393,34 +2758,66 @@ class _HomePageState extends State<HomePage> {
         .toList();
   }
 
-  /// v0.7: user-created folder filter chips. Long-press a folder chip
-  /// to rename or delete it.
+  /// WhatsApp-style filter chips ("All", "Unread", "Groups" in
+  /// WhatsApp; here: "All" + the user's own folders). Long-press a
+  /// folder chip to rename or delete it.
   Widget _folderChips() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final selectedBg = dark ? const Color(0xFF1A3A34) : const Color(0xFFD8F3DC);
+    final selectedFg = dark ? WaColors.accentDark : WaColors.lightHeader;
+    final unselectedBg = dark ? WaColors.darkInputBackground : const Color(0xFFF0F2F5);
+    final unselectedFg = dark ? WaColors.darkText : WaColors.lightText;
+    Widget chip(String label, bool selected, VoidCallback onTap,
+        {VoidCallback? onLongPress}) {
+      final w = GestureDetector(
+        onLongPress: onLongPress,
+        child: ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          showCheckmark: false,
+          selectedColor: selectedBg,
+          backgroundColor: unselectedBg,
+          labelStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? selectedFg : unselectedFg,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide.none,
+          ),
+          onSelected: (_) => onTap(),
+        ),
+      );
+      return w;
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          ChoiceChip(
-            label: const Text('All'),
-            selected: _folderFilter.isEmpty,
-            onSelected: (_) => setState(() => _folderFilter = ''),
-          ),
+          chip('All', _folderFilter.isEmpty,
+              () => setState(() => _folderFilter = '')),
           const SizedBox(width: 6),
           for (final f in _folderNames) ...[
-            GestureDetector(
-              onLongPress: () => _manageFolder(f),
-              child: ChoiceChip(
-                label: Text(f),
-                selected: _folderFilter == f,
-                onSelected: (_) => setState(
+            chip(f, _folderFilter == f,
+                () => setState(
                     () => _folderFilter = _folderFilter == f ? '' : f),
-              ),
-            ),
+                onLongPress: () => _manageFolder(f)),
             const SizedBox(width: 6),
           ],
           ActionChip(
             label: const Text('+ Folder'),
+            backgroundColor: unselectedBg,
+            labelStyle: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: unselectedFg),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide.none,
+            ),
             onPressed: _createFolder,
           ),
         ],
@@ -2689,20 +3086,78 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// WhatsApp-style Settings: profile card on top, then grouped
+  /// rows — Account (last-seen privacy), Chats (Data Saver + usage
+  /// + chat lock), Security (E2EE, bots, official-download warning),
+  /// About. Every row does something real.
   Widget _buildSettingsBody() {
     String mb(double v) => '${v.toStringAsFixed(2)} MB';
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final secondary =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
+    final myName = (_user?['display_name'] as String?) ??
+        (_user?['username'] as String?) ??
+        'Me';
+    final myUsername = _user?['username'] as String? ?? '';
+    final myEmail = _user?['email'] as String? ?? '';
+    Widget header(String text) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: secondary,
+              ),
+            ),
+          ),
+        );
     return ListView(
-      padding: const EdgeInsets.all(16),
       children: [
-        Text('Data Saver', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 4),
-        const Text(
-          'Safari uses far less data than Telegram and WhatsApp: '
-          'voice calls use Opus at 12 kbps (~0.09 MB/min vs ~0.3-0.5 '
-          'MB/min on WhatsApp), photos are compressed before upload, '
-          'and nothing downloads automatically.',
-          style: TextStyle(fontSize: 13),
+        ListTile(
+          leading: WaAvatar(label: myName, radius: 30),
+          title: Text(
+            myName,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            '@$myUsername${myEmail.isEmpty ? '' : ' · $myEmail'}',
+            style: TextStyle(fontSize: 13, color: secondary),
+          ),
         ),
+        const Divider(),
+        header('Account'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Who can see when you were last online. "Nobody" hides your '
+            'online status and last seen from everyone.',
+            style: TextStyle(fontSize: 13, color: secondary),
+          ),
+        ),
+        RadioListTile<String>(
+          title: const Text('Everyone'),
+          subtitle:
+              const Text('Anyone can see your online status and last seen.'),
+          value: 'everyone',
+          groupValue: _lastSeenVisibility,
+          onChanged: (v) {
+            if (v != null) _setLastSeenVisibility(v);
+          },
+        ),
+        RadioListTile<String>(
+          title: const Text('Nobody'),
+          subtitle:
+              const Text('Nobody can see your online status or last seen.'),
+          value: 'nobody',
+          groupValue: _lastSeenVisibility,
+          onChanged: (v) {
+            if (v != null) _setLastSeenVisibility(v);
+          },
+        ),
+        header('Chats'),
         SwitchListTile(
           title: const Text('Data Saver (default ON)'),
           subtitle: const Text('Tap-to-download for photos, videos, files '
@@ -2710,9 +3165,47 @@ class _HomePageState extends State<HomePage> {
           value: _dataSaver,
           onChanged: _setDataSaver,
         ),
-        const Divider(),
-        Text('Data used this month (${_usage.month})',
-            style: Theme.of(context).textTheme.titleMedium),
+        ListTile(
+          leading: const Icon(Icons.lock_outlined),
+          title: Text(_chatLock?.hasPin == true
+              ? 'Change chat lock PIN'
+              : 'Set chat lock PIN'),
+          subtitle: Text(_chatLock?.hasPin == true
+              ? '${_chatLock?.lockedChatIds().length ?? 0} chat(s) locked'
+              : 'Lock individual chats with a 4-8 digit PIN.'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _setChatPin,
+        ),
+        if (_chatLock?.hasPin == true)
+          ListTile(
+            leading: const Icon(Icons.lock_open_outlined),
+            title: const Text('Remove chat lock PIN'),
+            subtitle: const Text('Unlocks every chat and removes the PIN.'),
+            onTap: () async {
+              final ok = await _askPin('Enter PIN to remove the lock');
+              if (ok == true) {
+                await _chatLock?.removePin();
+                _unlockedThisSession.clear();
+                if (mounted) setState(() {});
+              }
+            },
+          ),
+        header('Storage and data'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Safari uses far less data than Telegram and WhatsApp: '
+            'voice calls use Opus at 12 kbps (~0.09 MB/min vs ~0.3-0.5 '
+            'MB/min on WhatsApp), photos are compressed before upload, '
+            'and nothing downloads automatically.',
+            style: TextStyle(fontSize: 13, color: secondary),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text('Data used this month (${_usage.month})',
+              style: Theme.of(context).textTheme.titleMedium),
+        ),
         for (final c in UsageCategory.values)
           ListTile(
             title: Text(c.label),
@@ -2730,8 +3223,7 @@ class _HomePageState extends State<HomePage> {
           },
           child: const Text('Reset counters'),
         ),
-        const Divider(),
-        Text('Security', style: Theme.of(context).textTheme.titleMedium),
+        header('Security'),
         const ListTile(
           leading: Icon(Icons.verified_user_outlined),
           title: Text('Download Safari only from the official Safari website'),
@@ -2756,75 +3248,14 @@ class _HomePageState extends State<HomePage> {
                   'never leave the device.'
               : 'Not set up yet — log in to generate keys.'),
         ),
-        const Divider(),
-        Text('Privacy', style: Theme.of(context).textTheme.titleMedium),
-        const Text(
-          'Who can see when you were last online. "Nobody" hides your '
-          'online status and last seen from everyone — just like '
-          'Telegram and WhatsApp.',
-          style: TextStyle(fontSize: 13),
-        ),
-        RadioListTile<String>(
-          title: const Text('Everyone'),
-          subtitle:
-              const Text('Anyone can see your online status and last seen.'),
-          value: 'everyone',
-          groupValue: _lastSeenVisibility,
-          onChanged: (v) {
-            if (v != null) _setLastSeenVisibility(v);
-          },
-        ),
-        RadioListTile<String>(
-          title: const Text('Nobody'),
-          subtitle: const Text(
-              'Nobody can see your online status or last seen.'),
-          value: 'nobody',
-          groupValue: _lastSeenVisibility,
-          onChanged: (v) {
-            if (v != null) _setLastSeenVisibility(v);
-          },
-        ),
-        const Divider(),
-        Text('Chat lock', style: Theme.of(context).textTheme.titleMedium),
-        const Text(
-          'Lock individual chats with a 4-8 digit PIN. A locked chat '
-          'asks for the PIN before opening. The PIN is stored only as '
-          'a hash on this device — locking hides content on this '
-          'device, it is not encryption.',
-          style: TextStyle(fontSize: 13),
-        ),
-        ListTile(
-          leading: const Icon(Icons.lock_outlined),
-          title: Text(_chatLock?.hasPin == true
-              ? 'Change chat lock PIN'
-              : 'Set chat lock PIN'),
-          subtitle: Text(_chatLock?.hasPin == true
-              ? '${_chatLock?.lockedChatIds().length ?? 0} chat(s) locked'
-              : 'No PIN set — locked chats are off'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _setChatPin,
-        ),
-        if (_chatLock?.hasPin == true)
-          ListTile(
-            leading: const Icon(Icons.lock_open_outlined),
-            title: const Text('Remove chat lock PIN'),
-            subtitle: const Text('Unlocks every chat and removes the PIN.'),
-            onTap: () async {
-              final ok = await _askPin('Enter PIN to remove the lock');
-              if (ok == true) {
-                await _chatLock?.removePin();
-                _unlockedThisSession.clear();
-                if (mounted) setState(() {});
-              }
-            },
-          ),
-        const Divider(),
+        header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
           title: Text('Safari 0.6 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -3204,19 +3635,18 @@ class _HomePageState extends State<HomePage> {
     return '';
   }
 
+  /// WhatsApp conversation screen: plain chat background, date
+  /// chips, a yellow E2EE notice when encryption is on for this
+  /// chat, and the WhatsApp input bar (rounded field with attach +
+  /// camera inside, green mic/send circle outside).
   Widget _buildChatBody() {
     final callState = _call?.state ?? CallState.idle;
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final chatBg =
+        dark ? WaColors.darkChatBackground : WaColors.lightChatBackground;
+    final isE2ee = _e2eeChats.contains(_activeChat!['id']);
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: dark
-              ? const [Color(0xFF171226), Color(0xFF0F1115)]
-              : const [Color(0xFFF1F4FF), Color(0xFFF6F7FB)],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-      ),
+      color: chatBg,
       child: Column(
         children: [
           if (_incomingCall != null)
@@ -3283,12 +3713,54 @@ class _HomePageState extends State<HomePage> {
               height: 200,
               child: RTCVideoView(_remoteRenderer),
             ),
+          if (isE2ee)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: dark
+                    ? const Color(0xFF2A2F2B)
+                    : const Color(0xFFFFF8C6),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.lock,
+                      size: 15,
+                      color: dark ? Colors.white70 : Colors.black54),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Messages are end-to-end encrypted. No one outside '
+                      'of this chat, not even Safari, can read or listen '
+                      'to them.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: dark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Expanded(
             child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
               itemCount: _messages.length,
               itemBuilder: (context, i) {
                 final m = _messages[i] as Map<String, dynamic>;
-                return _messageBubble(m);
+                final showDate = i == 0 ||
+                    _messageDay(_messages[i - 1] as Map<String, dynamic>) !=
+                        _messageDay(m);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (showDate) _dateChip(_messageDay(m)),
+                    _messageBubble(m),
+                    const SizedBox(height: 4),
+                  ],
+                );
               },
             ),
           ),
@@ -3305,7 +3777,7 @@ class _HomePageState extends State<HomePage> {
           if (_replyTo != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              color: Colors.grey.shade200,
+              color: dark ? WaColors.darkInputBackground : Colors.grey.shade200,
               child: Row(children: [
                 Expanded(
                   child: Text(
@@ -3340,33 +3812,25 @@ class _HomePageState extends State<HomePage> {
             ),
           if (_draftEmpty) _smartReplyChips(),
           Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -3),
-                ),
-              ],
-            ),
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+            color: chatBg,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  tooltip: 'Attach: photo, location, schedule, disappearing',
-                  iconSize: 30,
-                  color: VyroColors.purple,
-                  onPressed: _showAttachSheet,
-                ),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(26),
+                      color: dark
+                          ? WaColors.darkInputBackground
+                          : WaColors.lightInputBackground,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
@@ -3374,7 +3838,7 @@ class _HomePageState extends State<HomePage> {
                           child: TextField(
                             controller: _draft,
                             decoration: const InputDecoration(
-                              hintText: 'Type a message…',
+                              hintText: 'Message',
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
@@ -3388,7 +3852,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         if (_ttlSeconds > 0)
                           Padding(
-                            padding: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: 4),
                             child: Chip(
                               label: Text(
                                   '⏱ ${_ttlSeconds >= 86400 ? '1d' : _ttlSeconds >= 3600 ? '1h' : '1m'}'),
@@ -3396,24 +3860,128 @@ class _HomePageState extends State<HomePage> {
                               onDeleted: () => setState(() => _ttlSeconds = 0),
                             ),
                           ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.attach_file,
+                            color: dark
+                                ? WaColors.darkIcon
+                                : WaColors.lightIcon,
+                          ),
+                          tooltip:
+                              'Attach: photo, location, schedule, disappearing',
+                          onPressed: _showAttachSheet,
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.camera_alt_outlined,
+                            color: dark
+                                ? WaColors.darkIcon
+                                : WaColors.lightIcon,
+                          ),
+                          tooltip: 'Send photo',
+                          onPressed: _sendPhoto,
+                        ),
+                        const SizedBox(width: 4),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                VoiceRecordButton(
-                  api: _api,
-                  chatId: _activeChat!['id'] as String,
-                  onSent: _refreshMessages,
-                ),
-                const SizedBox(width: 8),
-                GradientIconButton(icon: Icons.send, onPressed: _send),
+                const SizedBox(width: 6),
+                if (_draftEmpty)
+                  VoiceRecordButton(
+                    api: _api,
+                    chatId: _activeChat!['id'] as String,
+                    onSent: _refreshMessages,
+                  )
+                else
+                  _WaSendButton(onPressed: _send),
               ],
             ),
           ),
           if (_error != null)
             Text(_error!, style: const TextStyle(color: Colors.red)),
         ],
+      ),
+    );
+  }
+
+  /// Day key (yyyy-mm-dd) of a message, for the date chips.
+  String _messageDay(Map<String, dynamic> m) {
+    final raw = m['created_at'] as String?;
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final t = DateTime.parse(raw).toLocal();
+      return '${t.year}-${t.month.toString().padLeft(2, '0')}-${t.day.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// WhatsApp date chip: "Today", "Yesterday", weekday, or date.
+  Widget _dateChip(String dayKey) {
+    if (dayKey.isEmpty) return const SizedBox.shrink();
+    final now = DateTime.now();
+    final today =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final yesterday = now.subtract(const Duration(days: 1));
+    final yesterdayKey =
+        '${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}';
+    String label = dayKey;
+    if (dayKey == today) {
+      label = 'Today';
+    } else if (dayKey == yesterdayKey) {
+      label = 'Yesterday';
+    } else {
+      try {
+        final t = DateTime.parse(dayKey);
+        if (now.difference(t).inDays < 7) {
+          const weekdays = [
+            'Monday',
+            'Tuesday',
+            'Wednesday',
+            'Thursday',
+            'Friday',
+            'Saturday',
+            'Sunday'
+          ];
+          label = weekdays[t.weekday - 1];
+        } else {
+          label =
+              '${t.day}/${t.month}/${t.year}';
+        }
+      } catch (_) {}
+    }
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Center(
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: dark
+                ? WaColors.darkBubbleIn
+                : const Color(0xFFFCF8F0),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 3,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: dark
+                  ? WaColors.darkTextSecondary
+                  : WaColors.lightTextSecondary,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -3528,21 +4096,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// WhatsApp message bubble: green outgoing (#D9FDD3 light /
+  /// #005C4B dark), white/dark incoming, small radius with the tail
+  /// corner, time + ticks inline at the bottom-right (blue ticks
+  /// when read).
   Widget _messageBubble(Map<String, dynamic> m) {
     final mine = m['sender_id'] == _user!['id'];
     final kind = m['kind'] as String? ?? 'text';
     final status = m['status'] as String?;
-    final ticks = !mine
-        ? ''
-        : status == 'read'
-            ? ' ✓✓'
-            : status == 'delivered'
-                ? ' ✓✓'
-                : ' ✓';
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final time = (m['created_at'] as String?) ?? '';
+    final timeLabel = time.length >= 19 ? time.substring(11, 16) : time;
     final isE2ee = kind == 'e2ee';
     final content = isE2ee
-        ? (_decrypted[m['id'] as String] ?? '🔒 Encrypted message')
+        ? (_decrypted[m['id'] as String] ?? 'Encrypted message')
         : (m['content'] as String? ?? '');
     final replyToId = m['reply_to_id'] as String?;
     String? replyText;
@@ -3558,6 +4125,20 @@ class _HomePageState extends State<HomePage> {
     final reactions = m['reactions'] as Map<String, dynamic>?;
     // v0.7 forwarding: "Forwarded from <name>" above the body.
     final fwdLabel = forwardedLabel(m);
+    final bubbleColor = mine
+        ? (dark ? WaColors.darkBubbleOut : WaColors.lightBubbleOut)
+        : (dark ? WaColors.darkBubbleIn : WaColors.lightBubbleIn);
+    final textColor = dark ? WaColors.darkText : WaColors.lightText;
+    final metaColor =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
+    final tickColor = status == 'read'
+        ? WaColors.readBlue
+        : metaColor;
+    final ticks = !mine
+        ? ''
+        : status == 'read' || status == 'delivered'
+            ? ' ✓✓'
+            : ' ✓';
     // Subtle entrance: fade + rise, so new messages feel alive.
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -3578,57 +4159,50 @@ class _HomePageState extends State<HomePage> {
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
             decoration: BoxDecoration(
-              gradient: mine ? VyroColors.brandGradient : null,
-              color: mine
-                  ? null
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: bubbleColor,
               borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(20),
-                topRight: const Radius.circular(20),
-                bottomLeft: Radius.circular(mine ? 20 : 6),
-                bottomRight: Radius.circular(mine ? 6 : 20),
+                topLeft: const Radius.circular(8),
+                topRight: const Radius.circular(8),
+                bottomLeft: Radius.circular(mine ? 8 : 2),
+                bottomRight: Radius.circular(mine ? 2 : 8),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isE2ee)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.lock,
-                            size: 12,
-                            color: mine ? Colors.white70 : Colors.grey),
+                        Icon(Icons.lock, size: 12, color: metaColor),
                         const SizedBox(width: 2),
                         Text('E2EE',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: mine ? Colors.white70 : Colors.grey)),
+                            style:
+                                TextStyle(fontSize: 11, color: metaColor)),
                       ],
                     ),
                   if (fwdLabel != null)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.forward,
-                            size: 12,
-                            color: mine ? Colors.white70 : Colors.grey),
+                        Icon(Icons.forward, size: 12, color: metaColor),
                         const SizedBox(width: 2),
                         Text(fwdLabel,
                             style: TextStyle(
                                 fontSize: 11,
                                 fontStyle: FontStyle.italic,
-                                color: mine ? Colors.white70 : Colors.grey)),
+                                color: metaColor)),
                       ],
                     ),
                   if (replyText != null)
@@ -3637,9 +4211,9 @@ class _HomePageState extends State<HomePage> {
                       margin: const EdgeInsets.only(bottom: 4),
                       decoration: BoxDecoration(
                         color: mine
-                            ? Colors.white.withOpacity(0.18)
-                            : Colors.black12,
-                        borderRadius: BorderRadius.circular(8),
+                            ? Colors.black.withOpacity(0.08)
+                            : Colors.black.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(replyText,
                           maxLines: 2,
@@ -3647,15 +4221,13 @@ class _HomePageState extends State<HomePage> {
                           style: TextStyle(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color: mine ? Colors.white : null)),
+                              color: textColor)),
                     ),
                   DefaultTextStyle(
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.35,
-                      color: mine
-                          ? Colors.white
-                          : Theme.of(context).colorScheme.onSurface,
+                      color: textColor,
                     ),
                     child: _messageContent(m, kind, content),
                   ),
@@ -3670,8 +4242,7 @@ class _HomePageState extends State<HomePage> {
                           padding: EdgeInsets.zero,
                           minimumSize: const Size(0, 26),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          foregroundColor:
-                              mine ? Colors.white70 : VyroColors.purple,
+                          foregroundColor: metaColor,
                         ),
                         onPressed: () => _showTranslation(m, content),
                       ),
@@ -3685,20 +4256,29 @@ class _HomePageState extends State<HomePage> {
                             .join('  '),
                         style: TextStyle(
                           fontSize: 13,
-                          color: mine ? Colors.white : null,
+                          color: textColor,
                         ),
                       ),
                     ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${time.length >= 19 ? time.substring(11, 16) : time}$ticks',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: mine
-                          ? Colors.white70
-                          : status == 'read'
-                              ? Colors.blue
-                              : Colors.grey,
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          timeLabel,
+                          style: TextStyle(fontSize: 11, color: metaColor),
+                        ),
+                        if (ticks.isNotEmpty)
+                          Text(
+                            ticks,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: tickColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ],
@@ -3847,6 +4427,32 @@ class _VideoPlayerState extends State<_VideoPlayer> {
               setState(() => c.value.isPlaying ? c.pause() : c.play()),
         ),
       ],
+    );
+  }
+}
+
+
+/// WhatsApp green circular send button.
+class _WaSendButton extends StatelessWidget {
+  const _WaSendButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        color: dark ? WaColors.accentDark : WaColors.accent,
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: const Icon(Icons.send, color: Colors.white),
+        tooltip: 'Send',
+        onPressed: onPressed,
+      ),
     );
   }
 }

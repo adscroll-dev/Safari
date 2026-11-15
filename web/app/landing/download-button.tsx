@@ -12,34 +12,34 @@ type Apk = {
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
 // 2026-11-15 with aapt2 (package app.vyro, version 0.6.0, label
-// "Safari"). Rebuilt 2026-11-15 02:56 +0430 — the Safari rebrand:
-// swift-bird logo as app icon, Safari name, premium register screen
-// with automatic username, DM chats show the person's name,
+// "Safari"). Rebuilt 2026-11-15 08:54 +0430 — the WhatsApp redesign:
+// teal header, 4 tabs (Chats/Updates/Communities/Calls), WhatsApp
+// chat list with previews + unread badges, WhatsApp bubbles,
 // live API https://vyro-api-wf4b.onrender.com.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
     href: "/downloads/safari-0.6.0-arm64-v8a.apk",
     size: "33.4 MB",
-    bytes: "33,425,128 bytes",
+    bytes: "33,424,899 bytes",
     sha256:
-      "1c532840ac8127621f19d8ce8d8c47156552bff56338b962f87415dbfa7059f5",
+      "b6c133007c80954560dc4d91f7a19673a6d1316722d179e9b99e0b04be8fa630",
   },
   {
     abi: "armeabi-v7a",
     href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
     size: "26.5 MB",
-    bytes: "26,486,997 bytes",
+    bytes: "26,503,155 bytes",
     sha256:
-      "f1398379af01c0abe8b63a71a6a29c2629a567b2afbc6c705c287eb9a916ba4b",
+      "21953230cb0d8429c4ad54da914c7150dbe590677786bd152a5ccf96bb628bf2",
   },
   {
     abi: "x86_64",
     href: "/downloads/safari-0.6.0-x86_64.apk",
     size: "35.9 MB",
-    bytes: "35,895,789 bytes",
+    bytes: "35,895,557 bytes",
     sha256:
-      "4fd04205df291368b14447aaaf959568d67ce846a3080767d1f818be1c1598b1",
+      "9ba40b839262b129f46fe5ac5e3dc791ca0593ab1638b612cfd46c89b5d5974b",
   },
 ];
 

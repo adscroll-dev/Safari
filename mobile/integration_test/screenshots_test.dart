@@ -39,13 +39,15 @@ Future<void> _waitFor(
   throw Exception('Timed out waiting for ${label ?? finder}');
 }
 
-Future<String> _waitForCode(String email) async {
+Future<String> _waitForCode(String email, {String? except}) async {
   final end = DateTime.now().add(const Duration(seconds: 30));
   while (DateTime.now().isBefore(end)) {
     try {
       final data = await _getJson('$_helper/code?email=$email');
       final code = data['code'] as String?;
-      if (code != null && code.length == 6) return code;
+      // Skip the seeding-time register code: the login code is a
+      // different 6-digit code issued after tapping "Log in".
+      if (code != null && code.length == 6 && code != except) return code;
     } catch (_) {
       // Not issued yet — keep polling.
     }
@@ -66,6 +68,13 @@ void main() {
     final config = await _getJson('$_helper/config');
     final email = config['email'] as String;
     final password = config['password'] as String;
+    // The seeding-time register code, if any — the login code issued
+    // after tapping "Log in" is a different code.
+    String? staleCode;
+    try {
+      final stale = await _getJson('$_helper/code?email=$email');
+      staleCode = stale['code'] as String?;
+    } catch (_) {}
 
     await tester.enterText(
         find.widgetWithText(TextField, 'Email'), email);
@@ -77,19 +86,46 @@ void main() {
     // 2) 6-digit code screen (code is emailed by the real backend).
     await _waitFor(tester, find.text('Check your email'),
         label: 'code screen');
-    final code = await _waitForCode(email);
-    await tester.enterText(
-        find.widgetWithText(TextField, '6-digit code'), code);
+    final code = await _waitForCode(email, except: staleCode);
+    final codeFinder = find.widgetWithText(TextField, '6-digit code');
+    await tester.enterText(codeFinder, code);
+    await tester.pump();
+    // Decisive check: did the code actually land in the field?
+    // (On web, enterText silently fails on this field — maxLength +
+    // number keyboard — while it works for email/password. Setting the
+    // controller directly is a test-harness workaround; real users type
+    // on a phone keyboard, which works fine.)
+    var ctrl =
+        (codeFinder.evaluate().first.widget as TextField).controller;
+    if (ctrl?.text != code) {
+      ctrl?.text = code;
+      await tester.pump();
+    }
+    ctrl = (codeFinder.evaluate().first.widget as TextField).controller;
+    if (ctrl?.text != code) {
+      throw Exception(
+          'code field read-back mismatch: entered="${ctrl?.text}" want="$code"');
+    }
     await tester.tap(find.text('Verify and continue'));
     await tester.pump();
 
-    // 3) Chat list ("Your World").
-    await _waitFor(tester, find.text('🌍 Your World'),
-        label: 'chat list');
-    await _waitFor(tester, find.text('Demo Two'), label: 'Demo Two chat');
+    // 3) Chat list (WhatsApp-style: avatar, name, preview, time).
+    try {
+      await _waitFor(tester, find.text('Demo Two'), label: 'Demo Two chat');
+    } catch (e) {
+      // Diagnostic (thrown, so it lands in the failure details):
+      // dump every visible text so a stuck screen is identifiable
+      // (wrong code? login error? empty list?).
+      final texts = find.byType(Text).evaluate().map((el) {
+        final w = el.widget as Text;
+        return w.data ?? w.textSpan?.toPlainText() ?? '';
+      }).where((s) => s.isNotEmpty).toList();
+      throw Exception(
+          'Stuck waiting for Demo Two. Screen texts: $texts (cause: $e)');
+    }
     await _waitFor(tester, find.text('Weekend Plans'),
         label: 'Weekend Plans chat');
-    // Let the world background settle and chats render fully.
+    // Let the list render fully.
     await tester.pump(const Duration(seconds: 2));
     await binding.takeScreenshot('chat-list');
 
@@ -101,11 +137,10 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await binding.takeScreenshot('chat');
 
-    // 5) Back to the list, then the Stories tab.
-    await tester.tap(find.byIcon(Icons.arrow_back));
-    await _waitFor(tester, find.text('🌍 Your World'),
-        label: 'chat list again');
-    await tester.tap(find.text('Stories'));
+    // 5) Back to the list (the small back FAB), then the Updates tab.
+    await tester.tap(find.byType(FloatingActionButton));
+    await _waitFor(tester, find.text('Demo Two'), label: 'chat list again');
+    await tester.tap(find.text('Updates'));
     await _waitFor(tester, find.text('Morning in Kabul ☀️'),
         label: 'story row');
     await tester.pump(const Duration(seconds: 1));

@@ -50,6 +50,10 @@ type StoreIface interface {
 	CreateMessage(m *models.Message) error
 	MessageByID(id string) (*models.Message, error)
 	MessagesForChat(chatID string, limit, offset int) []*models.Message
+	// Chat-list previews (WhatsApp-style): the latest message in a
+	// chat, and how many messages from others userID has not read.
+	LastMessageForChat(chatID string) *models.Message
+	UnreadCountForChat(chatID, userID string) int
 	SearchMessages(userID, query string, limit int) []*models.Message
 	UpdateMessage(m *models.Message) error
 	DeleteMessage(id string) error
@@ -454,6 +458,48 @@ func (s *MemoryStore) MessagesForChat(chatID string, limit, offset int) []*model
 		}
 	}
 	return out
+}
+
+func (s *MemoryStore) LastMessageForChat(chatID string) *models.Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := s.chatMsgs[chatID]
+	now := time.Now().UTC()
+	for i := len(ids) - 1; i >= 0; i-- {
+		if m, ok := s.messages[ids[i]]; ok && m.DeletedAt == nil &&
+			(m.ExpiresAt == nil || m.ExpiresAt.After(now)) {
+			return s.withReceipts(m)
+		}
+	}
+	return nil
+}
+
+func (s *MemoryStore) UnreadCountForChat(chatID, userID string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	now := time.Now().UTC()
+	n := 0
+	for _, id := range s.chatMsgs[chatID] {
+		m, ok := s.messages[id]
+		if !ok || m.DeletedAt != nil ||
+			(m.ExpiresAt != nil && !m.ExpiresAt.After(now)) {
+			continue
+		}
+		if m.SenderID == userID {
+			continue
+		}
+		read := false
+		for _, r := range s.withReceipts(m).ReadBy {
+			if r == userID {
+				read = true
+				break
+			}
+		}
+		if !read {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *MemoryStore) SearchMessages(userID, query string, limit int) []*models.Message {

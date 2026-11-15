@@ -2,12 +2,15 @@
 """Paint out the Flutter DEBUG ribbon from screenshot PNGs.
 
 The ribbon is a dark-red diagonal band in the top-right corner of the
-app bar (x>=336, y<=53, x+y in [336,442]) with white anti-aliased
+app bar (x>=336, y<=55, x+y in [336,446]) with white anti-aliased
 "DEBUG" text on it. It is a debug-build artifact, not app content:
-only the ribbon pixels are replaced, with the app bar's own horizontal
-gradient (fitted from a clean stretch of the header), and only inside
-the app bar (y<56) so the light content below is never touched.
-The settings-gear icon (x<344) is preserved.
+only the ribbon pixels are replaced, with the app bar's own color
+(fitted from a clean stretch of the header — solid teal #008069
+since the WhatsApp redesign), and only inside the app bar (y<56)
+so the light content below is never touched.
+The header icons (search/camera on the list screens, video/call on
+the chat screen) all end at x<=339 while the DEBUG text starts at
+x>=352, so white pixels with x<344 are never touched.
 """
 import sys
 
@@ -38,11 +41,11 @@ def clean(path):
     replaced = 0
     for y in range(min(h, 56)):  # inside the app bar only
         for x in range(w):
-            if not (x >= 336 and 336 <= x + y <= 442):
+            if not (x >= 336 and 336 <= x + y <= 446):
                 continue  # outside the ribbon band
             r, g, b = px[x, y]
-            # The settings-gear icon (white, x<344) sits just left of the
-            # ribbon: never touch it.
+            # The header icons (white, x<=339) sit just left of the
+            # ribbon: never touch them.
             if x < 344 and min(r, g, b) > 200:
                 continue
             # Anything that is not the header gradient itself is ribbon

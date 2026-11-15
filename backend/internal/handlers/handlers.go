@@ -309,11 +309,31 @@ type createChatReq struct {
 }
 
 func (h *Handler) ListChats(w http.ResponseWriter, r *http.Request) {
-	chats := h.Store.ChatsForUser(middleware.UserID(r))
+	me := middleware.UserID(r)
+	chats := h.Store.ChatsForUser(me)
 	if chats == nil {
 		chats = []*models.Chat{}
 	}
 	h.applySettings(w, r, chats)
+	// WhatsApp-style list data: latest message preview + unread
+	// count for the requesting user. E2EE previews never carry the
+	// ciphertext — the client shows "Encrypted message" instead.
+	for _, c := range chats {
+		if m := h.Store.LastMessageForChat(c.ID); m != nil {
+			content := m.Content
+			if m.Kind == "e2ee" {
+				content = ""
+			}
+			c.LastMessage = &models.LastMessagePreview{
+				Content:   content,
+				Kind:      m.Kind,
+				SenderID:  m.SenderID,
+				Status:    m.Status,
+				CreatedAt: m.CreatedAt,
+			}
+		}
+		c.UnreadCount = h.Store.UnreadCountForChat(c.ID, me)
+	}
 	// Pinned chats first, archived last (Telegram-style ordering).
 	sortChats(chats)
 	middleware.WriteJSON(w, http.StatusOK, chats)
