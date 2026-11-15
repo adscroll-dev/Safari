@@ -81,24 +81,21 @@ Never present a demo feature as complete.
 ### 3. Calls
 - DONE: 1:1 voice/video signaling (WebRTC), Opus 12 kbps cap, video
   starts low, audio-only fallback, TURN wiring on web.
-- MISSING: group calls, call history (persisted), missed-call marker,
-  in-call mic mute / camera on-off / front-back switch, reconnect
-  handling. Live two-phone media test still never done — needs her
-  phone + a second phone.
-- STAGE 3 REVIEW (2026-11-15, code read while the Stage 2 APK built):
-  CallController (mobile/lib/call.dart) has startCall, acceptCall,
-  declineCall, handleAnswer, handleIce, dropToAudioOnly, endCall,
-  handleRemoteEnd — NO mic-mute, camera on/off, front/back switch,
-  speaker toggle, or reconnect. The in-call UI (main.dart ~4458) is
-  only a banner: "Audio only" button + End call. There is NO call
-  history storage anywhere (no call_history model, no missed-call
-  marker) and no group-call signaling (1:1 only). Stage 3 plan:
-  (a) backend call_records table + POST/GET /api/calls (history,
-  missed flag, duration); (b) CallController mic/camera/switch
-  toggles + reconnect on ICE failure; (c) Calls tab lists real
-  history with missed markers; (d) group-call signaling (mesh,
-  one peer connection per member) — the biggest piece; (e) live
-  two-phone media test still needs her phone + a second phone.
+- DONE 2026-11-15 (Stage 3): call history (migration 013
+  call_records; POST/GET /api/calls; caller records ended/missed,
+  callee + group members see it; TestStage3Calls passes), missed-call
+  marker (red "Missed" in the Calls tab), in-call mic mute / camera
+  on-off / front-back switch, live duration label, ICE reconnect
+  (restartIce once on failure), group calls (mesh: one peer
+  connection per member, offers via the existing to_user_id relay,
+  join/leave handling, per-member video tiles), incoming-call banner
+  on every screen (with caller/group name) + "return to call" bar,
+  call-back from history. Backend go test ./... all pass; mobile
+  analyze clean, flutter test 33/33.
+- MISSING: live two-phone media test still never done — needs her
+  phone + a second phone. Speaker toggle not built (no API in the
+  WebRTC fork). No "busy" handling when a second call arrives
+  mid-call.
 
 ### 4. Status / Updates
 - DONE: photo/video status post + view, 24h expiry, sponsored
@@ -124,6 +121,26 @@ Never present a demo feature as complete.
   types, group E2EE (Sender Keys).
 - VERIFY: group photo/about editing, member permissions.
 - MISSING: polls, pinned message, group calls.
+- STAGE 4 PLAN (2026-11-15, reviewed while the Stage 3 APK built):
+  Polls need a FULL build — zero poll code exists anywhere today
+  (backend or mobile). Plan: (a) backend migration 014 — polls
+  table (id, chat_id, creator_id, question, options JSON,
+  allow_multiple, created_at) + poll_votes (poll_id, user_id,
+  option_index, PK poll+user+option); model Poll {id, question,
+  options, votes per option, myVotes, total}; endpoints
+  POST /api/chats/{id}/polls (member; question ≤300 chars, 2–12
+  options), GET /api/chats/{id}/polls, POST /api/polls/{id}/vote
+  (one vote per option; re-vote replaces), DELETE /api/polls/{id}
+  (creator/admin); poll is also a message kind so it appears in the
+  chat flow with live results; (b) mobile: attach-sheet "Poll" →
+  question + options composer, poll bubble with tap-to-vote and live
+  percentages, change-vote support. Pinned message in groups is
+  ALMOST done — Stage 1 pin/unpin works in every chat already, but
+  any member can pin; Stage 4 tightens it: group pin/unpin requires
+  admin/owner (requireRole helper exists in v04.go), DMs stay
+  either-member, and pinning posts a system notice in the chat
+  ("X pinned a message") like WhatsApp. Group calls: DONE in
+  Stage 3.
 
 ### 6. Communities
 - PARTIAL: tab lists real groups; "New community" opens the group flow.
@@ -163,7 +180,7 @@ Never present a demo feature as complete.
 2. Chat gaps: mute chat, pin message, contact share, delete-for-me /
    delete-for-everyone check. — DONE 2026-11-15 (Stage 1 above).
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
-4. Calls: history + missed, in-call controls, group calls (signaling).
+4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above).
 5. Polls + pinned message (groups).
 6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group).

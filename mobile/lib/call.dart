@@ -38,10 +38,16 @@ enum CallState { idle, outgoing, incoming, inCall }
 
 class IncomingCall {
   IncomingCall(
-      {required this.chatId, required this.peerId, required this.offer});
+      {required this.chatId,
+      required this.peerId,
+      required this.offer,
+      this.group = false});
   final String chatId;
   final String peerId;
   final Map<String, dynamic> offer;
+
+  /// True for a group-call invite (Stage 3): accepting joins the mesh.
+  final bool group;
 }
 
 /// Sends one signaling frame over the existing WebSocket.
@@ -68,9 +74,35 @@ class CallController {
   final _stateController = StreamController<CallState>.broadcast();
   final _remoteStreamController = StreamController<MediaStream?>.broadcast();
 
+  // Stage 3: in-call controls.
+  bool micMuted = false;
+  bool cameraOff = false;
+  bool _iceRestarted = false;
+
+  // Stage 3: group calls (mesh) — one peer connection per member.
+  bool isGroup = false;
+  final Map<String, RTCPeerConnection> _groupPcs = {};
+  final Map<String, MediaStream?> _groupRemoteStreams = {};
+  final Set<String> _groupPeers = {};
+  final Map<String, Map<String, dynamic>> _pendingGroupOffers = {};
+  final _groupStreamsController = StreamController<void>.broadcast();
+
   Stream<CallState> get onState => _stateController.stream;
   Stream<MediaStream?> get onRemoteStream => _remoteStreamController.stream;
   MediaStream? get remoteStream => _remoteStream;
+
+  /// Fires whenever a group member's remote stream appears or leaves.
+  Stream<void> get onGroupStreams => _groupStreamsController.stream;
+
+  /// Remote streams of the group call, keyed by peer user id.
+  Map<String, MediaStream?> get groupRemoteStreams =>
+      Map.unmodifiable(_groupRemoteStreams);
+
+  bool get connected => state == CallState.inCall;
+  DateTime? get callStartedAt => _callStartedAt;
+  int get durationSeconds => _callStartedAt == null
+      ? 0
+      : DateTime.now().difference(_callStartedAt!).inSeconds;
 
   Map<String, dynamic> _iceServers() {
     final servers = <Map<String, dynamic>>[
@@ -132,6 +164,19 @@ class CallController {
     return out;
   }
 
+  /// Watch a peer connection's ICE state and restart ICE once if it
+  /// fails (Stage 3 reconnect): a brief network drop should not kill
+  /// the call.
+  void _watchIce(RTCPeerConnection pc) {
+    pc.onIceConnectionState = (state) {
+      if (state == RTCIceConnectionState.RTCIceConnectionStateFailed &&
+          !_iceRestarted) {
+        _iceRestarted = true;
+        unawaited(pc.restartIce());
+      }
+    };
+  }
+
   Future<RTCPeerConnection> _newPc() async {
     final pc = await createPeerConnection(_iceServers(), {
       'mandatory': {},
@@ -154,6 +199,35 @@ class CallController {
       _remoteStream = stream;
       _remoteStreamController.add(_remoteStream);
     };
+    _watchIce(pc);
+    return pc;
+  }
+
+  /// One peer connection for a single member of a group call
+  /// (Stage 3, mesh): ICE and remote streams are routed per peer.
+  Future<RTCPeerConnection> _newPcForPeer(String peer) async {
+    final pc = await createPeerConnection(_iceServers(), {
+      'mandatory': {},
+      'optional': [
+        {'DtlsSrtpKeyAgreement': true},
+      ],
+    });
+    pc.onIceCandidate = (candidate) {
+      if (candidate.candidate != null && chatId.isNotEmpty) {
+        sendSignal(chatId, 'call-ice', peer, candidate.toMap());
+      }
+    };
+    pc.onTrack = (event) {
+      if (event.streams.isNotEmpty) {
+        _groupRemoteStreams[peer] = event.streams[0];
+        _groupStreamsController.add(null);
+      }
+    };
+    pc.onAddStream = (stream) {
+      _groupRemoteStreams[peer] = stream;
+      _groupStreamsController.add(null);
+    };
+    _watchIce(pc);
     return pc;
   }
 
@@ -187,6 +261,7 @@ class CallController {
     this.peerId = peerId;
     this.video = video;
     audioOnly = !video;
+    _iceRestarted = false;
     _pc = await _newPc();
     _localStream = await _getLocalMedia(video: video);
     _localStream!.getTracks().forEach(_pc!.addTrack);
@@ -217,6 +292,7 @@ class CallController {
 
   Future<void> acceptCall(IncomingCall call) async {
     _pc = await _newPc();
+    _iceRestarted = false;
     _localStream = await _getLocalMedia(video: video);
     _localStream!.getTracks().forEach(_pc!.addTrack);
     await _pc!.setRemoteDescription(RTCSessionDescription(
@@ -239,6 +315,202 @@ class CallController {
     sendSignal(call.chatId, 'call-end', call.peerId, {'reason': 'declined'});
     state = CallState.idle;
     _stateController.add(state);
+  }
+
+  // ---- Stage 3: group calls (mesh) ----
+
+  /// Start a group call: one peer connection per member, each offered
+  /// directly via the existing to_user_id relay.
+  Future<void> startGroupCall(
+      {required String chatId,
+      required List<String> peerIds,
+      bool video = false}) async {
+    this.chatId = chatId;
+    isGroup = true;
+    this.video = video;
+    audioOnly = !video;
+    _iceRestarted = false;
+    _groupPeers.addAll(peerIds);
+    _localStream = await _getLocalMedia(video: video);
+    for (final peer in peerIds) {
+      final pc = await _newPcForPeer(peer);
+      _groupPcs[peer] = pc;
+      _localStream!.getTracks().forEach(pc.addTrack);
+      final offer = await pc.createOffer(
+          {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+      final capped = capSdpBitrates(offer.sdp ?? '', video: video);
+      await pc.setLocalDescription(RTCSessionDescription(capped, offer.type));
+      sendSignal(chatId, 'call-offer', peer, {
+        'sdp': capped,
+        'type': offer.type,
+        'video': video,
+        'group': true,
+      });
+    }
+    state = CallState.outgoing;
+    _stateController.add(state);
+  }
+
+  /// Handle an incoming group-call offer. The offer is parked until
+  /// the user accepts; media starts in acceptGroupCall.
+  IncomingCall handleGroupOffer(
+      String chatId, String peerId, Map<String, dynamic> offer) {
+    this.chatId = chatId;
+    isGroup = true;
+    video = offer['video'] == true;
+    _pendingGroupOffers[peerId] = offer;
+    state = CallState.incoming;
+    _stateController.add(state);
+    return IncomingCall(
+        chatId: chatId, peerId: peerId, offer: offer, group: true);
+  }
+
+  /// Accept a group call: answer the peer who invited us, then offer
+  /// to every other member (mesh) so all pairs connect.
+  Future<void> acceptGroupCall(
+      IncomingCall call, List<String> otherMemberIds) async {
+    _iceRestarted = false;
+    _localStream ??= await _getLocalMedia(video: video);
+    _groupPeers.addAll(otherMemberIds);
+    _groupPeers.add(call.peerId);
+    // Answer the peer who invited us.
+    final pc = await _newPcForPeer(call.peerId);
+    _groupPcs[call.peerId] = pc;
+    _localStream!.getTracks().forEach(pc.addTrack);
+    await pc.setRemoteDescription(RTCSessionDescription(
+        call.offer['sdp'] as String, call.offer['type'] as String));
+    final answer = await pc.createAnswer(
+        {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+    final capped = capSdpBitrates(answer.sdp ?? '', video: video);
+    await pc.setLocalDescription(RTCSessionDescription(capped, answer.type));
+    sendSignal(call.chatId, 'call-answer', call.peerId, {
+      'sdp': capped,
+      'type': answer.type,
+      'video': video,
+      'group': true,
+    });
+    // Offer to the remaining members (mesh).
+    for (final peer in otherMemberIds) {
+      if (peer == call.peerId || _groupPcs.containsKey(peer)) continue;
+      final p2 = await _newPcForPeer(peer);
+      _groupPcs[peer] = p2;
+      _localStream!.getTracks().forEach(p2.addTrack);
+      final offer = await p2.createOffer(
+          {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+      final cappedOffer = capSdpBitrates(offer.sdp ?? '', video: video);
+      await p2.setLocalDescription(
+          RTCSessionDescription(cappedOffer, offer.type));
+      sendSignal(call.chatId, 'call-offer', peer, {
+        'sdp': cappedOffer,
+        'type': offer.type,
+        'video': video,
+        'group': true,
+      });
+    }
+    _callStartedAt = DateTime.now();
+    state = CallState.inCall;
+    _stateController.add(state);
+  }
+
+  /// Decline a group-call invite: only the inviter is told.
+  void declineGroupCall(IncomingCall call) {
+    sendSignal(call.chatId, 'call-end', call.peerId, {'reason': 'declined'});
+    _pendingGroupOffers.remove(call.peerId);
+    if (_groupPcs.isEmpty) {
+      isGroup = false;
+      state = CallState.idle;
+      _stateController.add(state);
+    }
+  }
+
+  Future<void> handleGroupAnswer(
+      String peerId, Map<String, dynamic> answer) async {
+    final pc = _groupPcs[peerId];
+    if (pc == null) return;
+    await pc.setRemoteDescription(RTCSessionDescription(
+        answer['sdp'] as String, answer['type'] as String));
+    _callStartedAt ??= DateTime.now();
+    state = CallState.inCall;
+    _stateController.add(state);
+  }
+
+  Future<void> handleGroupIce(
+      String peerId, Map<String, dynamic> candidate) async {
+    final pc = _groupPcs[peerId];
+    if (pc == null) return;
+    await pc.addCandidate(RTCIceCandidate(
+      candidate['candidate'] as String?,
+      candidate['sdpMid'] as String?,
+      candidate['sdpMLineIndex'] as int?,
+    ));
+  }
+
+  /// End a group call for us: one broadcast call-end reaches every
+  /// other member of the room.
+  Future<void> endGroupCall({String reason = 'hangup'}) async {
+    if (chatId.isNotEmpty) {
+      sendSignal(chatId, 'call-end', '', {'reason': reason});
+    }
+    await _recordUsage();
+    await _cleanupGroup();
+    state = CallState.idle;
+    _stateController.add(state);
+  }
+
+  /// One peer left a group call. When nobody is left, the call ends
+  /// for us too.
+  Future<void> handleRemoteEndForPeer(String peerId) async {
+    final pc = _groupPcs.remove(peerId);
+    try {
+      await pc?.close();
+    } catch (_) {}
+    _groupRemoteStreams.remove(peerId);
+    _groupPeers.remove(peerId);
+    _groupStreamsController.add(null);
+    if (_groupPcs.isEmpty && isGroup) {
+      await _recordUsage();
+      await _cleanupGroup();
+      state = CallState.idle;
+      _stateController.add(state);
+    }
+  }
+
+  Future<void> _cleanupGroup() async {
+    for (final pc in _groupPcs.values) {
+      try {
+        await pc.close();
+      } catch (_) {}
+    }
+    _groupPcs.clear();
+    _groupRemoteStreams.clear();
+    _groupPeers.clear();
+    _pendingGroupOffers.clear();
+    await _cleanup();
+  }
+
+  // ---- Stage 3: in-call controls ----
+
+  /// Mute/unmute the microphone mid-call.
+  void toggleMute() {
+    micMuted = !micMuted;
+    for (final track in _localStream?.getAudioTracks() ?? const []) {
+      track.enabled = !micMuted;
+    }
+  }
+
+  /// Turn the camera on/off mid-call.
+  void toggleCamera() {
+    cameraOff = !cameraOff;
+    for (final track in _localStream?.getVideoTracks() ?? const []) {
+      track.enabled = !cameraOff;
+    }
+  }
+
+  /// Switch between front and back camera mid-call.
+  Future<bool> switchCamera() async {
+    final tracks = _localStream?.getVideoTracks() ?? const [];
+    if (tracks.isEmpty) return false;
+    return Helper.switchCamera(tracks.first);
   }
 
   Future<void> handleAnswer(Map<String, dynamic> answer) async {
@@ -310,10 +582,15 @@ class CallController {
     _pc = null;
     chatId = '';
     peerId = '';
+    isGroup = false;
+    micMuted = false;
+    cameraOff = false;
+    _iceRestarted = false;
   }
 
   void dispose() {
     _stateController.close();
     _remoteStreamController.close();
+    _groupStreamsController.close();
   }
 }

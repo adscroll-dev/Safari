@@ -292,6 +292,25 @@ class ApiClient {
       _req('GET', '/api/users/me/status-privacy');
   Future<Map<String, dynamic>> setStatusPrivacy(String v) =>
       _req('PUT', '/api/users/me/status-privacy', {'status_privacy': v});
+
+  /// Stage 3 (calls): record a finished/missed call (caller only)
+  /// and list my call history, newest first.
+  Future<Map<String, dynamic>> recordCall({
+    required String chatId,
+    String? calleeId,
+    required String callType,
+    required String status,
+    required int durationSeconds,
+  }) =>
+      _req('POST', '/api/calls', {
+        'chat_id': chatId,
+        if (calleeId != null) 'callee_id': calleeId,
+        'call_type': callType,
+        'status': status,
+        'duration_seconds': durationSeconds,
+      });
+  Future<List<dynamic>> listCalls() => _getList('/api/calls');
+
   Future<List<dynamic>> listScheduled(String chatId) =>
       _getList('/api/chats/$chatId/scheduled');
   Future<Map<String, dynamic>> cancelScheduled(String id) =>

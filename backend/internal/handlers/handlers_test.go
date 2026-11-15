@@ -211,6 +211,12 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.GetStatusPrivacy(w, r)
 				}
+			case path == "/api/calls":
+				if method == http.MethodPost {
+					h.CreateCallRecord(w, r)
+				} else {
+					h.ListCallRecords(w, r)
+				}
 			case path == "/api/bots":
 				if method == http.MethodPost {
 					h.CreateBot(w, r)

@@ -362,3 +362,30 @@ type PendingUser struct {
 	ExpiresAt    time.Time // same 10-minute window as its code
 	CreatedAt    time.Time
 }
+
+// CallRecord is one finished (or missed) call, written by the caller
+// when the call ends (Stage 3). Group calls have CalleeID == "" —
+// the chat is then the group.
+type CallRecord struct {
+	ID              string     `json:"id"`
+	ChatID          string     `json:"chat_id"`
+	CallerID        string     `json:"caller_id"`
+	CalleeID        string     `json:"callee_id,omitempty"`
+	CallType        string     `json:"call_type"` // voice | video
+	Status          string     `json:"status"`    // missed | ended
+	StartedAt       time.Time  `json:"started_at"`
+	EndedAt         *time.Time `json:"ended_at,omitempty"`
+	DurationSeconds int        `json:"duration_seconds"`
+}
+
+// CallRecordView is a CallRecord enriched for the requesting user:
+// which direction the call went, who the other side was, and whether
+// it was a group call.
+type CallRecordView struct {
+	CallRecord
+	Direction    string `json:"direction"` // outgoing | incoming
+	IsGroup      bool   `json:"is_group"`
+	PeerName     string `json:"peer_name"`
+	PeerUsername string `json:"peer_username,omitempty"`
+	ChatTitle    string `json:"chat_title,omitempty"`
+}

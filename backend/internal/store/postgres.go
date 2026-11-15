@@ -75,6 +75,9 @@ var migration011SQL string
 //go:embed migrations/012_stage2_status.sql
 var migration012SQL string
 
+//go:embed migrations/013_stage3_calls.sql
+var migration013SQL string
+
 // The embedded migration is a copy of backend/migrations/001_init.sql
 // (go:embed cannot reach outside the package directory).
 // TestMigrationMatchesFile fails if the two ever drift apart.
@@ -160,6 +163,10 @@ func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, 
 	if _, err := pool.Exec(ctx, migration012SQL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("apply migration 012_stage2_status.sql: %w", err)
+	}
+	if _, err := pool.Exec(ctx, migration013SQL); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("apply migration 013_stage3_calls.sql: %w", err)
 	}
 	return &PostgresStore{pool: pool}, nil
 }

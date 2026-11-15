@@ -145,6 +145,12 @@ class _HomePageState extends State<HomePage> {
   CallController? _call;
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
   IncomingCall? _incomingCall;
+  // Stage 3: call history (loaded at login, refreshed after a call).
+  List<dynamic> _calls = [];
+  bool _callInitiatedByMe = false;
+  // Stage 3: one video renderer per member of a group call.
+  final Map<String, RTCVideoRenderer> _groupRenderers = {};
+  Timer? _callTicker;
   String _deviceId = 'mobile-default';
   final Set<String> _e2eeChats = {}; // chat ids with E2EE enabled
   Map<String, dynamic>? _replyTo;
@@ -190,6 +196,13 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _remoteRenderer.initialize();
     _initPrefs();
+    // Stage 3: refresh the in-call duration label once a second
+    // while a call is active (cheap: setState only during a call).
+    _callTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _call != null && _call!.state != CallState.idle) {
+        setState(() {});
+      }
+    });
     _draft.addListener(() {
       final empty = _draft.text.isEmpty;
       if (empty != _draftEmpty) {
@@ -272,6 +285,11 @@ class _HomePageState extends State<HomePage> {
     _ws?.sink.close();
     _call?.dispose();
     _remoteRenderer.dispose();
+    _callTicker?.cancel();
+    for (final r in _groupRenderers.values) {
+      r.dispose();
+    }
+    _groupRenderers.clear();
     _resendTimer?.cancel();
     _draftSaveTimer?.cancel();
     _codeCtrl.dispose();
@@ -398,7 +416,14 @@ class _HomePageState extends State<HomePage> {
       _remoteRenderer.srcObject = s;
       if (mounted) setState(() {});
     });
+    // Stage 3: group-call remote streams get one renderer each.
+    _call!.onGroupStreams.listen((_) {
+      _syncGroupRenderers();
+      if (mounted) setState(() {});
+    });
     await _refreshChats();
+    // Stage 3: call history for the Calls tab.
+    await _refreshCalls();
     // Last-seen privacy: load the server setting for the Settings page.
     try {
       final privacy = await _api.getPrivacy();
@@ -496,16 +521,55 @@ class _HomePageState extends State<HomePage> {
       } else if (type == 'call-offer' && ev['payload'] != null) {
         final payload = ev['payload'] as Map<String, dynamic>;
         final peerId = ev['user_id'] as String? ?? '';
-        final call =
-            _call?.handleOffer(ev['chat_id'] as String, peerId, payload);
+        final call = payload['group'] == true
+            ? _call?.handleGroupOffer(
+                ev['chat_id'] as String, peerId, payload)
+            : _call?.handleOffer(ev['chat_id'] as String, peerId, payload);
         if (call != null) setState(() => _incomingCall = call);
       } else if (type == 'call-answer' && ev['payload'] != null) {
-        _call?.handleAnswer(ev['payload'] as Map<String, dynamic>);
+        final payload = ev['payload'] as Map<String, dynamic>;
+        final peerId = ev['user_id'] as String? ?? '';
+        if (_call?.isGroup == true) {
+          _call?.handleGroupAnswer(peerId, payload);
+        } else {
+          _call?.handleAnswer(payload);
+        }
       } else if (type == 'call-ice' && ev['payload'] != null) {
-        _call?.handleIce(ev['payload'] as Map<String, dynamic>);
+        final payload = ev['payload'] as Map<String, dynamic>;
+        final peerId = ev['user_id'] as String? ?? '';
+        if (_call?.isGroup == true) {
+          _call?.handleGroupIce(peerId, payload);
+        } else {
+          _call?.handleIce(payload);
+        }
       } else if (type == 'call-end') {
-        _call?.handleRemoteEnd();
+        // Stage 3: if I started this call and the other side ended
+        // it (declined, or hung up while I was ringing), record it
+        // as missed/ended before the controller resets.
+        final wasConnected = _call?.connected ?? false;
+        final duration = _call?.durationSeconds ?? 0;
+        final chatId = _call?.chatId ?? '';
+        final peerId = _call?.peerId ?? '';
+        final video = _call?.video ?? false;
+        final group = _call?.isGroup ?? false;
+        final initiatedByMe = _callInitiatedByMe;
+        final endedBy = ev['user_id'] as String? ?? '';
+        if (group) {
+          _call?.handleRemoteEndForPeer(endedBy);
+        } else {
+          _call?.handleRemoteEnd();
+        }
         setState(() => _incomingCall = null);
+        _callInitiatedByMe = false;
+        if (initiatedByMe && chatId.isNotEmpty) {
+          _recordEndedCall(
+            chatId: chatId,
+            peerId: group ? null : peerId,
+            video: video,
+            wasConnected: wasConnected,
+            durationSeconds: duration,
+          );
+        }
       }
     });
   }
@@ -2323,7 +2387,18 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: _buildAppBar(),
       body: _activeChat == null
-          ? (_showSettings ? _buildSettingsBody() : _buildHomeBody())
+          ? (_showSettings
+              ? _buildSettingsBody()
+              : Column(
+                  children: [
+                    if (_incomingCall != null) _incomingCallBanner(),
+                    if (_incomingCall == null &&
+                        (_call?.state == CallState.inCall ||
+                            _call?.state == CallState.outgoing))
+                      _inCallReturnBar(),
+                    Expanded(child: _buildHomeBody()),
+                  ],
+                ))
           : _buildChatBody(),
       bottomNavigationBar: _activeChat == null && !_showSettings
           ? NavigationBar(
@@ -3101,30 +3176,123 @@ class _HomePageState extends State<HomePage> {
   // No call history is stored yet, so the tab honestly shows the
   // empty state until the first call happens.
 
+  /// Stage 3: Calls tab — real call history with missed markers.
+  /// Tap a row to call that person/group back.
   Widget _buildCallsBody() {
+    if (_calls.isEmpty) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
+        children: [
+          const Icon(Icons.call_outlined, size: 72, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text(
+            'No calls yet',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'To make a call, open a chat and tap the call button.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () => setState(() => _tabIndex = 0),
+            child: const Text('Start a call'),
+          ),
+        ],
+      );
+    }
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 24),
       children: [
-        const Icon(Icons.call_outlined, size: 72, color: Colors.grey),
-        const SizedBox(height: 16),
-        const Text(
-          'No calls yet',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'To make a call, open a chat and tap the call button.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 14, color: Colors.grey),
-        ),
-        const SizedBox(height: 24),
-        FilledButton(
-          onPressed: () => setState(() => _tabIndex = 0),
-          child: const Text('Start a call'),
-        ),
+        for (final c in _calls)
+          ListTile(
+            leading: WaAvatar(
+                label: (c['peer_name'] as String?) ?? '?', radius: 26),
+            title: Text((c['peer_name'] as String?) ?? ''),
+            subtitle: Text(_callSubtitle(c),
+                style: TextStyle(
+                    color: c['status'] == 'missed' ? Colors.red : null)),
+            trailing: IconButton(
+              icon: Icon(c['call_type'] == 'video'
+                  ? Icons.videocam
+                  : Icons.call),
+              color: WaColors.accent,
+              onPressed: () => _callBack(c),
+            ),
+            onTap: () => _callBack(c),
+          ),
       ],
     );
+  }
+
+  /// Subtitle for a call-history row (Stage 3): "Missed · Today,
+  /// 11:20" or "↗ 02:05 · Yesterday".
+  String _callSubtitle(Map<String, dynamic> c) {
+    final missed = c['status'] == 'missed';
+    final time = _callTimeLabel(_parseTime(c['started_at'] as String?));
+    if (missed) return 'Missed · $time';
+    final arrow = c['direction'] == 'outgoing' ? '↗' : '↙';
+    final dur = c['duration_seconds'] as int? ?? 0;
+    final mm = (dur ~/ 60).toString().padLeft(2, '0');
+    final ss = (dur % 60).toString().padLeft(2, '0');
+    return '$arrow $mm:$ss · $time';
+  }
+
+  /// WhatsApp time label for a DateTime (Stage 3): HH:MM today,
+  /// "Yesterday", weekday, or dd/MM/yyyy — same rules as the chat list.
+  String _callTimeLabel(DateTime t) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(t.year, t.month, t.day);
+    final hhmm =
+        '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    if (day == today) return hhmm;
+    if (day == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday';
+    }
+    if (today.difference(day).inDays < 7) {
+      const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return weekdays[t.weekday - 1];
+    }
+    return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}';
+  }
+
+  DateTime _parseTime(String? iso) {
+    if (iso == null) return DateTime.now();
+    return DateTime.tryParse(iso)?.toLocal() ?? DateTime.now();
+  }
+
+  /// Call back from a history row (Stage 3): open the chat and start
+  /// the same kind of call (video or voice).
+  Future<void> _callBack(Map<String, dynamic> c) async {
+    final chatId = c['chat_id'] as String?;
+    if (chatId == null) return;
+    Map<String, dynamic>? chat;
+    for (final ch in _chats) {
+      if ((ch as Map)['id'] == chatId) {
+        chat = ch as Map<String, dynamic>;
+        break;
+      }
+    }
+    if (chat == null) {
+      await _refreshChats();
+      for (final ch in _chats) {
+        if ((ch as Map)['id'] == chatId) {
+          chat = ch as Map<String, dynamic>;
+          break;
+        }
+      }
+    }
+    if (chat == null) {
+      setState(() => _error = 'Chat not found');
+      return;
+    }
+    _openChat(chat);
+    // Let the chat screen settle before starting the call.
+    await Future.delayed(const Duration(milliseconds: 300));
+    await _startCall(video: c['call_type'] == 'video');
   }
 
   /// v0.7: chats visible under the active folder filter.
@@ -4280,16 +4448,228 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// Write one call-history record (Stage 3) and refresh the Calls
+  /// tab. Fire-and-forget: history must never break the call UI.
+  Future<void> _recordEndedCall({
+    required String chatId,
+    String? peerId,
+    required bool video,
+    required bool wasConnected,
+    required int durationSeconds,
+  }) async {
+    try {
+      await _api.recordCall(
+        chatId: chatId,
+        calleeId: peerId,
+        callType: video ? 'video' : 'voice',
+        status: wasConnected ? 'ended' : 'missed',
+        durationSeconds: wasConnected ? durationSeconds : 0,
+      );
+      await _refreshCalls();
+    } catch (_) {}
+  }
+
+  /// Refresh the Calls tab history (Stage 3). Best-effort.
+  Future<void> _refreshCalls() async {
+    try {
+      final calls = await _api.listCalls();
+      if (mounted) setState(() => _calls = calls);
+    } catch (_) {}
+  }
+
+  /// End the current call (1:1 or group) and record it in history
+  /// when I started it (Stage 3).
+  Future<void> _endCallAndRecord() async {
+    final call = _call;
+    if (call == null) return;
+    final wasConnected = call.connected;
+    final duration = call.durationSeconds;
+    final chatId = call.chatId;
+    final peerId = call.peerId;
+    final video = call.video;
+    final group = call.isGroup;
+    final initiatedByMe = _callInitiatedByMe;
+    if (group) {
+      await call.endGroupCall();
+    } else {
+      await call.endCall();
+    }
+    _callInitiatedByMe = false;
+    if (mounted) setState(() {});
+    if (initiatedByMe && chatId.isNotEmpty) {
+      await _recordEndedCall(
+        chatId: chatId,
+        peerId: group ? null : peerId,
+        video: video,
+        wasConnected: wasConnected,
+        durationSeconds: duration,
+      );
+    }
+  }
+
+  /// One video renderer per member of a group call (Stage 3):
+  /// create renderers for new remote streams, drop the ones gone.
+  Future<void> _syncGroupRenderers() async {
+    final streams = _call?.groupRemoteStreams ?? {};
+    for (final entry in streams.entries) {
+      var r = _groupRenderers[entry.key];
+      if (r == null) {
+        r = RTCVideoRenderer();
+        await r.initialize();
+        _groupRenderers[entry.key] = r;
+      }
+      r.srcObject = entry.value;
+    }
+    final gone =
+        _groupRenderers.keys.where((k) => !streams.containsKey(k)).toList();
+    for (final k in gone) {
+      await _groupRenderers[k]?.dispose();
+      _groupRenderers.remove(k);
+    }
+  }
+
+  /// Incoming-call banner (Stage 3): shown above every screen — the
+  /// chat list, the tabs, and inside a chat — so a call is never
+  /// missed just because the user is not inside that chat.
+  Widget _incomingCallBanner() {
+    final call = _incomingCall!;
+    final video = _call?.video == true;
+    String who;
+    if (call.group) {
+      String title = 'Group';
+      for (final c in _chats) {
+        if ((c as Map)['id'] == call.chatId) {
+          title = _chatTitle(c as Map<String, dynamic>);
+          break;
+        }
+      }
+      who = 'Incoming group ${video ? 'video' : 'voice'} call · $title';
+    } else {
+      final peer = _usersById[call.peerId];
+      final name = (peer?['display_name'] as String?) ?? 'Unknown';
+      who = 'Incoming ${video ? 'video' : 'voice'} call · $name';
+    }
+    return Container(
+      color: Colors.green.shade100,
+      padding: const EdgeInsets.all(12),
+      child: Row(children: [
+        const Icon(Icons.call),
+        const SizedBox(width: 8),
+        Expanded(child: Text(who)),
+        FilledButton(
+          onPressed: _acceptIncomingCall,
+          child: const Text('Accept'),
+        ),
+        const SizedBox(width: 8),
+        OutlinedButton(
+          onPressed: _declineIncomingCall,
+          child: const Text('Decline'),
+        ),
+      ]),
+    );
+  }
+
+  /// Accept the ringing call (Stage 3): a group invite joins the
+  /// mesh (offering to every other member except the inviter).
+  /// Opens the chat first, so the in-call controls are visible.
+  Future<void> _acceptIncomingCall() async {
+    final call = _incomingCall;
+    if (call == null) return;
+    setState(() => _incomingCall = null);
+    _callInitiatedByMe = false;
+    _openChatById(call.chatId);
+    if (call.group) {
+      final members = await _api.listMembers(call.chatId);
+      final others = <String>[];
+      for (final m in members) {
+        final uid = (m as Map)['user_id'] as String;
+        if (uid != _user!['id'] && uid != call.peerId) {
+          others.add(uid);
+        }
+      }
+      await _call?.acceptGroupCall(call, others);
+    } else {
+      await _call?.acceptCall(call);
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// "Return to call" bar (Stage 3): when a call is active and the
+  /// user is on the chat list, one tap brings the call screen back.
+  Widget _inCallReturnBar() {
+    final chatId = _call?.chatId ?? '';
+    return InkWell(
+      onTap: () {
+        if (chatId.isNotEmpty) _openChatById(chatId);
+      },
+      child: Container(
+        color: Colors.green.shade100,
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          const Icon(Icons.call, color: Colors.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+                'In call — ${_callDurationLabel()} · Tap to return to call'),
+          ),
+          const Icon(Icons.keyboard_arrow_up),
+        ]),
+      ),
+    );
+  }
+
+  /// Decline the ringing call (Stage 3). The caller records it as a
+  /// missed call in their history.
+  void _declineIncomingCall() {
+    final call = _incomingCall;
+    if (call == null) return;
+    if (call.group) {
+      _call?.declineGroupCall(call);
+    } else {
+      _call?.declineCall(call);
+    }
+    setState(() => _incomingCall = null);
+  }
+  String _callDurationLabel() {
+    final s = _call?.durationSeconds ?? 0;
+    final m = s ~/ 60;
+    final sec = s % 60;
+    return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+  }
+
+  /// Start a call from the open chat (Stage 3): a group chat starts a
+  /// mesh group call with every other member; a DM starts a 1:1 call.
   Future<void> _startCall({required bool video}) async {
     if (_activeChat == null || _call == null) return;
-    final peerId = await _peerUserId();
-    if (peerId.isEmpty) {
-      setState(() => _error = 'Cannot call: peer user not found');
-      return;
-    }
     try {
-      await _call!.startCall(
-          chatId: _activeChat!['id'] as String, peerId: peerId, video: video);
+      if (_activeChat!['type'] == 'group') {
+        final members = await _api.listMembers(_activeChat!['id'] as String);
+        final peerIds = <String>[];
+        for (final m in members) {
+          final uid = (m as Map)['user_id'] as String;
+          if (uid != _user!['id']) peerIds.add(uid);
+        }
+        if (peerIds.isEmpty) {
+          setState(() => _error = 'No one else in this group to call');
+          return;
+        }
+        _callInitiatedByMe = true;
+        await _call!.startGroupCall(
+            chatId: _activeChat!['id'] as String,
+            peerIds: peerIds,
+            video: video);
+      } else {
+        final peerId = await _peerUserId();
+        if (peerId.isEmpty) {
+          setState(() => _error = 'Cannot call: peer user not found');
+          return;
+        }
+        _callInitiatedByMe = true;
+        await _call!.startCall(
+            chatId: _activeChat!['id'] as String,
+            peerId: peerId,
+            video: video);
+      }
       if (mounted) setState(() {});
     } catch (e) {
       setState(() => _error = 'Call failed: $e');
@@ -4428,33 +4808,7 @@ class _HomePageState extends State<HomePage> {
       color: chatBg,
       child: Column(
         children: [
-          if (_incomingCall != null)
-            Container(
-              color: Colors.green.shade100,
-              padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                const Icon(Icons.call),
-                const SizedBox(width: 8),
-                const Expanded(child: Text('Incoming voice call…')),
-                FilledButton(
-                  onPressed: () async {
-                    final call = _incomingCall!;
-                    setState(() => _incomingCall = null);
-                    await _call?.acceptCall(call);
-                    setState(() {});
-                  },
-                  child: const Text('Accept'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton(
-                  onPressed: () {
-                    _call?.declineCall(_incomingCall!);
-                    setState(() => _incomingCall = null);
-                  },
-                  child: const Text('Decline'),
-                ),
-              ]),
-            ),
+          if (_incomingCall != null) _incomingCallBanner(),
           if (callState == CallState.inCall || callState == CallState.outgoing)
             Container(
               color: Colors.blue.shade100,
@@ -4466,9 +4820,41 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     callState == CallState.outgoing
                         ? 'Calling… (Opus 12 kbps)'
-                        : 'In call — Opus 12 kbps · ~0.09 MB/min',
+                        : 'In call — ${_callDurationLabel()}${_call?.isGroup == true ? ' · Group' : ''} · ~0.09 MB/min',
                   ),
                 ),
+                // Stage 3: in-call controls — mic, camera, switch.
+                IconButton(
+                  icon: Icon(
+                      _call?.micMuted == true ? Icons.mic_off : Icons.mic),
+                  tooltip: _call?.micMuted == true ? 'Unmute' : 'Mute',
+                  onPressed: () {
+                    _call?.toggleMute();
+                    setState(() {});
+                  },
+                ),
+                if (_call?.video == true) ...[
+                  IconButton(
+                    icon: Icon(_call?.cameraOff == true
+                        ? Icons.videocam_off
+                        : Icons.videocam),
+                    tooltip: _call?.cameraOff == true
+                        ? 'Turn camera on'
+                        : 'Turn camera off',
+                    onPressed: () {
+                      _call?.toggleCamera();
+                      setState(() {});
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.cameraswitch),
+                    tooltip: 'Switch camera',
+                    onPressed: () async {
+                      await _call?.switchCamera();
+                      setState(() {});
+                    },
+                  ),
+                ],
                 if (_call?.video == true && _call?.audioOnly == false)
                   TextButton(
                     onPressed: () async {
@@ -4480,10 +4866,7 @@ class _HomePageState extends State<HomePage> {
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red),
                   tooltip: 'End call',
-                  onPressed: () async {
-                    await _call?.endCall();
-                    setState(() {});
-                  },
+                  onPressed: _endCallAndRecord,
                 ),
               ]),
             ),
@@ -4491,6 +4874,21 @@ class _HomePageState extends State<HomePage> {
             SizedBox(
               height: 200,
               child: RTCVideoView(_remoteRenderer),
+            ),
+          // Stage 3: group-call video tiles, one per connected member.
+          if (_call?.isGroup == true &&
+              _call?.video == true &&
+              _groupRenderers.isNotEmpty)
+            SizedBox(
+              height: 160,
+              child: GridView.count(
+                crossAxisCount: 2,
+                childAspectRatio: 4 / 3,
+                children: [
+                  for (final entry in _groupRenderers.entries)
+                    RTCVideoView(entry.value),
+                ],
+              ),
             ),
           if (isE2ee)
             Container(

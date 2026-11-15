@@ -99,6 +99,10 @@ type StoreIface interface {
 	ListStoryReplies(storyID string) []*models.StoryReply
 	GetStatusPrivacy(userID string) string
 	SetStatusPrivacy(userID, privacy string) error
+	// Stage 3 (calls): one record per finished/missed call, written
+	// by the caller when the call ends.
+	CreateCallRecord(rec *models.CallRecord) error
+	ListCallRecordsForUser(userID string) []*models.CallRecord
 	CreateScheduled(sm *models.ScheduledMessage) error
 	DueScheduled(now time.Time) []*models.ScheduledMessage
 	MarkScheduledSent(id, messageID string) error
@@ -213,6 +217,9 @@ type MemoryStore struct {
 	storyReactions map[string]map[string]storyReaction
 	storyReplies   map[string][]*models.StoryReply
 	statusPrivacy  map[string]string
+	// Stage 3: call history, newest first per user (call records in
+	// insertion order; ListCallRecordsForUser sorts them).
+	callRecords []*models.CallRecord
 }
 
 type storyReaction struct {
@@ -260,6 +267,7 @@ func NewMemoryStore() *MemoryStore {
 		storyReactions:     map[string]map[string]storyReaction{},
 		storyReplies:       map[string][]*models.StoryReply{},
 		statusPrivacy:      map[string]string{},
+		callRecords:        []*models.CallRecord{},
 	}
 }
 

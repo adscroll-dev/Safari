@@ -392,6 +392,17 @@ func main() {
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	})))
+	// Stage 3: call history (POST record, GET list).
+	mux.Handle("/api/calls", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.ListCallRecords(w, r)
+		case http.MethodPost:
+			h.CreateCallRecord(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
 	mux.Handle("/api/stories/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch handlers.StorySuffix(r) {
 		case "":
