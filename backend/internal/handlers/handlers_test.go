@@ -307,6 +307,32 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.GetMessageViews(w, r)
 			case path == "/api/channels/search":
 				h.SearchChannels(w, r)
+			case path == "/api/communities" && method == http.MethodPost:
+				h.CreateCommunity(w, r)
+			case path == "/api/communities" && method == http.MethodGet:
+				h.ListCommunities(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.HasSuffix(path, "/leave"):
+				h.LeaveCommunity(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.Contains(path, "/members/") && strings.HasSuffix(path, "/role"):
+				h.SetCommunityMemberRole(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.Contains(path, "/members/"):
+				h.RemoveCommunityMember(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.HasSuffix(path, "/members"):
+				if method == http.MethodPost {
+					h.AddCommunityMember(w, r)
+				} else {
+					h.ListCommunityMembers(w, r)
+				}
+			case strings.HasPrefix(path, "/api/communities/") && strings.Contains(path, "/subgroups/"):
+				h.RemoveSubgroup(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.HasSuffix(path, "/subgroups"):
+				h.AddSubgroup(w, r)
+			case strings.HasPrefix(path, "/api/communities/"):
+				if method == http.MethodPatch {
+					h.UpdateCommunity(w, r)
+				} else {
+					h.GetCommunity(w, r)
+				}
 			case path == "/api/messages/search":
 				h.SearchMessages(w, r)
 			case strings.HasPrefix(path, "/api/messages/"):

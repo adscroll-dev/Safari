@@ -460,6 +460,51 @@ func main() {
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	})))
+	// Stage 6: communities.
+	mux.Handle("/api/communities", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.ListCommunities(w, r)
+		case http.MethodPost:
+			h.CreateCommunity(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
+	mux.Handle("/api/communities/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		switch {
+		case strings.HasSuffix(path, "/leave"):
+			h.LeaveCommunity(w, r)
+		case strings.Contains(path, "/members/") && strings.HasSuffix(path, "/role"):
+			h.SetCommunityMemberRole(w, r)
+		case strings.Contains(path, "/members/"):
+			h.RemoveCommunityMember(w, r)
+		case strings.HasSuffix(path, "/members"):
+			switch r.Method {
+			case http.MethodGet:
+				h.ListCommunityMembers(w, r)
+			case http.MethodPost:
+				h.AddCommunityMember(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+		case strings.Contains(path, "/subgroups/"):
+			h.RemoveSubgroup(w, r)
+		case strings.HasSuffix(path, "/subgroups"):
+			h.AddSubgroup(w, r)
+		default:
+			// /api/communities/{id}
+			switch r.Method {
+			case http.MethodGet:
+				h.GetCommunity(w, r)
+			case http.MethodPatch:
+				h.UpdateCommunity(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+		}
+	})))
 	mux.Handle("/api/stories/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch handlers.StorySuffix(r) {
 		case "":

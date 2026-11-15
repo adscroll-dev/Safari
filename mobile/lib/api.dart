@@ -200,6 +200,38 @@ class ApiClient {
         if (public != null) 'public': public,
       });
 
+  // Stage 6 — Communities (WhatsApp parity).
+  Future<List<dynamic>> listCommunities() => _getList('/api/communities');
+  Future<Map<String, dynamic>> createCommunity(String name,
+          {String description = ''}) =>
+      _req('POST', '/api/communities', {'name': name, 'description': description});
+  Future<Map<String, dynamic>> getCommunity(String id) =>
+      _req('GET', '/api/communities/$id');
+  Future<Map<String, dynamic>> updateCommunity(String id,
+          {String? name, String? description}) =>
+      _req('PATCH', '/api/communities/$id', {
+        if (name != null) 'name': name,
+        if (description != null) 'description': description,
+      });
+  Future<List<dynamic>> listCommunityMembers(String id) =>
+      _getList('/api/communities/$id/members');
+  Future<void> addCommunityMember(String id, String userId) =>
+      _req('POST', '/api/communities/$id/members', {'user_id': userId});
+  Future<void> removeCommunityMember(String id, String userId) =>
+      _req('DELETE', '/api/communities/$id/members/$userId');
+  Future<void> setCommunityMemberRole(String id, String userId, String role) =>
+      _req('POST', '/api/communities/$id/members/$userId/role', {'role': role});
+  Future<void> leaveCommunity(String id) =>
+      _req('POST', '/api/communities/$id/leave', null);
+  Future<Map<String, dynamic>> addSubgroup(String id,
+          {String? chatId, String? title}) =>
+      _req('POST', '/api/communities/$id/subgroups', {
+        if (chatId != null) 'chat_id': chatId,
+        if (title != null) 'title': title,
+      });
+  Future<void> removeSubgroup(String id, String chatId) =>
+      _req('DELETE', '/api/communities/$id/subgroups/$chatId');
+
   // Stage 5 — Channels (WhatsApp parity).
   Future<List<dynamic>> searchChannels(String q) => _getList(
       '/api/channels/search?q=${Uri.encodeQueryComponent(q)}');

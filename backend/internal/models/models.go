@@ -372,6 +372,30 @@ type PendingUser struct {
 	CreatedAt    time.Time
 }
 
+// Community (Stage 6) is a WhatsApp-style community: a named group
+// of people with an admin-only announcement group, subgroups
+// (ordinary group chats) and its own membership with roles.
+type Community struct {
+	ID                 string    `json:"id"`
+	Name               string    `json:"name"`
+	Description        string    `json:"description,omitempty"`
+	OwnerID            string    `json:"owner_id,omitempty"`
+	AnnouncementChatID string    `json:"announcement_chat_id,omitempty"`
+	// Computed, populated by list/detail endpoints.
+	MemberCount   int       `json:"member_count,omitempty"`
+	SubgroupCount int       `json:"subgroup_count,omitempty"`
+	MyRole        string    `json:"my_role,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+// CommunityMember is one person's membership in a community.
+type CommunityMember struct {
+	UserID   string    `json:"user_id"`
+	Role     string    `json:"role"` // member | admin | owner
+	JoinedAt time.Time `json:"joined_at"`
+}
+
 // CallRecord is one finished (or missed) call, written by the caller
 // when the call ends (Stage 3). Group calls have CalleeID == "" —
 // the chat is then the group.

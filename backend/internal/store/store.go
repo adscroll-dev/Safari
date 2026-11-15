@@ -119,6 +119,21 @@ type StoreIface interface {
 	MessageViewCounts(chatID string) map[string]int
 	SearchPublicChannels(query string) []*models.Chat
 	UpdateChat(chatID string, title *string, isPublic *bool) error
+	// Stage 6 (communities): a community with an announcement
+	// group, subgroups and its own membership.
+	CreateCommunity(c *models.Community) error
+	CommunityByID(id string) *models.Community
+	ListCommunitiesForUser(userID string) []*models.Community
+	CommunityByAnnouncementChat(chatID string) *models.Community
+	CommunityMembers(communityID string) []*models.CommunityMember
+	CommunityRole(communityID, userID string) string
+	AddCommunityMember(communityID, userID, role string) error
+	RemoveCommunityMember(communityID, userID string) error
+	SetCommunityMemberRole(communityID, userID, role string) error
+	AddSubgroup(communityID, chatID string) error
+	RemoveSubgroup(communityID, chatID string) error
+	ListSubgroups(communityID string) []*models.Chat
+	UpdateCommunity(communityID string, name, description *string) error
 	CreateScheduled(sm *models.ScheduledMessage) error
 	DueScheduled(now time.Time) []*models.ScheduledMessage
 	MarkScheduledSent(id, messageID string) error
@@ -244,6 +259,12 @@ type MemoryStore struct {
 	// viewed it). One row per viewer, so re-views never inflate
 	// the count.
 	messageViews map[string]map[string]bool
+	// Stage 6: communities (community id -> community), membership
+	// (community id -> user id -> member) and subgroups
+	// (community id -> chat id set).
+	communities        map[string]*models.Community
+	communityMembers   map[string]map[string]*models.CommunityMember
+	communitySubgroups map[string]map[string]bool
 }
 
 type storyReaction struct {
@@ -295,6 +316,9 @@ func NewMemoryStore() *MemoryStore {
 		polls:              map[string]*models.Poll{},
 		pollVotes:          map[string]map[string][]int{},
 		messageViews:       map[string]map[string]bool{},
+		communities:        map[string]*models.Community{},
+		communityMembers:   map[string]map[string]*models.CommunityMember{},
+		communitySubgroups: map[string]map[string]bool{},
 	}
 }
 

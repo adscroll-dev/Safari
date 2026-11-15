@@ -157,6 +157,29 @@ Never present a demo feature as complete.
 - PARTIAL: tab lists real groups; "New community" opens the group flow.
 - MISSING: real community model — community with subgroups,
   admin announcement group, member management, invites, admin settings.
+- DONE 2026-11-15 (Stage 6, IN PROGRESS — build running): real
+  community model (migration 016: communities + community_members
+  + community_subgroups; Community {id, name, description, owner_id,
+  announcement_chat_id, member_count, subgroup_count, my_role}).
+  POST /api/communities (creates the announcement group chat too),
+  GET /api/communities, GET /api/communities/{id} (community +
+  subgroups), PATCH /api/communities/{id} (name/description; also
+  renames the announcement group), GET/POST
+  /api/communities/{id}/members (+ /{userID}/role, DELETE
+  /{userID}), POST /api/communities/{id}/leave, POST/DELETE
+  /api/communities/{id}/subgroups[/{chatID}] (link an existing
+  group or create a new one; only groups; the group chat survives
+  unlinking). Rules: only community admins/owner may post in the
+  announcement group (enforced in SendMessage; followers see the
+  normal input bar there only if they are admins); joining the
+  announcement group via its invite link also joins the community;
+  adding/removing a member mirrors the announcement group. Mobile:
+  Communities tab lists real communities (member + group counts),
+  detail sheet (announcement group row, subgroups with open/remove,
+  Add group / Add members / Members / Edit community / Leave),
+  create dialog (name + description). TestStage6Communities passes;
+  backend go test ./... all pass; mobile analyze clean, flutter
+  test 33/33.
 
 ### 7. Channels
 - DONE: channel type, create, open/follow (as a chat), invite links.
@@ -215,7 +238,7 @@ Never present a demo feature as complete.
 6. Channels: view counter, search, admin management. — DONE 2026-11-15 (Stage 5 above), DELIVERED ~13:00.
 7. Communities: real model (subgroups + announcement group). — NEXT (Stage 6).
 6. Channels: view counter + search.
-7. Communities: real model (subgroups + announcement group).
+7. Communities: real model (subgroups + announcement group). — IN PROGRESS 2026-11-15 (Stage 6; backend + mobile done and tested, APK build running).
 8. Accounts: phone OTP (if a free route exists), profile photo/about,
    linked devices, app lock, backup/restore, storage page, link preview.
 9. iOS/desktop feasibility check (no Mac — report honestly).

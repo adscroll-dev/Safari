@@ -199,5 +199,10 @@ func (h *Handler) JoinViaInvite(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not join")
 		return
 	}
+	// Stage 6: joining an announcement group via its invite link
+	// also joins the community.
+	if community := h.Store.CommunityByAnnouncementChat(chat.ID); community != nil {
+		_ = h.Store.AddCommunityMember(community.ID, me, "member")
+	}
 	middleware.WriteJSON(w, http.StatusOK, map[string]string{"status": "joined", "chat_id": chat.ID})
 }

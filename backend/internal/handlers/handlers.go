@@ -530,6 +530,15 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Stage 6: in a community announcement group only community
+	// admins and the owner may post.
+	if community := h.Store.CommunityByAnnouncementChat(chatID); community != nil {
+		role := h.Store.CommunityRole(community.ID, me)
+		if role != "admin" && role != "owner" {
+			middleware.WriteError(w, http.StatusForbidden, "only community admins can post announcements")
+			return
+		}
+	}
 	var req sendMessageReq
 	if !decode(w, r, &req) {
 		return

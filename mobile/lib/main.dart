@@ -124,6 +124,8 @@ class _HomePageState extends State<HomePage> {
   final _searchCtrl = TextEditingController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
+  // Stage 6: the communities I belong to (real model, not groups).
+  List<dynamic> _communities = [];
   // Users by id, loaded with the chat list so a DM can show the other
   // person's name instead of the literal type ("dm").
   Map<String, Map<String, dynamic>> _usersById = {};
@@ -422,6 +424,8 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() {});
     });
     await _refreshChats();
+    // Stage 6: communities for the Communities tab.
+    await _refreshCommunities();
     // Stage 3: call history for the Calls tab.
     await _refreshCalls();
     // Last-seen privacy: load the server setting for the Settings page.
@@ -591,6 +595,14 @@ class _HomePageState extends State<HomePage> {
         if (id != null) map[id] = m;
       }
       if (mounted) setState(() => _usersById = map);
+    } catch (_) {}
+  }
+
+  /// Stage 6: load my communities for the Communities tab.
+  Future<void> _refreshCommunities() async {
+    try {
+      final communities = await _api.listCommunities();
+      if (mounted) setState(() => _communities = communities);
     } catch (_) {}
   }
 
@@ -3370,9 +3382,9 @@ class _HomePageState extends State<HomePage> {
   // a group: the list shows real groups, and "New community"
   // opens the new-group flow.
 
+  /// Stage 6: real communities (name, description, member and
+  /// subgroup counts). Tapping one opens its detail sheet.
   Widget _buildCommunitiesBody() {
-    final groups =
-        _chats.where((c) => (c as Map)['type'] == 'group').toList();
     return ListView(
       children: [
         ListTile(
@@ -3387,26 +3399,499 @@ class _HomePageState extends State<HomePage> {
                 color: Colors.white, size: 28),
           ),
           title: const Text('New community'),
-          onTap: _showNewChatSheet,
+          onTap: _createCommunity,
         ),
         const Divider(),
-        if (groups.isEmpty)
+        if (_communities.isEmpty)
           const ListTile(
             title: Text('No communities yet'),
             subtitle: Text(
                 'Create a community to bring related groups together.'),
           ),
-        for (final g in groups)
+        for (final c in _communities)
           ListTile(
             leading: WaAvatar(
-                label: _chatTitle(g as Map<String, dynamic>), radius: 26),
-            title: Text(_chatTitle(g)),
+                label: c['name'] as String? ?? 'Community', radius: 26),
+            title: Text(c['name'] as String? ?? 'Community'),
             subtitle: Text(
-                '${((g as Map)['member_ids'] as List?)?.length ?? 0} members'),
-            onTap: () => _openChat(g),
+                '${c['member_count'] ?? 0} members · ${c['subgroup_count'] ?? 0} groups'),
+            onTap: () => _showCommunityDetail(c),
           ),
       ],
     );
+  }
+
+  /// Stage 6: create a community (name + description). The server
+  /// also creates the admin-only announcement group.
+  Future<void> _createCommunity() async {
+    final nameCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New community'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Community name'),
+              maxLength: 100,
+            ),
+            TextField(
+              controller: descCtrl,
+              decoration:
+                  const InputDecoration(labelText: 'Description (optional)'),
+              maxLength: 500,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Create')),
+        ],
+      ),
+    );
+    if (ok != true || nameCtrl.text.trim().isEmpty) return;
+    try {
+      await _api.createCommunity(nameCtrl.text.trim(),
+          description: descCtrl.text.trim());
+      await _refreshCommunities();
+      await _refreshChats();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 6: community detail — announcement group, subgroups,
+  /// members and admin settings.
+  Future<void> _showCommunityDetail(Map<String, dynamic> community) async {
+    final id = community['id'] as String;
+    Map<String, dynamic> detail;
+    try {
+      detail = await _api.getCommunity(id);
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final c = detail['community'] as Map<String, dynamic>;
+    final subgroups = (detail['subgroups'] as List?) ?? [];
+    final myRole = c['my_role'] as String? ?? '';
+    final isAdmin = myRole == 'admin' || myRole == 'owner';
+    final announcementId = c['announcement_chat_id'] as String?;
+    final announcement = announcementId == null
+        ? null
+        : _chats.cast<Map?>().firstWhere(
+            (ch) => ch?['id'] == announcementId,
+            orElse: () => null);
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text((c['name'] as String?) ?? 'Community',
+                style: Theme.of(context).textTheme.titleLarge),
+            if ((c['description'] as String?)?.isNotEmpty == true)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(c['description'] as String),
+              ),
+            Text(
+                '${c['member_count'] ?? 0} members · ${subgroups.length} groups',
+                style: Theme.of(context).textTheme.bodySmall),
+            const SizedBox(height: 12),
+            if (announcement != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.campaign_outlined),
+                title: Text((announcement['title'] as String?) ?? 'Announcements'),
+                subtitle: const Text('Announcement group · admins only'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _openChat(announcement as Map<String, dynamic>);
+                },
+              ),
+            const Divider(),
+            Text('Groups', style: Theme.of(context).textTheme.titleMedium),
+            if (subgroups.isEmpty)
+              const ListTile(
+                title: Text('No groups yet'),
+                subtitle: Text('Admins can add groups to this community.'),
+              ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: subgroups.length,
+                itemBuilder: (context, i) {
+                  final g = subgroups[i] as Map<String, dynamic>;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: WaAvatar(
+                        label: (g['title'] as String?) ?? 'Group', radius: 26),
+                    title: Text((g['title'] as String?) ?? 'Group'),
+                    subtitle: Text(
+                        '${((g['member_ids'] as List?)?.length ?? 0)} members'),
+                    trailing: isAdmin
+                        ? IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            tooltip: 'Remove from community',
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              try {
+                                await _api.removeSubgroup(
+                                    id, g['id'] as String);
+                                await _refreshCommunities();
+                              } catch (e) {
+                                setState(() => _error = e.toString());
+                              }
+                            },
+                          )
+                        : null,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _openChat(g);
+                    },
+                  );
+                },
+              ),
+            ),
+            const Divider(),
+            if (isAdmin) ...[
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.group_add_outlined),
+                title: const Text('Add group'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _addSubgroup(c);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.person_add_outlined),
+                title: const Text('Add members'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _addCommunityMembers(c);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.people_outline),
+                title: const Text('Members'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _showCommunityMembers(c);
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Edit community'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _editCommunity(c);
+                },
+              ),
+            ] else
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.people_outline),
+                title: const Text('Members'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _showCommunityMembers(c);
+                },
+              ),
+            if (myRole != 'owner')
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.exit_to_app, color: Colors.red),
+                title: const Text('Leave community',
+                    style: TextStyle(color: Colors.red)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    await _api.leaveCommunity(id);
+                    await _refreshCommunities();
+                    await _refreshChats();
+                  } catch (e) {
+                    setState(() => _error = e.toString());
+                  }
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stage 6: add a subgroup — pick an existing group or create
+  /// a new one (admins only).
+  Future<void> _addSubgroup(Map<String, dynamic> community) async {
+    final id = community['id'] as String;
+    final announcementId = community['announcement_chat_id'] as String?;
+    final existing = _chats
+        .where((ch) =>
+            ch['type'] == 'group' && ch['id'] != announcementId)
+        .toList();
+    final titleCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add group'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: existing.map((ch) {
+                      final m = ch as Map<String, dynamic>;
+                      return ListTile(
+                        title: Text((m['title'] as String?) ?? 'Group'),
+                        onTap: () async {
+                          Navigator.pop(context, true);
+                          try {
+                            await _api.addSubgroup(id,
+                                chatId: m['id'] as String);
+                            await _refreshCommunities();
+                          } catch (e) {
+                            setState(() => _error = e.toString());
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                const Divider(),
+                TextField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Or create a new group'),
+                  maxLength: 100,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Create new')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || titleCtrl.text.trim().isEmpty) return;
+    try {
+      await _api.addSubgroup(id, title: titleCtrl.text.trim());
+      await _refreshCommunities();
+      await _refreshChats();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 6: add members to a community (admins only). They are
+  /// also added to the announcement group.
+  Future<void> _addCommunityMembers(Map<String, dynamic> community) async {
+    final id = community['id'] as String;
+    final users = await _api.listUsers();
+    if (!mounted) return;
+    final selected = <String>{};
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add members'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: users.map((u) {
+                final m = u as Map<String, dynamic>;
+                final uid = m['id'] as String;
+                final name = (m['display_name'] as String?) ??
+                    (m['username'] as String?) ??
+                    uid;
+                return CheckboxListTile(
+                  title: Text(name),
+                  value: selected.contains(uid),
+                  onChanged: (v) => setDialogState(() {
+                    if (v == true) {
+                      selected.add(uid);
+                    } else {
+                      selected.remove(uid);
+                    }
+                  }),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Add')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || selected.isEmpty) return;
+    try {
+      for (final uid in selected) {
+        await _api.addCommunityMember(id, uid);
+      }
+      await _refreshCommunities();
+      await _refreshChats();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 6: members list with roles; admins can promote,
+  /// demote and remove (never the owner).
+  Future<void> _showCommunityMembers(Map<String, dynamic> community) async {
+    final id = community['id'] as String;
+    List<dynamic> members;
+    try {
+      members = await _api.listCommunityMembers(id);
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final myRole = community['my_role'] as String? ?? '';
+    final isAdmin = myRole == 'admin' || myRole == 'owner';
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Members (${members.length})',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: members.length,
+                itemBuilder: (context, i) {
+                  final m = members[i] as Map<String, dynamic>;
+                  final uid = m['user_id'] as String;
+                  final role = m['role'] as String? ?? 'member';
+                  final name =
+                      _usersById[uid]?['display_name'] as String? ?? uid;
+                  final isMe = uid == _user?['id'];
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: WaAvatar(label: name, radius: 22),
+                    title: Text(isMe ? '$name (you)' : name),
+                    subtitle: Text('Role: $role'),
+                    trailing: !isAdmin || isMe || role == 'owner'
+                        ? null
+                        : PopupMenuButton<String>(
+                            onSelected: (v) async {
+                              Navigator.pop(context);
+                              try {
+                                if (v == 'remove') {
+                                  await _api.removeCommunityMember(id, uid);
+                                } else {
+                                  await _api.setCommunityMemberRole(
+                                      id, uid, v);
+                                }
+                                await _refreshCommunities();
+                              } catch (e) {
+                                setState(() => _error = e.toString());
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                  value: 'admin', child: Text('Make admin')),
+                              PopupMenuItem(
+                                  value: 'member',
+                                  child: Text('Make member')),
+                              PopupMenuItem(
+                                  value: 'remove', child: Text('Remove')),
+                            ],
+                          ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stage 6: rename a community / edit its description
+  /// (admins and the owner).
+  Future<void> _editCommunity(Map<String, dynamic> community) async {
+    final id = community['id'] as String;
+    final nameCtrl = TextEditingController(
+        text: (community['name'] as String?) ?? '');
+    final descCtrl = TextEditingController(
+        text: (community['description'] as String?) ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit community'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Community name'),
+              maxLength: 100,
+            ),
+            TextField(
+              controller: descCtrl,
+              decoration: const InputDecoration(labelText: 'Description'),
+              maxLength: 500,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _api.updateCommunity(id,
+          name: nameCtrl.text.trim(), description: descCtrl.text.trim());
+      await _refreshCommunities();
+      await _refreshChats();
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
   }
 
   // --- Calls tab (WhatsApp) -----------------------------------------
