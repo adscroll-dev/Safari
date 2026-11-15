@@ -70,7 +70,14 @@ type StoreIface interface {
 	RemoveReaction(messageID, userID, emoji string) error
 
 	BlockUser(blockerID, blockedID string) error
+	UnblockUser(blockerID, blockedID string) error
+	ListBlocked(userID string) []string
 	IsBlocked(a, b string) bool
+
+	// Stage 7: profile editing (display name, bio, avatar) and
+	// user reports. Nil pointer fields mean "unchanged".
+	UpdateProfile(userID string, displayName, bio, avatarURL *string) error
+	CreateReport(r *models.Report) error
 
 	// v0.4: admin roles, receipts, presence, stories, scheduled, bots, keys, settings.
 	MemberRole(chatID, userID string) string
@@ -226,6 +233,8 @@ type MemoryStore struct {
 	chatSettings map[string]models.ChatSettings     // chatID + "/" + userID
 	// v0.6 state
 	groupSenderKeys map[string]*models.GroupSenderKey // distribution key, see v06.go
+	// Stage 7 state
+	reports []*models.Report
 	devices         map[string]*models.Device         // userID + "/" + deviceID
 	pushSubs        map[string][]push.Subscription    // userID -> subscriptions
 	fcmTokens       map[string][]push.FCMToken        // userID -> FCM tokens
@@ -301,6 +310,7 @@ func NewMemoryStore() *MemoryStore {
 		groupSenderKeys:    map[string]*models.GroupSenderKey{},
 		devices:            map[string]*models.Device{},
 		pushSubs:           map[string][]push.Subscription{},
+		reports:            []*models.Report{},
 		fcmTokens:          map[string][]push.FCMToken{},
 		emailCodes:         map[string]*models.EmailCode{},
 		pendingUsers:       map[string]*models.PendingUser{},

@@ -164,7 +164,23 @@ func main() {
 	// Authenticated.
 	mux.Handle("/api/uploads", authMW(http.HandlerFunc(h.Upload)))
 	mux.Handle("/uploads/", authMW(http.HandlerFunc(h.ServeUpload)))
-	mux.Handle("/api/users/me", authMW(http.HandlerFunc(h.Me)))
+	mux.Handle("/api/users/me", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.Me(w, r)
+		case http.MethodPatch:
+			h.UpdateMe(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
+	mux.Handle("/api/users/me/blocked", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.GetBlockedUsers(w, r)
+			return
+		}
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	})))
 	mux.Handle("/api/users/me/privacy", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -193,6 +209,22 @@ func main() {
 		}
 		if strings.HasSuffix(r.URL.Path, "/devices") {
 			h.ListUserDevices(w, r)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/report") {
+			if r.Method == http.MethodPost {
+				h.ReportUser(w, r)
+				return
+			}
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/block") {
+			if r.Method == http.MethodDelete {
+				h.UnblockUser(w, r)
+				return
+			}
+			h.BlockUser(w, r)
 			return
 		}
 		h.BlockUser(w, r)

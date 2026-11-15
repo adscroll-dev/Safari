@@ -28,6 +28,7 @@ type PublicUser struct {
 	Username    string    `json:"username"`
 	DisplayName string    `json:"display_name"`
 	AvatarURL   string    `json:"avatar_url,omitempty"`
+	Bio         string    `json:"bio,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	IsOnline    bool      `json:"is_online"`
 }
@@ -35,9 +36,22 @@ type PublicUser struct {
 func (u *User) Public() PublicUser {
 	return PublicUser{
 		ID: u.ID, Email: u.Email, Username: u.Username,
-		DisplayName: u.DisplayName, AvatarURL: u.AvatarURL,
+		DisplayName: u.DisplayName, AvatarURL: u.AvatarURL, Bio: u.Bio,
 		CreatedAt: u.CreatedAt, IsOnline: u.IsOnline,
 	}
+}
+
+// Report is one user report (abuse/spam). The reports table also
+// supports target_type message/chat, but Stage 7 only files user
+// reports; moderators review them out of band.
+type Report struct {
+	ID         string    `json:"id"`
+	ReporterID string    `json:"reporter_id"`
+	TargetType string    `json:"target_type"`
+	TargetID   string    `json:"target_id"`
+	Reason     string    `json:"reason"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 // ChatType distinguishes private chats, groups and channels.

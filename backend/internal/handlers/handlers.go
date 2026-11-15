@@ -539,6 +539,18 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Stage 7: in a DM, a block in either direction stops messages
+	// (IsBlocked is symmetric: it is true if either user blocked
+	// the other). Blocking only stops new messages — the chat and
+	// its history stay visible.
+	if chat, err := h.Store.ChatByID(chatID); err == nil && chat.Type == models.ChatDM {
+		for _, memberID := range chat.MemberIDs {
+			if memberID != me && h.Store.IsBlocked(me, memberID) {
+				middleware.WriteError(w, http.StatusForbidden, "user is blocked")
+				return
+			}
+		}
+	}
 	var req sendMessageReq
 	if !decode(w, r, &req) {
 		return

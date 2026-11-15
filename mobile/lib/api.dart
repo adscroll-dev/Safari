@@ -200,6 +200,25 @@ class ApiClient {
         if (public != null) 'public': public,
       });
 
+  // Stage 7 — Accounts: profile, block/report, linked devices.
+  Future<Map<String, dynamic>> updateProfile(
+          {String? displayName, String? bio, String? avatarUrl}) =>
+      _req('PATCH', '/api/users/me', {
+        if (displayName != null) 'display_name': displayName,
+        if (bio != null) 'bio': bio,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+      });
+  Future<Map<String, dynamic>> reportUser(String userId, String reason) =>
+      _req('POST', '/api/users/$userId/report', {'reason': reason});
+  Future<void> blockUser(String userId) =>
+      _req('POST', '/api/users/$userId/block', null);
+  Future<void> unblockUser(String userId) =>
+      _req('DELETE', '/api/users/$userId/block');
+  Future<List<dynamic>> listBlocked() => _getList('/api/users/me/blocked');
+  Future<List<dynamic>> listDevices() => _getList('/api/devices');
+  Future<void> removeDevice(String deviceId) =>
+      _req('DELETE', '/api/devices/$deviceId');
+
   // Stage 6 — Communities (WhatsApp parity).
   Future<List<dynamic>> listCommunities() => _getList('/api/communities');
   Future<Map<String, dynamic>> createCommunity(String name,

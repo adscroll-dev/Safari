@@ -124,6 +124,8 @@ class _HomePageState extends State<HomePage> {
   final _searchCtrl = TextEditingController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
+  // Stage 7: the user IDs I blocked (loaded at login).
+  final Set<String> _blockedUserIds = {};
   // Stage 6: the communities I belong to (real model, not groups).
   List<dynamic> _communities = [];
   // Users by id, loaded with the chat list so a DM can show the other
@@ -424,7 +426,14 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() {});
     });
     await _refreshChats();
-    // Stage 6: communities for the Communities tab.
+    // Stage 7: blocked users (for Block/Unblock labels) + the
+    // communities for the Communities tab.
+    try {
+      final blocked = await _api.listBlocked();
+      if (mounted) {
+        setState(() => _blockedUserIds.addAll(blocked.cast<String>()));
+      }
+    } catch (_) {}
     await _refreshCommunities();
     // Stage 3: call history for the Calls tab.
     await _refreshCalls();
@@ -2736,6 +2745,25 @@ class _HomePageState extends State<HomePage> {
               case 'search':
                 _showSearchSheet();
                 break;
+              case 'block':
+                final peerId = _peerId(chat);
+                if (peerId.isEmpty) break;
+                try {
+                  if (_blockedUserIds.contains(peerId)) {
+                    await _api.unblockUser(peerId);
+                    setState(() => _blockedUserIds.remove(peerId));
+                  } else {
+                    await _api.blockUser(peerId);
+                    setState(() => _blockedUserIds.add(peerId));
+                  }
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
+                break;
+              case 'report':
+                final peerId = _peerId(chat);
+                if (peerId.isNotEmpty) _reportPeer(peerId);
+                break;
             }
           },
           itemBuilder: (context) => [
@@ -2770,10 +2798,30 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const PopupMenuItem(value: 'search', child: Text('Search')),
+            if (type == 'dm')
+              PopupMenuItem(
+                value: 'block',
+                child: Text(_blockedUserIds.contains(_peerId(chat))
+                    ? 'Unblock'
+                    : 'Block'),
+              ),
+            if (type == 'dm')
+              const PopupMenuItem(value: 'report', child: Text('Report')),
           ],
         ),
       ],
     );
+  }
+
+  /// The other member's id of a DM (for block/report actions).
+  String _peerId(Map<String, dynamic> chat) {
+    final me = _user?['id'] as String?;
+    final members = chat['member_ids'] as List?;
+    if (members == null) return '';
+    for (final id in members) {
+      if (id != me) return id as String? ?? '';
+    }
+    return '';
   }
 
   /// @username of the other member of a DM (chat header subtitle).
@@ -3894,6 +3942,205 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Stage 7: report a user (abuse/spam), optionally blocking them
+  /// too. The report is stored for review; blocking stops messages
+  /// in both directions.
+  Future<void> _reportPeer(String userId) async {
+    final reasonCtrl = TextEditingController();
+    var alsoBlock = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Report user'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: reasonCtrl,
+                decoration: const InputDecoration(labelText: 'Reason'),
+                maxLength: 500,
+              ),
+              CheckboxListTile(
+                title: const Text('Also block this user'),
+                value: alsoBlock,
+                onChanged: (v) =>
+                    setDialogState(() => alsoBlock = v == true),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Report')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || reasonCtrl.text.trim().isEmpty) return;
+    try {
+      await _api.reportUser(userId, reasonCtrl.text.trim());
+      if (alsoBlock && !_blockedUserIds.contains(userId)) {
+        await _api.blockUser(userId);
+        setState(() => _blockedUserIds.add(userId));
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 7: edit my profile — name, about (bio) and photo.
+  /// The photo is uploaded like any other image; the server only
+  /// accepts /uploads/ avatar URLs.
+  Future<void> _editProfile() async {
+    final nameCtrl = TextEditingController(
+        text: (_user?['display_name'] as String?) ?? '');
+    final bioCtrl =
+        TextEditingController(text: (_user?['bio'] as String?) ?? '');
+    var avatarUrl = _user?['avatar_url'] as String?;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit profile'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton.icon(
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('Change photo'),
+                onPressed: () async {
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                      source: ImageSource.gallery, maxWidth: 512);
+                  if (picked == null) return;
+                  try {
+                    final bytes = await picked.readAsBytes();
+                    final compressed = DataSaver.compressImage(bytes);
+                    final up = await _api.uploadFile(
+                        compressed,
+                        'avatar-${DateTime.now().millisecondsSinceEpoch}.jpg',
+                        'image/jpeg');
+                    setDialogState(
+                        () => avatarUrl = up['url'] as String?);
+                  } catch (e) {
+                    setState(() => _error = e.toString());
+                  }
+                },
+              ),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Name'),
+                maxLength: 100,
+              ),
+              TextField(
+                controller: bioCtrl,
+                decoration: const InputDecoration(labelText: 'About'),
+                maxLength: 500,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final updated = await _api.updateProfile(
+          displayName: nameCtrl.text.trim(),
+          bio: bioCtrl.text.trim(),
+          avatarUrl: avatarUrl);
+      setState(() => _user = updated);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 7: linked devices — every device registered for my
+  /// account, with remove (never the device I am on now).
+  Future<void> _showLinkedDevices() async {
+    List<dynamic> devices;
+    try {
+      devices = await _api.listDevices();
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Linked devices (${devices.length})',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (devices.isEmpty)
+              const ListTile(
+                title: Text('No other devices'),
+                subtitle: Text(
+                    'When you log in on another phone or computer, it shows up here.'),
+              ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: devices.length,
+                itemBuilder: (context, i) {
+                  final d = devices[i] as Map<String, dynamic>;
+                  final isThis = d['device_id'] == _deviceId;
+                  final name = (d['name'] as String?)?.isNotEmpty == true
+                      ? d['name'] as String
+                      : (d['device_id'] as String? ?? 'Device');
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                        (d['platform'] as String?) == 'android'
+                            ? Icons.phone_android
+                            : (d['platform'] as String?) == 'ios'
+                                ? Icons.phone_iphone
+                                : Icons.computer_outlined),
+                    title: Text(name),
+                    subtitle: Text(
+                        '${d['platform'] ?? ''}${isThis ? ' · This device' : ''}'),
+                    trailing: isThis
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Remove device',
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              try {
+                                await _api.removeDevice(
+                                    d['device_id'] as String);
+                              } catch (e) {
+                                setState(() => _error = e.toString());
+                              }
+                            },
+                          ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- Calls tab (WhatsApp) -----------------------------------------
   // No call history is stored yet, so the tab honestly shows the
   // empty state until the first call happens.
@@ -4390,12 +4637,20 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
           ),
           subtitle: Text(
-            '@$myUsername${myEmail.isEmpty ? '' : ' · $myEmail'}',
+            '@$myUsername${myEmail.isEmpty ? '' : ' · $myEmail'}${(_user?['bio'] as String?)?.isNotEmpty == true ? '\n${_user?['bio']}' : ''}',
             style: TextStyle(fontSize: 13, color: secondary),
           ),
+          // Stage 7: tap my profile to edit name, about and photo.
+          onTap: _editProfile,
         ),
         const Divider(),
         header('Account'),
+        ListTile(
+          leading: const Icon(Icons.devices_outlined),
+          title: const Text('Linked devices'),
+          subtitle: const Text('See and remove your other devices'),
+          onTap: _showLinkedDevices,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -5085,9 +5340,77 @@ class _HomePageState extends State<HomePage> {
               onTap: () async {
                 Navigator.pop(context);
                 final users = await _api.listUsers();
-                if (!mounted || users.isEmpty) return;
-                final other = users.first as Map<String, dynamic>;
-                final chat = await _api.createDm(other['id'] as String);
+                if (!context.mounted || users.isEmpty) return;
+                // Stage 7: contact search — pick by name or username.
+                final queryCtrl = TextEditingController();
+                final picked = await showDialog<Map<String, dynamic>>(
+                  context: context,
+                  builder: (context) => StatefulBuilder(
+                    builder: (context, setDialogState) => AlertDialog(
+                      title: const Text('New direct message'),
+                      content: SizedBox(
+                        width: double.maxFinite,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: queryCtrl,
+                              decoration: const InputDecoration(
+                                  hintText: 'Search contacts…',
+                                  prefixIcon: Icon(Icons.search)),
+                              onChanged: (_) => setDialogState(() {}),
+                            ),
+                            Flexible(
+                              child: ListView(
+                                shrinkWrap: true,
+                                children: users.where((u) {
+                                  final m = u as Map<String, dynamic>;
+                                  if (m['id'] == _user?['id']) return false;
+                                  final q =
+                                      queryCtrl.text.trim().toLowerCase();
+                                  if (q.isEmpty) return true;
+                                  final name =
+                                      ((m['display_name'] as String?) ?? '')
+                                          .toLowerCase();
+                                  final username =
+                                      ((m['username'] as String?) ?? '')
+                                          .toLowerCase();
+                                  return name.contains(q) ||
+                                      username.contains(q);
+                                }).map((u) {
+                                  final m = u as Map<String, dynamic>;
+                                  return ListTile(
+                                    leading: WaAvatar(
+                                        label: (m['display_name']
+                                                    as String?) ??
+                                                (m['username'] as String?) ??
+                                                '?',
+                                        radius: 20),
+                                    title: Text(
+                                        (m['display_name'] as String?) ??
+                                            (m['username'] as String?) ??
+                                            ''),
+                                    subtitle: Text(
+                                        '@${m['username'] as String? ?? ''}'),
+                                    onTap: () =>
+                                        Navigator.pop(context, m),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel')),
+                      ],
+                    ),
+                  ),
+                );
+                if (picked == null) return;
+                final chat = await _api.createDm(picked['id'] as String);
                 await _refreshChats();
                 await _openChat(chat);
               },
@@ -5118,56 +5441,106 @@ class _HomePageState extends State<HomePage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(
-                      hintText: 'Search messages…',
-                      prefixIcon: Icon(Icons.search)),
-                  onSubmitted: (_) => _search(),
+      // Stage 7: StatefulBuilder so contact matches filter live
+      // while typing (message results still refresh on submit).
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: const InputDecoration(
+                        hintText: 'Search messages and contacts…',
+                        prefixIcon: Icon(Icons.search)),
+                    onChanged: (_) => setSheetState(() {}),
+                    onSubmitted: (_) async {
+                      await _search();
+                      setSheetState(() {});
+                    },
+                  ),
                 ),
-              ),
-              IconButton(icon: const Icon(Icons.search), onPressed: _search),
-            ]),
-            const SizedBox(height: 8),
-            if (_searching) const CircularProgressIndicator(),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: _searchResults.length,
-                itemBuilder: (context, i) {
-                  final m = _searchResults[i] as Map<String, dynamic>;
-                  return ListTile(
-                    title: Text(m['content'] as String? ?? ''),
-                    subtitle: Text('in chat ${m['chat_id']}'),
+                IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: () async {
+                      await _search();
+                      setSheetState(() {});
+                    }),
+              ]),
+              const SizedBox(height: 8),
+              if (_searching) const CircularProgressIndicator(),
+              // Stage 7: contact search — matching users by name
+              // or username; tap opens a DM with them.
+              ..._contactSearchResults().map((u) => ListTile(
+                    leading: WaAvatar(
+                        label: (u['display_name'] as String?) ??
+                            (u['username'] as String?) ??
+                            '?',
+                        radius: 20),
+                    title: Text((u['display_name'] as String?) ??
+                        (u['username'] as String?) ??
+                        ''),
+                    subtitle: Text('@${u['username'] as String? ?? ''}'),
                     onTap: () async {
                       Navigator.pop(context);
-                      final chat = _chats.firstWhere(
-                          (c) => (c as Map)['id'] == m['chat_id'],
-                          orElse: () => null);
-                      if (chat != null) {
-                        await _openChat(chat as Map<String, dynamic>);
-                      }
+                      final chat =
+                          await _api.createDm(u['id'] as String);
+                      await _refreshChats();
+                      await _openChat(chat);
                     },
-                  );
-                },
+                  )),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, i) {
+                    final m = _searchResults[i] as Map<String, dynamic>;
+                    return ListTile(
+                      title: Text(m['content'] as String? ?? ''),
+                      subtitle: Text('in chat ${m['chat_id']}'),
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final chat = _chats.firstWhere(
+                            (c) => (c as Map)['id'] == m['chat_id'],
+                            orElse: () => null);
+                        if (chat != null) {
+                          await _openChat(chat as Map<String, dynamic>);
+                        }
+                      },
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  /// Stage 7: users whose name or username matches the current
+  /// search text (up to 8), excluding myself.
+  List<Map<String, dynamic>> _contactSearchResults() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return [];
+    return _usersById.values
+        .where((u) {
+          if (u['id'] == _user?['id']) return false;
+          final name = ((u['display_name'] as String?) ?? '').toLowerCase();
+          final username =
+              ((u['username'] as String?) ?? '').toLowerCase();
+          return name.contains(q) || username.contains(q);
+        })
+        .take(8)
+        .toList();
   }
 
   /// Write one call-history record (Stage 3) and refresh the Calls

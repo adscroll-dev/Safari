@@ -291,6 +291,22 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.GetPrivacy(w, r)
 				}
+			case path == "/api/users/me":
+				if method == http.MethodPatch {
+					h.UpdateMe(w, r)
+				} else {
+					h.Me(w, r)
+				}
+			case path == "/api/users/me/blocked":
+				h.GetBlockedUsers(w, r)
+			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/report"):
+				h.ReportUser(w, r)
+			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/block"):
+				if method == http.MethodDelete {
+					h.UnblockUser(w, r)
+				} else {
+					h.BlockUser(w, r)
+				}
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/presence"):
 				h.Presence(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/devices"):
