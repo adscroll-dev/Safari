@@ -103,15 +103,19 @@ Never present a demo feature as complete.
 ### 4. Status / Updates
 - DONE: photo/video status post + view, 24h expiry, sponsored
   stories (demo inventory, capped), Promote flow.
-- DONE 2026-11-15 (Stage 2): text status (700 chars, 9 background
-  colours), audio status (Opus 12 kbps, same Data Saver encoder as
-  voice messages), delete own status, viewers list (owner only,
-  "Viewed by" sheet), status privacy everyone/nobody (Settings →
-  Privacy; enforced in list/view/react/reply), reply to a status
-  (also a real DM message to the owner, so they get notified),
-  react to a status (8 emojis, one per user, changeable). Backend
-  migration 012 + TestStage2Status passes; mobile analyze clean,
-  flutter test 33/33.
+- DONE 2026-11-15 (Stage 2, commit 2531bbf): text status (700 chars,
+  9 background colours), audio status (Opus 12 kbps, same Data
+  Saver encoder as voice messages), delete own status, viewers
+  list (owner only, "Viewed by" sheet), status privacy
+  everyone/nobody (Settings → Privacy; enforced in list/view/
+  react/reply), reply to a status (also a real DM message to the
+  owner, so they get notified), react to a status (8 emojis, one
+  per user, changeable). Backend migration 012 + TestStage2Status
+  passes; mobile analyze clean, flutter test 33/33. DELIVERED
+  2026-11-15 ~11:10: APKs arm64 33,490,663 B (893bf636…b7f7),
+  armeabi 26,568,904 B, x86_64 35,961,324 B; verified live (landing
+  hash, live APK SHA-256 match, /api/stories/{id}/view probe 401,
+  /health ok, migration 012 applied cleanly).
 - MISSING: status privacy "except specific people" (only
   everyone/nobody so far, same as last-seen).
 
