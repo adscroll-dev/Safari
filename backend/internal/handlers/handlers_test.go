@@ -151,6 +151,16 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.SetChatSetting(w, r, "archive")
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/unarchive"):
 				h.SetChatSetting(w, r, "unarchive")
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/mute"):
+				h.SetChatSetting(w, r, "mute")
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/unmute"):
+				h.SetChatSetting(w, r, "unmute")
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/pin-message"):
+				if method == http.MethodPost {
+					h.PinMessage(w, r)
+				} else {
+					h.UnpinMessage(w, r)
+				}
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/folder"):
 				h.SetChatSetting(w, r, "folder")
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/invites"):
@@ -233,6 +243,8 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.CancelScheduled(w, r)
 			case strings.HasPrefix(path, "/api/messages/") && strings.HasSuffix(path, "/read"):
 				h.MarkRead(w, r)
+			case strings.HasPrefix(path, "/api/messages/") && strings.HasSuffix(path, "/delete-for-me"):
+				h.DeleteMessageForMe(w, r)
 			case path == "/api/messages/search":
 				h.SearchMessages(w, r)
 			case strings.HasPrefix(path, "/api/messages/"):

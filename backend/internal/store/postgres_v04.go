@@ -672,8 +672,8 @@ func (s *PostgresStore) GetChatSettings(chatID, userID string) models.ChatSettin
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = s.pool.QueryRow(ctx,
-		`SELECT pinned, archived, folder FROM chat_settings WHERE chat_id = $1 AND user_id = $2`,
-		chatID, userID).Scan(&cs.Pinned, &cs.Archived, &cs.Folder)
+		`SELECT pinned, archived, folder, muted FROM chat_settings WHERE chat_id = $1 AND user_id = $2`,
+		chatID, userID).Scan(&cs.Pinned, &cs.Archived, &cs.Folder, &cs.Muted)
 	return cs
 }
 
@@ -684,10 +684,10 @@ func (s *PostgresStore) SetChatSettings(cs models.ChatSettings) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO chat_settings (chat_id, user_id, pinned, archived, folder)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO chat_settings (chat_id, user_id, pinned, archived, folder, muted)
+		 VALUES ($1, $2, $3, $4, $5, $6)
 		 ON CONFLICT (chat_id, user_id) DO UPDATE
-		   SET pinned = EXCLUDED.pinned, archived = EXCLUDED.archived, folder = EXCLUDED.folder`,
-		cs.ChatID, cs.UserID, cs.Pinned, cs.Archived, cs.Folder)
+		   SET pinned = EXCLUDED.pinned, archived = EXCLUDED.archived, folder = EXCLUDED.folder, muted = EXCLUDED.muted`,
+		cs.ChatID, cs.UserID, cs.Pinned, cs.Archived, cs.Folder, cs.Muted)
 	return mapStoreErr(err)
 }

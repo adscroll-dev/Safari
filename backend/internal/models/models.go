@@ -58,17 +58,21 @@ type Chat struct {
 	// Roles maps user id -> role (member | admin | owner). Populated by
 	// handlers from chat_members; empty in older callers.
 	Roles map[string]string `json:"roles,omitempty"`
-	// Per-user settings for the requesting user (pin/archive/folder).
+	// Per-user settings for the requesting user (pin/archive/folder/mute).
 	Pinned   bool   `json:"pinned,omitempty"`
 	Archived bool   `json:"archived,omitempty"`
 	Folder   string `json:"folder,omitempty"`
+	Muted    bool   `json:"muted,omitempty"`
 	// WhatsApp-style list data for the requesting user, populated by
 	// ListChats only: the latest message preview and how many messages
 	// from others the user has not read yet.
 	LastMessage *LastMessagePreview `json:"last_message,omitempty"`
 	UnreadCount int                 `json:"unread_count,omitempty"`
-	CreatedAt   time.Time           `json:"created_at"`
-	UpdatedAt   time.Time           `json:"updated_at"`
+	// The chat's pinned message (Stage 1), if any, populated by
+	// ListChats/GetChat. The client renders it as the pinned banner.
+	PinnedMessage *Message  `json:"pinned_message,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // LastMessagePreview is the chat-list preview of the latest message.
@@ -83,14 +87,16 @@ type LastMessagePreview struct {
 }
 
 // ChatSettings are per-user, per-chat preferences (Telegram-style pin /
-// archive / folders). A folder is a free-form label such as "work",
-// "family" or "unread"; the empty folder means the default list.
+// archive / folders, WhatsApp-style mute). A folder is a free-form label
+// such as "work", "family" or "unread"; the empty folder means the
+// default list.
 type ChatSettings struct {
 	ChatID   string `json:"chat_id"`
 	UserID   string `json:"user_id"`
 	Pinned   bool   `json:"pinned"`
 	Archived bool   `json:"archived"`
 	Folder   string `json:"folder,omitempty"`
+	Muted    bool   `json:"muted"`
 }
 
 type ChatMember struct {
@@ -123,7 +129,7 @@ type Message struct {
 	ChatID          string              `json:"chat_id"`
 	SenderID        string              `json:"sender_id"`
 	Content         string              `json:"content"`
-	Kind            string              `json:"kind"` // text | image | video | file | voice | location | sticker
+	Kind            string              `json:"kind"` // text | image | video | file | voice | location | sticker | contact
 	FileURL         string              `json:"file_url,omitempty"`
 	FileName        string              `json:"file_name,omitempty"`
 	FileSize        int64               `json:"file_size,omitempty"`

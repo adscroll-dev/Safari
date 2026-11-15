@@ -19,6 +19,34 @@ Never present a demo feature as complete.
 - Still to do in this stage: fresh screenshots, fresh split APKs,
   commit + push, verify live site, deliver to the user.
 
+## Stage 1 — DONE (2026-11-15): chat gaps
+- Mute chat (per-user setting; chat ⋮ menu Mute/Unmute; bell-off
+  icon + grey unread badge in the chat list), pin message (one per
+  chat; pinned banner with sender + text, tap for the full message,
+  X to unpin; long-press Pin/Unpin), contact share (attach sheet →
+  Share contact → pick a Safari user → contact card; tapping the
+  card opens a DM with them), delete-for-me / delete-for-everyone
+  choice dialog (delete-for-me hides the message only for the
+  caller; chat preview + unread counts skip it).
+- Backend: migration 011 (chat_settings.muted,
+  chats.pinned_message_id, message_deletions table); endpoints
+  /mute, /unmute, /pin-message (POST/DELETE),
+  /api/messages/{id}/delete-for-me; contact is a new message kind
+  (content JSON {"user_id"}, server validates the user exists);
+  TestStage1ChatGaps passes; go test ./... all pass.
+- Mobile: api.dart mute/unmute/pinMessage/unpinMessage/
+  deleteMessageForMe/sendContact; main.dart message-actions sheet
+  (Pin/Unpin + delete choice), chat ⋮ menu mute toggle, _chatRow
+  muted state, _chatPreview "Contact" label, pinned banner,
+  attach-sheet contact picker, contact card in _messageBubble.
+  flutter analyze clean, flutter test 33/33.
+- Also fixed: pin-chat menu used to replace the open chat with the
+  settings response; it now re-reads the fresh chat from the list.
+- NOTE: Postgres SQL for migration 011 could NOT be validated from
+  the VM (raw TCP to Supabase is intercepted by the sandbox), so
+  the Render deploy is the first live run of it — verify the deploy
+  succeeds and /health stays ok before calling it live.
+
 ## Gap list (verify each by code inspection before building)
 
 ### 1. Accounts
@@ -35,8 +63,15 @@ Never present a demo feature as complete.
   sent/delivered/read ticks, typing, message search, pin chat,
   archive, delete chat, folders, drafts, chat lock PIN, scheduled,
   disappearing.
-- VERIFY: delete for me vs delete for everyone (both options?).
-- MISSING: share contact, pin MESSAGE (not just pin chat), mute chat.
+- VERIFIED 2026-11-15 by code inspection: delete is a single
+  sender-only hard delete (DELETE /api/messages/{id}, broadcast
+  `message_deleted` to the chat; mobile shows one "Delete" option) —
+  effectively delete-for-everyone for own messages, with NO
+  delete-for-me option and no choice UI. Mute chat: NOT built (only
+  the word "muted" as a colour name in theme.dart). Pin MESSAGE: NOT
+  built (zero references; only pin *chat* exists). Share contact: NOT
+  built (no contact message kind; only "View contact" in the members
+  sheet).
 
 ### 3. Calls
 - DONE: 1:1 voice/video signaling (WebRTC), Opus 12 kbps cap, video
@@ -93,9 +128,9 @@ Never present a demo feature as complete.
   two real accounts on phones).
 
 ## Order of work (next stages)
-1. Finish Stage 0 delivery (screenshots + APK + push).
+1. Finish Stage 0 delivery (screenshots + APK + push). — DONE 2026-11-15.
 2. Chat gaps: mute chat, pin message, contact share, delete-for-me /
-   delete-for-everyone check.
+   delete-for-everyone check. — DONE 2026-11-15 (Stage 1 above).
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react.
 4. Calls: history + missed, in-call controls, group calls (signaling).
 5. Polls + pinned message (groups).

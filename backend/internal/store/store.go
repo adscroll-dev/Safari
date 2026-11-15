@@ -53,7 +53,16 @@ type StoreIface interface {
 	// Chat-list previews (WhatsApp-style): the latest message in a
 	// chat, and how many messages from others userID has not read.
 	LastMessageForChat(chatID string) *models.Message
+	// Per-user variant of LastMessageForChat: it skips messages the
+	// user deleted for themself, so the chat preview never shows one.
+	LastMessageForChatForUser(chatID, userID string) *models.Message
 	UnreadCountForChat(chatID, userID string) int
+	// Stage 1 (WhatsApp parity): one pinned message per chat, and
+	// delete-for-me (a message hidden only for one user).
+	SetPinnedMessage(chatID, messageID string) error
+	PinnedMessageForChat(chatID string) *models.Message
+	DeleteMessageForUser(messageID, userID string) error
+	IsMessageDeletedForUser(messageID, userID string) bool
 	SearchMessages(userID, query string, limit int) []*models.Message
 	UpdateMessage(m *models.Message) error
 	DeleteMessage(id string) error
@@ -179,6 +188,10 @@ type MemoryStore struct {
 	// Last-seen privacy: user id -> "everyone" | "nobody" (default
 	// "everyone" when absent).
 	lastSeenVisibility map[string]string
+	// Stage 1: one pinned message per chat (chat id -> message id),
+	// and delete-for-me (message id -> user ids who hid it).
+	pinnedMessages map[string]string
+	deletedForMe   map[string]map[string]bool
 }
 
 type receipt struct {
@@ -215,6 +228,8 @@ func NewMemoryStore() *MemoryStore {
 		pendingUsers:       map[string]*models.PendingUser{},
 		invites:            map[string]*models.ChatInvite{},
 		lastSeenVisibility: map[string]string{},
+		pinnedMessages:     map[string]string{},
+		deletedForMe:       map[string]map[string]bool{},
 	}
 }
 
@@ -474,6 +489,81 @@ func (s *MemoryStore) LastMessageForChat(chatID string) *models.Message {
 	return nil
 }
 
+// LastMessageForChatForUser is LastMessageForChat, but it also skips
+// messages the user deleted for themself.
+func (s *MemoryStore) LastMessageForChatForUser(chatID, userID string) *models.Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := s.chatMsgs[chatID]
+	now := time.Now().UTC()
+	for i := len(ids) - 1; i >= 0; i-- {
+		id := ids[i]
+		if s.deletedForMe[id] != nil && s.deletedForMe[id][userID] {
+			continue
+		}
+		if m, ok := s.messages[id]; ok && m.DeletedAt == nil &&
+			(m.ExpiresAt == nil || m.ExpiresAt.After(now)) {
+			return s.withReceipts(m)
+		}
+	}
+	return nil
+}
+
+// SetPinnedMessage pins one message in a chat; an empty messageID
+// clears the pin. The message must exist and belong to the chat.
+func (s *MemoryStore) SetPinnedMessage(chatID, messageID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.chats[chatID]; !ok {
+		return ErrNotFound
+	}
+	if messageID == "" {
+		delete(s.pinnedMessages, chatID)
+		return nil
+	}
+	m, ok := s.messages[messageID]
+	if !ok || m.ChatID != chatID || m.DeletedAt != nil {
+		return ErrNotFound
+	}
+	s.pinnedMessages[chatID] = messageID
+	return nil
+}
+
+func (s *MemoryStore) PinnedMessageForChat(chatID string) *models.Message {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.pinnedMessages[chatID]
+	if !ok {
+		return nil
+	}
+	m, ok := s.messages[id]
+	if !ok || m.DeletedAt != nil {
+		return nil
+	}
+	return s.withReceipts(m)
+}
+
+// DeleteMessageForUser hides a message only for one user
+// (delete-for-me). The message stays for everyone else.
+func (s *MemoryStore) DeleteMessageForUser(messageID, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.messages[messageID]; !ok {
+		return ErrNotFound
+	}
+	if s.deletedForMe[messageID] == nil {
+		s.deletedForMe[messageID] = map[string]bool{}
+	}
+	s.deletedForMe[messageID][userID] = true
+	return nil
+}
+
+func (s *MemoryStore) IsMessageDeletedForUser(messageID, userID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.deletedForMe[messageID] != nil && s.deletedForMe[messageID][userID]
+}
+
 func (s *MemoryStore) UnreadCountForChat(chatID, userID string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -483,6 +573,9 @@ func (s *MemoryStore) UnreadCountForChat(chatID, userID string) int {
 		m, ok := s.messages[id]
 		if !ok || m.DeletedAt != nil ||
 			(m.ExpiresAt != nil && !m.ExpiresAt.After(now)) {
+			continue
+		}
+		if s.deletedForMe[id] != nil && s.deletedForMe[id][userID] {
 			continue
 		}
 		if m.SenderID == userID {

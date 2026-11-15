@@ -291,8 +291,21 @@ func main() {
 			h.SetChatSetting(w, r, "archive")
 		case strings.HasSuffix(path, "/unarchive"):
 			h.SetChatSetting(w, r, "unarchive")
+		case strings.HasSuffix(path, "/mute"):
+			h.SetChatSetting(w, r, "mute")
+		case strings.HasSuffix(path, "/unmute"):
+			h.SetChatSetting(w, r, "unmute")
 		case strings.HasSuffix(path, "/folder"):
 			h.SetChatSetting(w, r, "folder")
+		case strings.HasSuffix(path, "/pin-message"):
+			switch r.Method {
+			case http.MethodPost:
+				h.PinMessage(w, r)
+			case http.MethodDelete:
+				h.UnpinMessage(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
 		default:
 			middleware.WriteError(w, http.StatusNotFound, "not found")
 		}
@@ -316,6 +329,14 @@ func main() {
 		}
 	})))
 	mux.Handle("/api/messages/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/delete-for-me") {
+			if r.Method == http.MethodPost {
+				h.DeleteMessageForMe(w, r)
+			} else {
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/reactions") {
 			switch r.Method {
 			case http.MethodPost:

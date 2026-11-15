@@ -196,11 +196,21 @@ class ApiClient {
       _req('POST', '/api/chats',
           {'type': type, 'member_ids': memberIds, 'title': title});
 
-  /// v0.6 parity: edit / delete a message.
+  /// v0.6 parity: edit / delete a message. deleteMessage is
+  /// delete-for-everyone (sender only); deleteMessageForMe hides a
+  /// message only for the caller (any member).
   Future<Map<String, dynamic>> editMessage(String id, String content) =>
       _req('PUT', '/api/messages/$id', {'content': content});
   Future<Map<String, dynamic>> deleteMessage(String id) =>
       _req('DELETE', '/api/messages/$id');
+  Future<Map<String, dynamic>> deleteMessageForMe(String id) =>
+      _req('POST', '/api/messages/$id/delete-for-me');
+
+  /// Stage 1: share a Safari user as a contact card. The server
+  /// validates that the user exists; content is JSON {"user_id"}.
+  Future<Map<String, dynamic>> sendContact(String chatId, String userId) =>
+      _req('POST', '/api/chats/$chatId/messages',
+          {'kind': 'contact', 'content': jsonEncode({'user_id': userId})});
 
   /// v0.6 parity: reactions (POST {emoji} / DELETE ?emoji=).
   Future<Map<String, dynamic>> addReaction(String id, String emoji) =>
@@ -405,6 +415,17 @@ class ApiClient {
       _req('POST', '/api/chats/$chatId/archive');
   Future<Map<String, dynamic>> unarchiveChat(String chatId) =>
       _req('POST', '/api/chats/$chatId/unarchive');
+  /// Stage 1: mute / unmute a chat (per-user; no push for it).
+  Future<Map<String, dynamic>> muteChat(String chatId) =>
+      _req('POST', '/api/chats/$chatId/mute');
+  Future<Map<String, dynamic>> unmuteChat(String chatId) =>
+      _req('POST', '/api/chats/$chatId/unmute');
+  /// Stage 1: pin / unpin one message in a chat (pinned banner).
+  Future<Map<String, dynamic>> pinMessage(String chatId, String messageId) =>
+      _req('POST', '/api/chats/$chatId/pin-message',
+          {'message_id': messageId});
+  Future<Map<String, dynamic>> unpinMessage(String chatId) =>
+      _req('DELETE', '/api/chats/$chatId/pin-message');
   Future<Map<String, dynamic>> setFolder(String chatId, String folder) =>
       _req('POST', '/api/chats/$chatId/folder', {'folder': folder});
   Future<Map<String, dynamic>> createDm(String otherUserId) =>

@@ -69,6 +69,9 @@ var migration009SQL string
 //go:embed migrations/010_privacy.sql
 var migration010SQL string
 
+//go:embed migrations/011_stage1.sql
+var migration011SQL string
+
 // The embedded migration is a copy of backend/migrations/001_init.sql
 // (go:embed cannot reach outside the package directory).
 // TestMigrationMatchesFile fails if the two ever drift apart.
@@ -146,6 +149,10 @@ func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, 
 	if _, err := pool.Exec(ctx, migration010SQL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("apply migration 010_privacy.sql: %w", err)
+	}
+	if _, err := pool.Exec(ctx, migration011SQL); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("apply migration 011_stage1.sql: %w", err)
 	}
 	return &PostgresStore{pool: pool}, nil
 }
@@ -620,6 +627,9 @@ func (s *PostgresStore) UnreadCountForChat(chatID, userID string) int {
 		 WHERE m.chat_id = $1 AND m.sender_id != $2
 		   AND m.deleted_at IS NULL
 		   AND (m.expires_at IS NULL OR m.expires_at > now())
+		   AND NOT EXISTS (
+		     SELECT 1 FROM message_deletions d
+		     WHERE d.message_id = m.id AND d.user_id = $2)
 		   AND NOT EXISTS (
 		     SELECT 1 FROM message_receipts r
 		     WHERE r.message_id = m.id AND r.user_id = $2

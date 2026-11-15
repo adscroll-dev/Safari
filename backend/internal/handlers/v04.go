@@ -55,6 +55,7 @@ func (h *Handler) applySettings(w http.ResponseWriter, r *http.Request, chats []
 	for _, c := range chats {
 		cs := h.Store.GetChatSettings(c.ID, me)
 		c.Pinned, c.Archived, c.Folder = cs.Pinned, cs.Archived, cs.Folder
+		c.Muted = cs.Muted
 		c.Roles = map[string]string{}
 		for _, m := range h.Store.ChatMembers(c.ID) {
 			c.Roles[m.UserID] = m.Role
@@ -424,6 +425,10 @@ func (h *Handler) SetChatSetting(w http.ResponseWriter, r *http.Request, kind st
 		cs.Archived = true
 	case "unarchive":
 		cs.Archived = false
+	case "mute":
+		cs.Muted = true
+	case "unmute":
+		cs.Muted = false
 	case "folder":
 		var req struct {
 			Folder string `json:"folder"`

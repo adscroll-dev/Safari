@@ -12,34 +12,33 @@ type Apk = {
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
 // 2026-11-15 with aapt2 (package app.vyro, version 0.6.0, label
-// "Safari"). Rebuilt 2026-11-15 08:54 +0430 — the WhatsApp redesign:
-// teal header, 4 tabs (Chats/Updates/Communities/Calls), WhatsApp
-// chat list with previews + unread badges, WhatsApp bubbles,
+// "Safari"). Rebuilt 2026-11-15 10:26 +0430 — Stage 1 chat gaps:
+// mute chat, pin message, contact share, delete for me/everyone;
 // live API https://vyro-api-wf4b.onrender.com.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
     href: "/downloads/safari-0.6.0-arm64-v8a.apk",
     size: "33.4 MB",
-    bytes: "33,424,899 bytes",
+    bytes: "33,425,019 bytes",
     sha256:
-      "b6c133007c80954560dc4d91f7a19673a6d1316722d179e9b99e0b04be8fa630",
+      "8cfb77d3fe91cc3c18a28b65a521efdc63c8ac4218f080f78e8924964c5ab67e",
   },
   {
     abi: "armeabi-v7a",
     href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
     size: "26.5 MB",
-    bytes: "26,503,155 bytes",
+    bytes: "26,536,037 bytes",
     sha256:
-      "21953230cb0d8429c4ad54da914c7150dbe590677786bd152a5ccf96bb628bf2",
+      "d5c085637ec64782b8704b3c4274d8bb6d50553290a4dd6e17730397d25c35b1",
   },
   {
     abi: "x86_64",
     href: "/downloads/safari-0.6.0-x86_64.apk",
-    size: "35.9 MB",
-    bytes: "35,895,557 bytes",
+    size: "36.0 MB",
+    bytes: "35,961,213 bytes",
     sha256:
-      "9ba40b839262b129f46fe5ac5e3dc791ca0593ab1638b612cfd46c89b5d5974b",
+      "df201cc3146c0ed6ab57c4332b8b30ace6216aee97faec1f8b382b5f0b8b0f2c",
   },
 ];
 

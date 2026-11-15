@@ -16,9 +16,10 @@
 //	POST /api/uploads           multipart "file" -> {url, file_name, file_size, mime_type, kind}
 //	GET  /uploads/{name}         download a file uploaded above (auth required)
 //	POST /api/chats/{id}/messages  {content, kind?, reply_to_id?, file_url?, file_name?, file_size?, mime_type?}
-//	                               kind: text | image | video | file | voice (file kinds need file_url from /api/uploads)
+//	                               kind: text | image | video | file | voice | location | sticker | contact (file kinds need file_url from /api/uploads; contact content is JSON {"user_id"})
 //	PUT  /api/messages/{id}   {content}            (sender only)
-//	DELETE /api/messages/{id}                       (sender only)
+//	DELETE /api/messages/{id}                       (sender only, delete-for-everyone)
+//	POST /api/messages/{id}/delete-for-me           (any member, hides it only for the caller)
 //	POST /api/messages/{id}/reactions {emoji}
 //	DELETE /api/messages/{id}/reactions?emoji=
 //	GET  /api/messages/search?q=
@@ -318,8 +319,9 @@ func (h *Handler) ListChats(w http.ResponseWriter, r *http.Request) {
 	// WhatsApp-style list data: latest message preview + unread
 	// count for the requesting user. E2EE previews never carry the
 	// ciphertext — the client shows "Encrypted message" instead.
+	// The preview skips messages the user deleted for themself.
 	for _, c := range chats {
-		if m := h.Store.LastMessageForChat(c.ID); m != nil {
+		if m := h.Store.LastMessageForChatForUser(c.ID, me); m != nil {
 			content := m.Content
 			if m.Kind == "e2ee" {
 				content = ""
@@ -333,6 +335,7 @@ func (h *Handler) ListChats(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		c.UnreadCount = h.Store.UnreadCountForChat(c.ID, me)
+		c.PinnedMessage = h.Store.PinnedMessageForChat(c.ID)
 	}
 	// Pinned chats first, archived last (Telegram-style ordering).
 	sortChats(chats)
@@ -434,6 +437,14 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 	if msgs == nil {
 		msgs = []*models.Message{}
 	}
+	// Delete-for-me: hide messages the reader hid only for themself.
+	visible := msgs[:0]
+	for _, m := range msgs {
+		if !h.Store.IsMessageDeletedForUser(m.ID, me) {
+			visible = append(visible, m)
+		}
+	}
+	msgs = visible
 	// Fetching a chat delivers its messages to the reader (WhatsApp-style
 	// second tick) — except the reader's own messages.
 	for _, m := range msgs {
@@ -503,7 +514,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		kind = "text"
 	}
 	switch kind {
-	case "text", "image", "video", "file", "voice", "location", "sticker", "e2ee":
+	case "text", "image", "video", "file", "voice", "location", "sticker", "contact", "e2ee":
 	default:
 		middleware.WriteError(w, http.StatusBadRequest, "kind '"+kind+"' is not implemented yet")
 		return
@@ -539,6 +550,21 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if kind == "contact" {
+		// A shared contact is JSON {"user_id": "<uuid>"} naming a
+		// Safari user; the client renders it as a contact card.
+		var c struct {
+			UserID string `json:"user_id"`
+		}
+		if err := json.Unmarshal([]byte(req.Content), &c); err != nil || c.UserID == "" {
+			middleware.WriteError(w, http.StatusBadRequest, "contact requires a JSON body with user_id")
+			return
+		}
+		if _, err := h.Store.UserByID(c.UserID); err != nil {
+			middleware.WriteError(w, http.StatusBadRequest, "contact user not found")
+			return
+		}
+	}
 	if kind == "e2ee" {
 		// No further content checks: the envelope was validated above.
 	} else if kind == "text" {
@@ -550,7 +576,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 			middleware.WriteError(w, http.StatusBadRequest, "message too long (max 10000 characters)")
 			return
 		}
-	} else if kind != "location" {
+	} else if kind != "location" && kind != "contact" {
 		// A media message must point at a file this server stored.
 		if !strings.HasPrefix(req.FileURL, "/uploads/") || strings.Contains(req.FileURL, "..") {
 			middleware.WriteError(w, http.StatusBadRequest, "file_url from /api/uploads is required for kind '"+kind+"'")

@@ -1213,6 +1213,8 @@ class _HomePageState extends State<HomePage> {
     final mine = m['sender_id'] == _user!['id'];
     final content =
         _decrypted[m['id'] as String] ?? (m['content'] as String? ?? '');
+    final isPinned =
+        (_activeChat?['pinned_message'] as Map?)?['id'] == m['id'];
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -1233,6 +1235,31 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 _showReactions(m);
+              },
+            ),
+            // Stage 1: pin / unpin this message in the chat.
+            ListTile(
+              leading: Icon(
+                  isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+              title: Text(isPinned ? 'Unpin' : 'Pin'),
+              onTap: () async {
+                Navigator.pop(context);
+                final chatId = _activeChat?['id'] as String;
+                try {
+                  if (isPinned) {
+                    await _api.unpinMessage(chatId);
+                  } else {
+                    await _api.pinMessage(chatId, m['id'] as String);
+                  }
+                  await _refreshChats();
+                  // Keep the open chat's pinned banner in sync.
+                  final fresh = _chats.firstWhere(
+                      (c) => (c as Map)['id'] == chatId,
+                      orElse: () => _activeChat!);
+                  setState(() => _activeChat = fresh as Map<String, dynamic>);
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
               },
             ),
             // v0.7 forwarding: E2EE messages cannot be forwarded
@@ -1258,23 +1285,67 @@ class _HomePageState extends State<HomePage> {
                   });
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Delete'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  try {
-                    await _api.deleteMessage(m['id'] as String);
-                    setState(() => _messages
-                        .removeWhere((x) => (x as Map)['id'] == m['id']));
-                  } catch (e) {
-                    setState(() => _error = e.toString());
-                  }
-                },
-              ),
             ],
+            // Stage 1: WhatsApp-style delete choice — for me, or for
+            // everyone (own messages only).
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteChoice(m, mine);
+              },
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Stage 1: delete choice dialog. "Delete for me" hides the message
+  /// only for the caller; "Delete for everyone" (own messages only)
+  /// removes it for all members.
+  void _showDeleteChoice(Map<String, dynamic> m, bool mine) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete message?'),
+        content: Text(mine
+            ? 'Delete this message for yourself or for everyone?'
+            : 'Delete this message for yourself?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _api.deleteMessageForMe(m['id'] as String);
+                setState(() => _messages
+                    .removeWhere((x) => (x as Map)['id'] == m['id']));
+              } catch (e) {
+                setState(() => _error = e.toString());
+              }
+            },
+            child: const Text('Delete for me'),
+          ),
+          if (mine)
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                try {
+                  await _api.deleteMessage(m['id'] as String);
+                  setState(() => _messages
+                      .removeWhere((x) => (x as Map)['id'] == m['id']));
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
+              },
+              child: const Text('Delete for everyone'),
+            ),
+        ],
       ),
     );
   }
@@ -2152,11 +2223,29 @@ class _HomePageState extends State<HomePage> {
                 _showMembers();
                 break;
               case 'pin':
-                final c = chat['pinned'] == true
-                    ? await _api.unpinChat(chat['id'] as String)
-                    : await _api.pinChat(chat['id'] as String);
-                setState(() => _activeChat = c);
+                // SetChatSetting returns the settings, not the chat —
+                // re-read the fresh chat from the list (same for mute).
+                if (chat['pinned'] == true) {
+                  await _api.unpinChat(chat['id'] as String);
+                } else {
+                  await _api.pinChat(chat['id'] as String);
+                }
                 await _refreshChats();
+                setState(() => _activeChat = _chats.firstWhere(
+                    (c) => (c as Map)['id'] == chat['id'],
+                    orElse: () => chat) as Map<String, dynamic>);
+                break;
+              case 'mute':
+                // Stage 1: mute / unmute notifications for this chat.
+                if (chat['muted'] == true) {
+                  await _api.unmuteChat(chat['id'] as String);
+                } else {
+                  await _api.muteChat(chat['id'] as String);
+                }
+                await _refreshChats();
+                setState(() => _activeChat = _chats.firstWhere(
+                    (c) => (c as Map)['id'] == chat['id'],
+                    orElse: () => chat) as Map<String, dynamic>);
                 break;
               case 'archive':
                 await _api.archiveChat(chat['id'] as String);
@@ -2190,6 +2279,12 @@ class _HomePageState extends State<HomePage> {
               value: 'pin',
               child: Text(
                   chat['pinned'] == true ? 'Unpin chat' : 'Pin chat'),
+            ),
+            PopupMenuItem(
+              value: 'mute',
+              child: Text(chat['muted'] == true
+                  ? 'Unmute notifications'
+                  : 'Mute notifications'),
             ),
             const PopupMenuItem(
                 value: 'archive', child: Text('Archive chat')),
@@ -2326,6 +2421,9 @@ class _HomePageState extends State<HomePage> {
     final unread = _unreadCount(c);
     final timeLabel = _chatTimeLabel(c);
     final pinned = c['pinned'] == true;
+    // Stage 1: muted chats show a bell-off icon and a grey (not
+    // green) unread badge, like WhatsApp.
+    final muted = c['muted'] == true;
     final locked = _chatLock?.isLocked(c['id'] as String) == true;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final secondary = dark
@@ -2352,6 +2450,12 @@ class _HomePageState extends State<HomePage> {
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Icon(Icons.push_pin, size: 15, color: secondary),
+            ),
+          if (muted)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child:
+                  Icon(Icons.notifications_off, size: 15, color: secondary),
             ),
           if (timeLabel.isNotEmpty)
             Text(
@@ -2393,7 +2497,7 @@ class _HomePageState extends State<HomePage> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: WaColors.unreadBadge,
+                color: muted ? secondary : WaColors.unreadBadge,
                 borderRadius: BorderRadius.circular(10),
               ),
               alignment: Alignment.center,
@@ -2477,6 +2581,9 @@ class _HomePageState extends State<HomePage> {
         break;
       case 'sticker':
         body = 'Sticker';
+        break;
+      case 'contact':
+        body = 'Contact';
         break;
       default:
         body = (lm['content'] as String?) ?? '';
@@ -3635,6 +3742,106 @@ class _HomePageState extends State<HomePage> {
     return '';
   }
 
+  /// Stage 1: WhatsApp-style pinned-message banner at the top of a
+  /// chat. Tap shows the full message; the X unpins it.
+  Widget _pinnedBanner(Map<String, dynamic> pm) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final kind = pm['kind'] as String? ?? 'text';
+    final text = kind == 'text'
+        ? (pm['content'] as String? ?? '')
+        : kind == 'image'
+            ? 'Photo'
+            : kind == 'video'
+                ? 'Video'
+                : kind == 'voice'
+                    ? 'Voice message'
+                    : kind == 'file'
+                        ? 'File'
+                        : kind == 'location'
+                            ? 'Location'
+                            : kind == 'contact'
+                                ? 'Contact'
+                                : kind == 'e2ee'
+                                    ? 'Encrypted message'
+                                    : 'Message';
+    final sender = _usersById[pm['sender_id'] as String? ?? ''];
+    final name = pm['sender_id'] == _user?['id']
+        ? 'You'
+        : (sender?['display_name'] as String?) ??
+            (sender?['username'] as String?) ??
+            '';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: dark ? WaColors.darkBubbleIn : Colors.white,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: () => showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(name.isEmpty ? 'Pinned message' : 'Pinned by $name'),
+            content: Text(text),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.push_pin,
+                size: 16, color: dark ? WaColors.accentDark : WaColors.accent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (name.isNotEmpty)
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: dark
+                                ? WaColors.accentDark
+                                : WaColors.accent)),
+                  Text(text,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Unpin',
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () async {
+                try {
+                  await _api.unpinMessage(_activeChat!['id'] as String);
+                  await _refreshChats();
+                  final fresh = _chats.firstWhere(
+                      (c) => (c as Map)['id'] == _activeChat!['id'],
+                      orElse: () => _activeChat!);
+                  setState(
+                      () => _activeChat = fresh as Map<String, dynamic>);
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// WhatsApp conversation screen: plain chat background, date
   /// chips, a yellow E2EE notice when encryption is on for this
   /// chat, and the WhatsApp input bar (rounded field with attach +
@@ -3744,6 +3951,10 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
+          // Stage 1: pinned-message banner (WhatsApp-style).
+          if (_activeChat?['pinned_message'] is Map<String, dynamic>)
+            _pinnedBanner(
+                _activeChat!['pinned_message'] as Map<String, dynamic>),
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
@@ -4029,6 +4240,69 @@ class _HomePageState extends State<HomePage> {
   /// Attach sheet: photo, location, schedule, disappearing timer.
   /// Keeps the input bar clean (premium) while all features stay
   /// one tap away.
+  /// Stage 1: pick a Safari user to share as a contact card in this
+  /// chat. The card carries their name + @username; tapping it in
+  /// the chat opens a DM with them.
+  void _showContactPicker() async {
+    List<dynamic> users;
+    try {
+      users = await _api.listUsers();
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    final me = _user?['id'] as String?;
+    final others = users
+        .where((u) => (u as Map)['id'] != me)
+        .cast<Map<String, dynamic>>()
+        .toList();
+    if (!mounted) return;
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Share contact',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: others.length,
+                itemBuilder: (context, i) {
+                  final u = others[i];
+                  final name =
+                      (u['display_name'] as String?)?.trim() ?? '';
+                  final username = (u['username'] as String?) ?? '';
+                  final label = name.isNotEmpty ? name : '@$username';
+                  return ListTile(
+                    leading: WaAvatar(label: label, radius: 22),
+                    title: Text(label),
+                    subtitle:
+                        username.isNotEmpty ? Text('@$username') : null,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      try {
+                        await _api.sendContact(
+                            _activeChat!['id'] as String, u['id'] as String);
+                        await _refreshMessages();
+                      } catch (e) {
+                        setState(() => _error = e.toString());
+                      }
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showAttachSheet() {
     showModalBottomSheet(
       context: context,
@@ -4050,6 +4324,15 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 _shareLocation();
+              },
+            ),
+            // Stage 1: share a Safari user as a contact card.
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Share contact'),
+              onTap: () {
+                Navigator.pop(context);
+                _showContactPicker();
               },
             ),
             ListTile(
@@ -4310,6 +4593,65 @@ class _HomePageState extends State<HomePage> {
     if (kind == 'location') {
       return Text(
           '📍 ${m['location_label'] ?? 'Location'} (${m['lat']}, ${m['lng']})');
+    }
+    if (kind == 'contact') {
+      // Stage 1: shared contact card — name + @username, tap
+      // "Message" to open a DM with them.
+      String userId = '';
+      try {
+        final parsed = jsonDecode(content) as Map<String, dynamic>;
+        userId = parsed['user_id'] as String? ?? '';
+      } catch (_) {}
+      final u = _usersById[userId];
+      final name = (u?['display_name'] as String?)?.trim() ?? '';
+      final username = (u?['username'] as String?) ?? '';
+      final label = name.isNotEmpty
+          ? name
+          : username.isNotEmpty
+              ? '@$username'
+              : 'Safari user';
+      return InkWell(
+        onTap: userId.isEmpty
+            ? null
+            : () async {
+                try {
+                  final chat = await _api.createDm(userId);
+                  await _refreshChats();
+                  await _openChat(chat);
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
+              },
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              WaAvatar(label: label, radius: 20),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (username.isNotEmpty)
+                      Text('@$username',
+                          style: const TextStyle(fontSize: 12)),
+                    const Text('Tap to message',
+                        style: TextStyle(fontSize: 11)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
     if (kind == 'image' ||
         kind == 'video' ||
