@@ -235,8 +235,30 @@ Never present a demo feature as complete.
   x86_64 36,271,034 B c1c08418…f702 — VERIFIED LIVE (landing hash,
   live APK SHA match, POST /api/users/me/change-email probe 401,
   /health ok).
-- MISSING: backup & restore, storage-management page, anti-spam
-  tools. (Stage 9.)
+- DONE 2026-11-15 (Stage 9, commit 6391721, DELIVERED ~15:25 +0430):
+  backup & restore — chats already live on the server (PostgreSQL),
+  so signing in anywhere restores them; GET /api/users/me/export
+  additionally gives a personal JSON copy (profile, chats, latest
+  200 messages per chat, blocked list, privacy settings); mobile
+  Settings -> Backup offers Download backup file (JSON via the
+  share sheet) and Restore from server (re-download everything);
+  storage page — GET /api/users/me/storage (per-chat message counts
+  + media bytes, totals; deleted messages excluded) with a mobile
+  page + Clear downloaded media cache; anti-spam — server send
+  rate limit, 60 messages/min per account (429 after; per-account
+  budget, other accounts unaffected), plus the existing Report and
+  Block in the chat menu and an Anti-spam explainer in Settings ->
+  Security. TestStage9BackupStorageAntiSpam passes; go test ./...
+  all pass; flutter analyze clean, flutter test 34/34.
+- APKs safari-0.6.0 built 15:17 +0430 (the first build was
+  interrupted by a runtime restart at ~9 min and wrote nothing;
+  the rebuild took 1,383.1 s): arm64 33,800,757 B
+  SHA-256 b63d7b85…8d54e, armeabi 26,944,563 B c36e2f2a…00077,
+  x86_64 36,336,955 B ce769295…5d7cf — VERIFIED LIVE (landing hash,
+  live APK SHA match, GET /api/users/me/storage probe 401,
+  /health ok).
+- MISSING: nothing in Extras — the master-brief scope is now
+  complete except the known blockers (below).
 
 ### 7. Accounts (Stage 7, DONE 2026-11-15, commit 20b2093, DELIVERED ~14:00 +0430)
 - DONE 2026-11-15: profile editing — PATCH /api/users/me
@@ -295,5 +317,5 @@ Never present a demo feature as complete.
 7. Communities: real model (subgroups + announcement group). — DONE 2026-11-15 (Stage 6, commit f47b9e0, DELIVERED).
 8. Accounts: profile photo/about, block/report, contact search, linked devices. — DONE 2026-11-15 (Stage 7, commit 20b2093, DELIVERED).
 9. Extras: app lock, link preview, notification settings, chat share/export, account transfer. — DONE 2026-11-15 (Stage 8, commit 39d681e, DELIVERED).
-10. Extras 2: backup/restore, storage page, anti-spam. — NEXT (Stage 9).
+10. Extras 2: backup/restore, storage page, anti-spam. — DONE 2026-11-15 (Stage 9, commit 6391721, DELIVERED).
 11. iOS/desktop feasibility check (no Mac — report honestly). — NEXT (Stage 10).
