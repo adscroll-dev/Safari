@@ -77,6 +77,9 @@ class CallController {
   // Stage 3: in-call controls.
   bool micMuted = false;
   bool cameraOff = false;
+  // Speaker toggle (WhatsApp parity): route call audio to the
+  // loudspeaker instead of the earpiece. Defaults to earpiece.
+  bool speakerOn = false;
   bool _iceRestarted = false;
 
   // Stage 3: group calls (mesh) — one peer connection per member.
@@ -513,6 +516,21 @@ class CallController {
     return Helper.switchCamera(tracks.first);
   }
 
+  /// Route call audio to the loudspeaker (on) or back to the
+  /// earpiece (off). Returns false when the platform cannot
+  /// switch (e.g. web), leaving the previous state untouched so
+  /// the UI never claims a route that is not active.
+  Future<bool> toggleSpeaker() async {
+    final next = !speakerOn;
+    try {
+      await Helper.setSpeakerphoneOn(next);
+    } catch (_) {
+      return false;
+    }
+    speakerOn = next;
+    return true;
+  }
+
   Future<void> handleAnswer(Map<String, dynamic> answer) async {
     if (_pc == null) return;
     await _pc!.setRemoteDescription(RTCSessionDescription(
@@ -585,6 +603,12 @@ class CallController {
     isGroup = false;
     micMuted = false;
     cameraOff = false;
+    if (speakerOn) {
+      speakerOn = false;
+      try {
+        await Helper.setSpeakerphoneOn(false);
+      } catch (_) {}
+    }
     _iceRestarted = false;
   }
 

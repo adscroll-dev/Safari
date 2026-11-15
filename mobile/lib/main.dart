@@ -6467,6 +6467,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     setState(() {});
                   },
                 ),
+                // Speaker toggle: loudspeaker on/off (voice + video).
+                IconButton(
+                  icon: Icon(_call?.speakerOn == true
+                      ? Icons.volume_up
+                      : Icons.volume_down),
+                  tooltip: _call?.speakerOn == true
+                      ? 'Speaker off'
+                      : 'Speaker on',
+                  onPressed: () async {
+                    await _call?.toggleSpeaker();
+                    setState(() {});
+                  },
+                ),
                 if (_call?.video == true) ...[
                   IconButton(
                     icon: Icon(_call?.cameraOff == true
