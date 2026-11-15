@@ -303,6 +303,10 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.RequestEmailChange(w, r)
 			case path == "/api/users/me/change-email/verify":
 				h.VerifyEmailChange(w, r)
+			case path == "/api/users/me/export":
+				h.ExportMyData(w, r)
+			case path == "/api/users/me/storage":
+				h.StorageStats(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/report"):
 				h.ReportUser(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/block"):

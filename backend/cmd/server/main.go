@@ -196,6 +196,21 @@ func main() {
 		}
 		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 	})))
+	// Stage 9: backup export + storage report.
+	mux.Handle("/api/users/me/export", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.ExportMyData(w, r)
+			return
+		}
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	})))
+	mux.Handle("/api/users/me/storage", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			h.StorageStats(w, r)
+			return
+		}
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	})))
 	mux.Handle("/api/users/me/privacy", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

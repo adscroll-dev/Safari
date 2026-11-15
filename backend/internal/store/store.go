@@ -83,6 +83,11 @@ type StoreIface interface {
 	// the NEW address). The handler checks the address is free.
 	ChangeEmail(userID, newEmail string) error
 
+	// Stage 9: storage report — per-chat message counts + media
+	// bytes for one user (only chats they belong to), plus totals.
+	// Deleted messages are excluded.
+	StorageStats(userID string) ([]models.ChatStorage, int, int64)
+
 	// v0.4: admin roles, receipts, presence, stories, scheduled, bots, keys, settings.
 	MemberRole(chatID, userID string) string
 	ChatMembers(chatID string) []*models.ChatMember

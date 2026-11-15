@@ -41,6 +41,16 @@ func (u *User) Public() PublicUser {
 	}
 }
 
+// ChatStorage is one row of the storage report (Stage 9): how many
+// messages and how many media bytes a chat holds for one user.
+type ChatStorage struct {
+	ChatID       string `json:"chat_id"`
+	Title        string `json:"title"`
+	Type         string `json:"type"`
+	MessageCount int    `json:"message_count"`
+	Bytes        int64  `json:"bytes"`
+}
+
 // Report is one user report (abuse/spam). The reports table also
 // supports target_type message/chat, but Stage 7 only files user
 // reports; moderators review them out of band.

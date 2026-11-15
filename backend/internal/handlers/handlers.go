@@ -61,6 +61,10 @@ type Handler struct {
 	JWTSecret   string
 	JWTExpiry   time.Duration
 	LoginLimits auth.Limiter
+	// SendLimits is the anti-spam throttle (Stage 9): at most 60
+	// messages per minute from one account. A human chatting fast
+	// never hits it; a flood script does.
+	SendLimits auth.Limiter
 	// StoreName is reported by /health ("memory" or "postgres").
 	StoreName string
 	// UploadDir is where /api/uploads stores files (default "./uploads").
@@ -88,6 +92,7 @@ func New(s store.StoreIface, hub *ws.Hub, secret string, expiry time.Duration) *
 	return &Handler{
 		Store: s, Hub: hub, JWTSecret: secret, JWTExpiry: expiry,
 		LoginLimits: auth.NewRateLimiter(5, 15*time.Minute),
+		SendLimits:  auth.NewRateLimiter(60, time.Minute),
 		StoreName:   "memory",
 		UploadDir:   "./uploads",
 		MaxUploadMB: 50,
@@ -563,6 +568,13 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	case "text", "image", "video", "file", "voice", "location", "sticker", "contact", "e2ee":
 	default:
 		middleware.WriteError(w, http.StatusBadRequest, "kind '"+kind+"' is not implemented yet")
+		return
+	}
+	// Stage 9 anti-spam: at most 60 messages per minute from one
+	// account. Only valid sends count (the check sits after the
+	// kind validation above).
+	if h.SendLimits != nil && !h.SendLimits.Allow("send:"+me) {
+		middleware.WriteError(w, http.StatusTooManyRequests, "too many messages, slow down")
 		return
 	}
 	// An E2EE envelope cannot be forwarded: its ciphertext is only

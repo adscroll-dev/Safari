@@ -4481,6 +4481,150 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  // --- Stage 9 helpers: backup, storage page ---
+
+  /// Stage 9: storage page — per-chat message counts + media bytes
+  /// from the server, plus a clear-cache button for downloads kept
+  /// on this device.
+  Future<void> _showStoragePage() async {
+    late Map<String, dynamic> stats;
+    try {
+      stats = await _api.storageStats();
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final rows = (stats['chats'] as List<dynamic>?) ?? [];
+    final totalMessages = stats['total_messages'] ?? 0;
+    final totalBytes = (stats['total_bytes'] as num?) ?? 0;
+    String mb(num bytes) => '${(bytes / 1048576).toStringAsFixed(2)} MB';
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (context, scroll) => ListView(
+          controller: scroll,
+          children: [
+            const ListTile(
+              title: Text('Storage',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ListTile(
+              title: const Text('Total messages'),
+              trailing: Text('$totalMessages'),
+            ),
+            ListTile(
+              title: const Text('Total media'),
+              trailing: Text(mb(totalBytes)),
+            ),
+            const Divider(),
+            for (final row in rows)
+              ListTile(
+                title: Text(_chatTitleFromMap(row)),
+                subtitle: Text('${row['message_count']} messages'),
+                trailing: Text(
+                    mb((row['bytes'] as num?) ?? 0)),
+              ),
+            if (rows.isEmpty)
+              const ListTile(title: Text('No chats yet.')),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Clear downloaded media cache'),
+              subtitle: const Text(
+                  'Removes photos, videos and files downloaded on this '
+                  'phone. Your chats stay on the server — media can be '
+                  'downloaded again.'),
+              onTap: () async {
+                _downloaded.clear();
+                await _usage.reset();
+                if (context.mounted) Navigator.pop(context);
+                setState(() {});
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _chatTitleFromMap(dynamic row) {
+    if (row is Map<String, dynamic>) {
+      final title = (row['title'] as String?)?.trim() ?? '';
+      if (title.isNotEmpty) return title;
+      return (row['type'] as String?) ?? 'Chat';
+    }
+    return 'Chat';
+  }
+
+  /// Stage 9: backup — your chats already live on Safari's server,
+  /// so signing in anywhere restores them. This sheet offers a
+  /// personal JSON copy (download) and a re-sync from the server
+  /// (restore).
+  Future<void> _showBackup() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const ListTile(
+            title: Text('Backup',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text('Your chats are saved on Safari\'s server — '
+                'signing in on any device restores them. Keep an extra '
+                'copy of your own, or re-download everything now.'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Download backup file'),
+            subtitle: const Text(
+                'Your profile, chats and latest messages as a JSON file.'),
+            onTap: () async {
+              Navigator.pop(context);
+              await _downloadBackup();
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore_outlined),
+            title: const Text('Restore from server'),
+            subtitle: const Text('Re-download all chats and messages now.'),
+            onTap: () async {
+              Navigator.pop(context);
+              await _refreshChats();
+              if (_activeChat != null) await _refreshMessages();
+              setState(() => _error = 'Restored from the server.');
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  /// Stage 9: download the backup JSON and open the share sheet.
+  Future<void> _downloadBackup() async {
+    try {
+      final json = await _api.exportMyData();
+      final dir = await getTemporaryDirectory();
+      final file = File(
+          '${dir.path}/safari-backup-${DateTime.now().millisecondsSinceEpoch}.json');
+      await file.writeAsString(json);
+      final shared =
+          await ShareFile.shareFile(file.path, text: 'Safari backup');
+      if (!shared) {
+        setState(() => _error =
+            'Sharing is not available here — the backup is saved at ${file.path}');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
   // --- Calls tab (WhatsApp) -----------------------------------------
   // No call history is stored yet, so the tab honestly shows the
   // empty state until the first call happens.
@@ -5129,6 +5273,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           trailing: Text(mb(_usage.totalMb),
               style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
+        ListTile(
+          leading: const Icon(Icons.storage_outlined),
+          title: const Text('Storage'),
+          subtitle:
+              const Text('Messages and media per chat, on the server'),
+          onTap: _showStoragePage,
+        ),
+        ListTile(
+          leading: const Icon(Icons.backup_outlined),
+          title: const Text('Backup'),
+          subtitle: const Text(
+              'Your chats are saved on the server — download a copy or restore'),
+          onTap: _showBackup,
+        ),
         TextButton(
           onPressed: () async {
             await _usage.reset();
@@ -5168,6 +5326,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ? 'On — PIN${_appLock?.biometric == true ? ' + fingerprint' : ''} required when the app returns from the background.'
               : 'Off — set a PIN to lock Safari when it goes to the background.'),
           onTap: _showAppLockSettings,
+        ),
+        const ListTile(
+          leading: Icon(Icons.shield_outlined),
+          title: Text('Anti-spam'),
+          subtitle: Text('One account can send at most 60 messages a '
+              'minute — a flood script is stopped automatically. '
+              'Report spam from any chat menu (Report), and block the '
+              'sender from the same menu.'),
         ),
         header('About'),
         const ListTile(

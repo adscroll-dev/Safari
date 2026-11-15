@@ -200,6 +200,21 @@ class ApiClient {
         if (public != null) 'public': public,
       });
 
+  // Stage 9 — backup export (raw JSON) + storage report.
+  Future<String> exportMyData() async {
+    final uri = Uri.parse('$baseUrl/api/users/me/export');
+    final res = await http.get(uri, headers: _headers);
+    usage?.add(UsageCategory.chat, res.bodyBytes.length);
+    if (res.statusCode >= 400) {
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      throw Exception(data['error'] ?? 'Request failed: ${res.statusCode}');
+    }
+    return res.body;
+  }
+
+  Future<Map<String, dynamic>> storageStats() =>
+      _req('GET', '/api/users/me/storage');
+
   // Stage 8 — change the account email (code to the new address).
   Future<Map<String, dynamic>> requestEmailChange(String newEmail) =>
       _req('POST', '/api/users/me/change-email', {'new_email': newEmail});
