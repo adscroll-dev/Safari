@@ -12,33 +12,33 @@ type Apk = {
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
 // 2026-11-15 with aapt2 (package app.vyro, version 0.6.0, label
-// "Safari"). Rebuilt 2026-11-15 10:26 +0430 — Stage 1 chat gaps:
-// mute chat, pin message, contact share, delete for me/everyone;
-// live API https://vyro-api-wf4b.onrender.com.
+// "Safari"). Rebuilt 2026-11-15 21:00 +0430 — speaker toggle in
+// calls (commit 05007bb); live API
+// https://vyro-api-wf4b.onrender.com.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
     href: "/downloads/safari-0.6.0-arm64-v8a.apk",
-    size: "33.5 MB",
-    bytes: "33,800,757 bytes",
+    size: "33.9 MB",
+    bytes: "33,866,430 bytes",
     sha256:
-      "b63d7b85c6be4b9b460afb1867b23047bed0404dc80119f44b8d5bba5368d54e",
+      "b098e64e04bc36e08fc2962b787054da782775f01e6ed4b7fa86dc244cffffb1",
   },
   {
     abi: "armeabi-v7a",
     href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
-    size: "26.6 MB",
-    bytes: "26,944,563 bytes",
+    size: "27.0 MB",
+    bytes: "26,961,064 bytes",
     sha256:
-      "c36e2f2a2aaa6ec81132dbc7051adc33b8c36279c167f41d5911de7c66800077",
+      "29e8ebb669e5e6b66522ea50031ba38fd09ab85b9b26f8456edda86b78cf8b09",
   },
   {
     abi: "x86_64",
     href: "/downloads/safari-0.6.0-x86_64.apk",
-    size: "36.0 MB",
-    bytes: "36,336,955 bytes",
+    size: "36.3 MB",
+    bytes: "36,337,079 bytes",
     sha256:
-      "ce7692956741b99198d38c558316aa46ef887e51c23cadd05eaa1f036245d7cf",
+      "1b09055db39ac9ec93b4ad8a7a97be1c74547bb547a580d5a5921e1abec8f332",
   },
 ];
 
