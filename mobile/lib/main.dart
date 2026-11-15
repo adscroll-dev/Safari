@@ -9,6 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -20,6 +21,7 @@ import 'data_saver.dart';
 import 'e2ee_client.dart';
 import 'fcm_push.dart';
 import 'local_ai.dart';
+import 'recording_bytes.dart';
 import 'sponsored_stories.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
@@ -153,6 +155,9 @@ class _HomePageState extends State<HomePage> {
   // Last-seen privacy (Telegram/WhatsApp-style): "everyone" or
   // "nobody". Loaded from the server after login.
   String _lastSeenVisibility = 'everyone';
+  // Status privacy (Stage 2): who may see my status — "everyone"
+  // (default) or "nobody". Loaded from the server after login.
+  String _statusPrivacy = 'everyone';
   // Downloaded media bytes, keyed by file_url (Data Saver: only after
   // the user taps Download, or when Data Saver is off).
   final Map<String, Uint8List> _downloaded = {};
@@ -242,6 +247,21 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       setState(() {
         _lastSeenVisibility = previous;
+        _error = e.toString();
+      });
+    }
+  }
+
+  /// Status privacy (Stage 2): who may see my status. Same pattern
+  /// as last-seen privacy.
+  Future<void> _setStatusPrivacy(String v) async {
+    final previous = _statusPrivacy;
+    setState(() => _statusPrivacy = v);
+    try {
+      await _api.setStatusPrivacy(v);
+    } catch (e) {
+      setState(() {
+        _statusPrivacy = previous;
         _error = e.toString();
       });
     }
@@ -385,6 +405,14 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() => _lastSeenVisibility =
             privacy['last_seen_visibility'] as String? ?? 'everyone');
+      }
+    } catch (_) {}
+    // Status privacy (Stage 2): same pattern.
+    try {
+      final statusPrivacy = await _api.getStatusPrivacy();
+      if (mounted) {
+        setState(() => _statusPrivacy =
+            statusPrivacy['status_privacy'] as String? ?? 'everyone');
       }
     } catch (_) {}
     try {
@@ -1127,9 +1155,47 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  /// Post a story: pick a photo, compress it (Data Saver), upload,
-  /// create the story. No fake stories: failures are shown as errors.
+  /// Post a status: choose the kind — photo/video, text, or voice
+  /// (Stage 2). No fake statuses: failures are shown as errors.
   Future<void> _postStory() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Photo or video'),
+              onTap: () => Navigator.pop(context, 'photo'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.text_fields_outlined),
+              title: const Text('Text status'),
+              onTap: () => Navigator.pop(context, 'text'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mic_outlined),
+              title: const Text('Voice status'),
+              onTap: () => Navigator.pop(context, 'voice'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == 'photo') {
+      await _postPhotoStory();
+    } else if (choice == 'text') {
+      await _postTextStory();
+    } else if (choice == 'voice') {
+      await _postVoiceStory();
+    }
+  }
+
+  /// Post a photo story: pick a photo, compress it (Data Saver),
+  /// upload, create the story. No fake stories: failures are shown
+  /// as errors.
+  Future<void> _postPhotoStory() async {
     final picker = ImagePicker();
     final picked =
         await picker.pickImage(source: ImageSource.gallery, maxWidth: 1920);
@@ -1166,6 +1232,208 @@ class _HomePageState extends State<HomePage> {
       setState(() => _stories = stories);
     } catch (e) {
       setState(() => _error = e.toString());
+    }
+  }
+
+  /// Text statuses (Stage 2): the same background colours the server
+  /// allows, so a colour the server would reject can never be picked.
+  static const List<String> _textStatusColors = [
+    '#008069',
+    '#25D366',
+    '#7C3AED',
+    '#DC2626',
+    '#EA580C',
+    '#CA8A04',
+    '#0EA5E9',
+    '#EC4899',
+    '#111B21',
+  ];
+
+  static Color _colorFromHex(String hex) {
+    final h = hex.replaceFirst('#', '');
+    return Color(int.parse('FF$h', radix: 16));
+  }
+
+  /// Post a text status (Stage 2): text + a background colour.
+  Future<void> _postTextStory() async {
+    final textCtrl = TextEditingController();
+    String color = _textStatusColors[0];
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Text status'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: textCtrl,
+                maxLength: 700,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                    labelText: 'Write your status…'),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final c in _textStatusColors)
+                    GestureDetector(
+                      onTap: () => setDialogState(() => color = c),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _colorFromHex(c),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: color == c
+                                ? Colors.white
+                                : Colors.transparent,
+                            width: 3,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Post')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    final text = textCtrl.text.trim();
+    if (text.isEmpty) return;
+    try {
+      await _api.createStory('',
+          kind: 'text', textContent: text, backgroundColor: color);
+      final stories = await _api.listStories();
+      setState(() => _stories = stories);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Post a voice status (Stage 2): record with the same Data Saver
+  /// Opus 12 kbps encoder as voice messages, upload, create the story.
+  Future<void> _postVoiceStory() async {
+    final recorder = AudioRecorder();
+    bool recording = false;
+    int seconds = 0;
+    String? mime;
+    Timer? timer;
+    try {
+      final posted = await showDialog<bool>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> toggle() async {
+              if (recording) {
+                timer?.cancel();
+                final path = await recorder.stop();
+                setDialogState(() => recording = false);
+                if (path == null || path.isEmpty) {
+                  setState(() => _error = 'Recording produced no file');
+                  if (context.mounted) Navigator.pop(context, false);
+                  return;
+                }
+                try {
+                  final bytes = await readRecordedBytes(path);
+                  if (bytes.isEmpty) {
+                    throw Exception('Recording is empty');
+                  }
+                  final fileName =
+                      path.split('/').last.split('?').first;
+                  final up = await _api.uploadFile(bytes, fileName,
+                      mime ?? 'audio/ogg',
+                      category: UsageCategory.voice);
+                  await _api.createStory(up['url'] as String,
+                      kind: 'audio');
+                  final stories = await _api.listStories();
+                  setState(() => _stories = stories);
+                  if (context.mounted) Navigator.pop(context, true);
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                  if (context.mounted) Navigator.pop(context, false);
+                }
+                return;
+              }
+              if (!await recorder.hasPermission()) {
+                setState(() => _error = 'Microphone permission denied');
+                if (context.mounted) Navigator.pop(context, false);
+                return;
+              }
+              final startedMime = await startVoiceRecording(recorder);
+              if (startedMime == null) {
+                setState(() => _error = 'Could not start recording');
+                if (context.mounted) Navigator.pop(context, false);
+                return;
+              }
+              mime = startedMime;
+              seconds = 0;
+              timer = Timer.periodic(
+                const Duration(seconds: 1),
+                (_) => setDialogState(() => seconds++),
+              );
+              setDialogState(() => recording = true);
+            }
+
+            final m = (seconds ~/ 60).toString().padLeft(2, '0');
+            final s = (seconds % 60).toString().padLeft(2, '0');
+            return AlertDialog(
+              title: const Text('Voice status'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(recording ? '● Recording $m:$s' : 'Tap to record',
+                      style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 12),
+                  IconButton(
+                    icon: Icon(
+                      recording
+                          ? Icons.stop_circle_outlined
+                          : Icons.mic_outlined,
+                      size: 48,
+                    ),
+                    color: WaColors.accent,
+                    onPressed: toggle,
+                  ),
+                  if (recording)
+                    const Text('Tap stop to post your voice status.'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () async {
+                    timer?.cancel();
+                    if (recording) await recorder.stop();
+                    if (context.mounted) Navigator.pop(context, false);
+                  },
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+      if (posted != true) {
+        timer?.cancel();
+        try {
+          await recorder.stop();
+        } catch (_) {}
+      }
+    } finally {
+      timer?.cancel();
+      recorder.dispose();
     }
   }
 
@@ -2684,20 +2952,22 @@ class _HomePageState extends State<HomePage> {
         for (final st in userStories)
           ListTile(
             leading: WaAvatar(
-              label: (st['caption'] as String?)?.isNotEmpty == true
-                  ? st['caption'] as String
-                  : 'Story',
+              label: _storyTitle(st),
               radius: 26,
               ring: true,
             ),
-            title: Text((st['caption'] as String?)?.isNotEmpty == true
-                ? st['caption'] as String
-                : 'Story'),
-            subtitle: Text(_storyTime(st)),
+            title: Text(_storyTitle(st)),
+            subtitle: Text(st['user_id'] == _user?['id'] &&
+                    (st['view_count'] as int? ?? 0) > 0
+                ? '${_storyTime(st)} · 👁 ${st['view_count']}'
+                : _storyTime(st)),
             trailing: (st['media_url'] as String?) == null
                 ? null
                 : const Icon(Icons.visibility_outlined),
             onTap: () => _viewStory(st),
+            onLongPress: st['user_id'] == _user?['id']
+                ? () => _deleteStory(st)
+                : null,
           ),
         if (sponsored.isNotEmpty) ...[
           _sectionHeader('Sponsored'),
@@ -3264,6 +3534,32 @@ class _HomePageState extends State<HomePage> {
             if (v != null) _setLastSeenVisibility(v);
           },
         ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            'Who can see your status updates. "Nobody" hides your '
+            'status from everyone.',
+            style: TextStyle(fontSize: 13, color: secondary),
+          ),
+        ),
+        RadioListTile<String>(
+          title: const Text('Everyone can see my status'),
+          subtitle: const Text('Anyone can see your status updates.'),
+          value: 'everyone',
+          groupValue: _statusPrivacy,
+          onChanged: (v) {
+            if (v != null) _setStatusPrivacy(v);
+          },
+        ),
+        RadioListTile<String>(
+          title: const Text('Nobody can see my status'),
+          subtitle: const Text('Nobody can see your status updates.'),
+          value: 'nobody',
+          groupValue: _statusPrivacy,
+          onChanged: (v) {
+            if (v != null) _setStatusPrivacy(v);
+          },
+        ),
         header('Chats'),
         SwitchListTile(
           title: const Text('Data Saver (default ON)'),
@@ -3367,52 +3663,328 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _viewStory(Map<String, dynamic> st) {
-    final mediaUrl = st['media_url'] as String?;
-    if (mediaUrl == null) return;
-    if (!_downloaded.containsKey(mediaUrl)) {
-      if (_dataSaver) {
-        // In Data Saver mode, ask before downloading a story.
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Download story?'),
-            content: const Text('Data Saver is on. Download this story '
-                'to view it?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel')),
-              FilledButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _downloadMedia(mediaUrl);
-                  },
-                  child: const Text('Download')),
-            ],
-          ),
-        );
-        return;
-      }
-      _downloadMedia(mediaUrl);
+  /// Title shown for a story in the Updates list, by kind.
+  String _storyTitle(Map<String, dynamic> st) {
+    final kind = st['kind'] as String? ?? 'photo';
+    if (kind == 'text') {
+      final text = (st['text_content'] as String?)?.trim() ?? '';
+      return text.isNotEmpty ? text : 'Text status';
     }
+    if (kind == 'audio') return 'Voice message';
+    final caption = (st['caption'] as String?)?.trim() ?? '';
+    return caption.isNotEmpty ? caption : 'Story';
+  }
+
+  /// Record a story view, ignoring failures (Stage 2).
+  Future<void> _recordStoryView(String id) async {
+    try {
+      await _api.recordStoryView(id);
+    } catch (_) {}
+  }
+
+  /// View a story (Stage 2): records a view for other people's
+  /// stories, renders text/audio/photo kinds, and offers reply +
+  /// reactions (others) or viewers + delete (my own story).
+  void _viewStory(Map<String, dynamic> st) {
+    final kind = st['kind'] as String? ?? 'photo';
+    final mine = st['user_id'] == _user?['id'];
+    if (!mine) {
+      // Fire-and-forget: a failed view record never blocks viewing.
+      _recordStoryView(st['id'] as String);
+    }
+    final mediaUrl = st['media_url'] as String?;
+    if (kind != 'text') {
+      if (mediaUrl == null) return;
+      if (!_downloaded.containsKey(mediaUrl)) {
+        if (_dataSaver) {
+          // In Data Saver mode, ask before downloading a story.
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Download story?'),
+              content: const Text('Data Saver is on. Download this story '
+                  'to view it?'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel')),
+                FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _downloadMedia(mediaUrl);
+                    },
+                    child: const Text('Download')),
+              ],
+            ),
+          );
+          return;
+        }
+        _downloadMedia(mediaUrl);
+      }
+    }
+    final replyCtrl = TextEditingController();
+    String myReaction = st['my_reaction'] as String? ?? '';
     showDialog(
       context: context,
-      builder: (context) {
-        final bytes = _downloaded[mediaUrl];
-        return AlertDialog(
-          title: Text((st['caption'] as String?) ?? 'Story'),
-          content: bytes == null
-              ? const Text('Downloading…')
-              : Image.memory(bytes, height: 300),
-          actions: [
-            TextButton(
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Widget content;
+          if (kind == 'text') {
+            content = Container(
+              width: double.infinity,
+              height: 300,
+              decoration: BoxDecoration(
+                color: _colorFromHex(
+                    (st['background_color'] as String?)?.isNotEmpty == true
+                        ? st['background_color'] as String
+                        : '#008069'),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(20),
+              child: Text(
+                (st['text_content'] as String?) ?? '',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+              ),
+            );
+          } else if (kind == 'audio') {
+            content = VoiceMessagePlayer(
+              api: _api,
+              fileUrl: mediaUrl!,
+              fileName: 'Voice status',
+            );
+          } else {
+            final bytes = _downloaded[mediaUrl!];
+            content = bytes == null
+                ? const Text('Downloading…')
+                : Image.memory(bytes, height: 300);
+          }
+          return AlertDialog(
+            title: Text(_storyTitle(st)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  content,
+                  if (!mine) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (final emoji in const [
+                          '❤️',
+                          '😂',
+                          '😮',
+                          '😢',
+                          '🙏',
+                          '👍',
+                          '🔥',
+                          '😍'
+                        ])
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Text(emoji,
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    color: myReaction == emoji
+                                        ? null
+                                        : Colors.grey)),
+                            onPressed: () async {
+                              try {
+                                if (myReaction == emoji) {
+                                  await _api
+                                      .deleteStoryReaction(st['id'] as String);
+                                  setDialogState(() => myReaction = '');
+                                } else {
+                                  await _api.reactToStory(
+                                      st['id'] as String, emoji);
+                                  setDialogState(() => myReaction = emoji);
+                                }
+                                st['my_reaction'] = myReaction;
+                              } catch (e) {
+                                setState(() => _error = e.toString());
+                              }
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: replyCtrl,
+                            decoration: const InputDecoration(
+                                hintText: 'Reply to status…'),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.send),
+                          color: WaColors.accent,
+                          onPressed: () async {
+                            final text = replyCtrl.text.trim();
+                            if (text.isEmpty) return;
+                            try {
+                              await _api.replyToStory(
+                                  st['id'] as String, text);
+                              replyCtrl.clear();
+                              await _refreshChats();
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                      content: Text('Reply sent')),
+                                );
+                              }
+                            } catch (e) {
+                              setState(() => _error = e.toString());
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              if (mine) ...[
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showStoryViewers(st);
+                  },
+                  child: const Text('Viewed by'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _deleteStory(st);
+                  },
+                  child: const Text('Delete',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+              TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close')),
-          ],
-        );
-      },
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) async {
+      // Refresh: view counts and my reaction may have changed.
+      try {
+        final stories = await _api.listStories();
+        if (mounted) setState(() => _stories = stories);
+      } catch (_) {}
+    });
+  }
+
+  /// Viewers, replies and reactions on my own story (Stage 2).
+  Future<void> _showStoryViewers(Map<String, dynamic> st) async {
+    try {
+      final results = await Future.wait([
+        _api.listStoryViews(st['id'] as String),
+        _api.listStoryReplies(st['id'] as String),
+        _api.listStoryReactions(st['id'] as String),
+      ]);
+      if (!mounted) return;
+      final views = results[0];
+      final replies = results[1];
+      final reactions = results[2];
+      await showModalBottomSheet(
+        context: context,
+        builder: (context) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Viewed by ${views.length}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                if (views.isEmpty)
+                  const Text('No views yet.')
+                else
+                  for (final v in views)
+                    ListTile(
+                      leading: WaAvatar(
+                          label: (v['display_name'] as String?) ?? 'S',
+                          radius: 20),
+                      title: Text((v['display_name'] as String?) ?? ''),
+                      subtitle: Text('@${v['username'] ?? ''}'),
+                    ),
+                if (replies.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Replies',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold)),
+                  for (final r in replies)
+                    ListTile(
+                      leading: WaAvatar(
+                          label: (r['display_name'] as String?) ?? 'S',
+                          radius: 20),
+                      title: Text((r['display_name'] as String?) ?? ''),
+                      subtitle: Text((r['content'] as String?) ?? ''),
+                    ),
+                ],
+                if (reactions.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('Reactions',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold)),
+                  for (final r in reactions)
+                    ListTile(
+                      leading: Text((r['emoji'] as String?) ?? '',
+                          style: const TextStyle(fontSize: 24)),
+                      title: Text((r['display_name'] as String?) ?? ''),
+                      subtitle: Text('@${r['username'] ?? ''}'),
+                    ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Delete my own story after a confirmation (Stage 2).
+  Future<void> _deleteStory(Map<String, dynamic> st) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete status?'),
+        content: const Text('This status will be deleted for everyone.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
+        ],
+      ),
     );
+    if (ok != true) return;
+    try {
+      await _api.deleteStory(st['id'] as String);
+      final stories = await _api.listStories();
+      setState(() => _stories = stories);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
   }
 
   /// Open a sponsored story: clearly labelled, counts against the

@@ -289,12 +289,48 @@ func (d *Device) Public() PublicDevice {
 }
 
 type Story struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	MediaURL  string    `json:"media_url"`
-	Caption   string    `json:"caption,omitempty"`
-	ExpiresAt time.Time `json:"expires_at"`
-	CreatedAt time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	MediaURL        string    `json:"media_url"`
+	Caption         string    `json:"caption,omitempty"`
+	Kind            string    `json:"kind"` // photo | video | text | audio (Stage 2)
+	TextContent     string    `json:"text_content,omitempty"`
+	BackgroundColor string    `json:"background_color,omitempty"`
+	ViewCount       int       `json:"view_count,omitempty"` // owner only, populated by ListStories
+	MyReaction      string    `json:"my_reaction,omitempty"` // requester's own reaction, if any
+	ExpiresAt       time.Time `json:"expires_at"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+// StoryView is one user having viewed a story.
+type StoryView struct {
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	Username    string    `json:"username"`
+	ViewedAt    time.Time `json:"viewed_at"`
+}
+
+// StoryReaction is one user's emoji reaction to a story (one per user).
+type StoryReaction struct {
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	Username    string    `json:"username"`
+	Emoji       string    `json:"emoji"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// StoryReply is a text reply to a story. The reply is ALSO delivered
+// as a normal DM message to the story owner (see ReplyToStory), so the
+// owner gets notified in chat; this row is the list the owner sees on
+// their own status.
+type StoryReply struct {
+	ID          string    `json:"id"`
+	StoryID     string    `json:"story_id"`
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	Username    string    `json:"username"`
+	Content     string    `json:"content"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // --- Email verification (v0.7) ---

@@ -256,9 +256,42 @@ class ApiClient {
   }
 
   /// v0.6 parity: stories (post + list scheduled + cancel scheduled).
+  /// Stage 2: kinds photo/video/text/audio (text has no media_url).
   Future<Map<String, dynamic>> createStory(String mediaUrl,
-          {String caption = ''}) =>
-      _req('POST', '/api/stories', {'media_url': mediaUrl, 'caption': caption});
+          {String caption = '',
+          String kind = 'photo',
+          String textContent = '',
+          String backgroundColor = ''}) =>
+      _req('POST', '/api/stories', {
+        'media_url': mediaUrl,
+        'caption': caption,
+        'kind': kind,
+        'text_content': textContent,
+        'background_color': backgroundColor,
+      });
+  Future<List<dynamic>> listStories() => _getList('/api/stories');
+
+  /// Stage 2 (status gaps): delete, views, reactions, replies, privacy.
+  Future<Map<String, dynamic>> deleteStory(String id) =>
+      _req('DELETE', '/api/stories/$id');
+  Future<Map<String, dynamic>> recordStoryView(String id) =>
+      _req('POST', '/api/stories/$id/view');
+  Future<List<dynamic>> listStoryViews(String id) =>
+      _getList('/api/stories/$id/views');
+  Future<List<dynamic>> listStoryReactions(String id) =>
+      _getList('/api/stories/$id/reactions');
+  Future<Map<String, dynamic>> reactToStory(String id, String emoji) =>
+      _req('POST', '/api/stories/$id/reactions', {'emoji': emoji});
+  Future<Map<String, dynamic>> deleteStoryReaction(String id) =>
+      _req('DELETE', '/api/stories/$id/reactions');
+  Future<List<dynamic>> listStoryReplies(String id) =>
+      _getList('/api/stories/$id/replies');
+  Future<Map<String, dynamic>> replyToStory(String id, String content) =>
+      _req('POST', '/api/stories/$id/reply', {'content': content});
+  Future<Map<String, dynamic>> getStatusPrivacy() =>
+      _req('GET', '/api/users/me/status-privacy');
+  Future<Map<String, dynamic>> setStatusPrivacy(String v) =>
+      _req('PUT', '/api/users/me/status-privacy', {'status_privacy': v});
   Future<List<dynamic>> listScheduled(String chatId) =>
       _getList('/api/chats/$chatId/scheduled');
   Future<Map<String, dynamic>> cancelScheduled(String id) =>
@@ -396,9 +429,6 @@ class ApiClient {
         'lng': lng,
         'location_label': label,
       });
-
-  /// v0.4: 24h stories.
-  Future<List<dynamic>> listStories() => _getList('/api/stories');
 
   /// v0.4: schedule a message for [sendAt] (ISO-8601).
   Future<Map<String, dynamic>> scheduleMessage(

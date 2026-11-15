@@ -254,11 +254,11 @@ func (s *PostgresStore) GetPresence(userID string) (bool, time.Time) {
 
 func scanStory(row pgx.Row) (*models.Story, error) {
 	var st models.Story
-	err := row.Scan(&st.ID, &st.UserID, &st.MediaURL, &st.Caption, &st.ExpiresAt, &st.CreatedAt)
+	err := row.Scan(&st.ID, &st.UserID, &st.MediaURL, &st.Caption, &st.Kind, &st.TextContent, &st.BackgroundColor, &st.ExpiresAt, &st.CreatedAt)
 	return &st, err
 }
 
-const storyColumns = `id::text, user_id::text, media_url, caption, expires_at, created_at`
+const storyColumns = `id::text, user_id::text, media_url, caption, kind, text_content, background_color, expires_at, created_at`
 
 func (s *PostgresStore) CreateStory(st *models.Story) error {
 	if !isUUID(st.UserID) {
@@ -268,9 +268,9 @@ func (s *PostgresStore) CreateStory(st *models.Story) error {
 	defer cancel()
 	st.ExpiresAt = time.Now().UTC().Add(24 * time.Hour)
 	err := s.pool.QueryRow(ctx,
-		`INSERT INTO stories (user_id, media_url, caption, expires_at)
-		 VALUES ($1, $2, $3, $4) RETURNING id::text, created_at`,
-		st.UserID, st.MediaURL, st.Caption, st.ExpiresAt).Scan(&st.ID, &st.CreatedAt)
+		`INSERT INTO stories (user_id, media_url, caption, kind, text_content, background_color, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id::text, created_at`,
+		st.UserID, st.MediaURL, st.Caption, st.Kind, st.TextContent, st.BackgroundColor, st.ExpiresAt).Scan(&st.ID, &st.CreatedAt)
 	return mapStoreErr(err)
 }
 

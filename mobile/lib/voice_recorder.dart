@@ -24,6 +24,43 @@ import 'data_saver.dart';
 import 'recording_bytes.dart';
 import 'theme.dart';
 
+/// Start a voice recording with the Data Saver encoder ladder (Opus
+/// 12 kbps, then AAC-LC 16 kbps, then WAV). Returns the MIME type on
+/// success, null when no encoder started. The caller stops the
+/// recorder and reads the file (see readRecordedBytes). Shared by the
+/// chat mic button and the voice-status flow.
+Future<String?> startVoiceRecording(AudioRecorder recorder) async {
+  final attempts = <(AudioEncoder, int, String, String)>[
+    (
+      AudioEncoder.opus,
+      DataSaver.voiceMessageBitrateKbps * 1000,
+      'ogg',
+      'audio/ogg'
+    ),
+    (AudioEncoder.aacLc, 16000, 'm4a', 'audio/mp4'),
+    (AudioEncoder.wav, 16000, 'wav', 'audio/wav'),
+  ];
+  for (final (encoder, bitRate, ext, mime) in attempts) {
+    try {
+      final fileName = 'voice-${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final path = await recordingOutputPath(fileName);
+      await recorder.start(
+        RecordConfig(
+          encoder: encoder,
+          bitRate: bitRate,
+          sampleRate: 16000,
+          numChannels: 1,
+        ),
+        path: path,
+      );
+      return mime;
+    } catch (_) {
+      // Try the next encoder.
+    }
+  }
+  return null;
+}
+
 /// Mic button for the chat input row. Tap to start, tap again to stop
 /// and send the recording as a voice message.
 class VoiceRecordButton extends StatefulWidget {
@@ -97,36 +134,10 @@ class _VoiceRecordButtonState extends State<VoiceRecordButton> {
   /// Try Opus 12 kbps, then AAC-LC 16 kbps, then WAV. Returns true
   /// when the recorder started.
   Future<bool> _startRecording() async {
-    final attempts = <(AudioEncoder, int, String, String)>[
-      (
-        AudioEncoder.opus,
-        DataSaver.voiceMessageBitrateKbps * 1000,
-        'ogg',
-        'audio/ogg'
-      ),
-      (AudioEncoder.aacLc, 16000, 'm4a', 'audio/mp4'),
-      (AudioEncoder.wav, 16000, 'wav', 'audio/wav'),
-    ];
-    for (final (encoder, bitRate, ext, mime) in attempts) {
-      try {
-        final fileName = 'voice-${DateTime.now().millisecondsSinceEpoch}.$ext';
-        final path = await recordingOutputPath(fileName);
-        await _recorder.start(
-          RecordConfig(
-            encoder: encoder,
-            bitRate: bitRate,
-            sampleRate: 16000,
-            numChannels: 1,
-          ),
-          path: path,
-        );
-        _mime = mime;
-        return true;
-      } catch (_) {
-        // Try the next encoder.
-      }
-    }
-    return false;
+    final mime = await startVoiceRecording(_recorder);
+    if (mime == null) return false;
+    _mime = mime;
+    return true;
   }
 
   Future<void> _stopAndSend() async {

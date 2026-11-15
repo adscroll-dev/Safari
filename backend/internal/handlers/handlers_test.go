@@ -181,6 +181,36 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.ListStories(w, r)
 				}
+			case strings.HasPrefix(path, "/api/stories/"):
+				switch StorySuffix(r) {
+				case "":
+					h.DeleteStory(w, r)
+				case "view":
+					h.RecordStoryView(w, r)
+				case "views":
+					h.ListStoryViews(w, r)
+				case "reactions":
+					switch method {
+					case http.MethodPost:
+						h.SetStoryReaction(w, r)
+					case http.MethodDelete:
+						h.DeleteStoryReaction(w, r)
+					default:
+						h.ListStoryReactions(w, r)
+					}
+				case "replies":
+					h.ListStoryReplies(w, r)
+				case "reply":
+					h.ReplyToStory(w, r)
+				default:
+					middleware.WriteError(w, http.StatusNotFound, "not found")
+				}
+			case path == "/api/users/me/status-privacy":
+				if method == http.MethodPut {
+					h.SetStatusPrivacy(w, r)
+				} else {
+					h.GetStatusPrivacy(w, r)
+				}
 			case path == "/api/bots":
 				if method == http.MethodPost {
 					h.CreateBot(w, r)

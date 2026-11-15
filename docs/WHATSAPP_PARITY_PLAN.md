@@ -85,13 +85,35 @@ Never present a demo feature as complete.
   in-call mic mute / camera on-off / front-back switch, reconnect
   handling. Live two-phone media test still never done — needs her
   phone + a second phone.
+- STAGE 3 REVIEW (2026-11-15, code read while the Stage 2 APK built):
+  CallController (mobile/lib/call.dart) has startCall, acceptCall,
+  declineCall, handleAnswer, handleIce, dropToAudioOnly, endCall,
+  handleRemoteEnd — NO mic-mute, camera on/off, front/back switch,
+  speaker toggle, or reconnect. The in-call UI (main.dart ~4458) is
+  only a banner: "Audio only" button + End call. There is NO call
+  history storage anywhere (no call_history model, no missed-call
+  marker) and no group-call signaling (1:1 only). Stage 3 plan:
+  (a) backend call_records table + POST/GET /api/calls (history,
+  missed flag, duration); (b) CallController mic/camera/switch
+  toggles + reconnect on ICE failure; (c) Calls tab lists real
+  history with missed markers; (d) group-call signaling (mesh,
+  one peer connection per member) — the biggest piece; (e) live
+  two-phone media test still needs her phone + a second phone.
 
 ### 4. Status / Updates
 - DONE: photo/video status post + view, 24h expiry, sponsored
   stories (demo inventory, capped), Promote flow.
-- MISSING: text status, audio status, delete own status, viewers
-  list, status privacy (who can see), reply to a status, react to a
-  status.
+- DONE 2026-11-15 (Stage 2): text status (700 chars, 9 background
+  colours), audio status (Opus 12 kbps, same Data Saver encoder as
+  voice messages), delete own status, viewers list (owner only,
+  "Viewed by" sheet), status privacy everyone/nobody (Settings →
+  Privacy; enforced in list/view/react/reply), reply to a status
+  (also a real DM message to the owner, so they get notified),
+  react to a status (8 emojis, one per user, changeable). Backend
+  migration 012 + TestStage2Status passes; mobile analyze clean,
+  flutter test 33/33.
+- MISSING: status privacy "except specific people" (only
+  everyone/nobody so far, same as last-seen).
 
 ### 5. Groups
 - DONE: create, members, admin/owner roles, invite links, all message
@@ -136,7 +158,7 @@ Never present a demo feature as complete.
 1. Finish Stage 0 delivery (screenshots + APK + push). — DONE 2026-11-15.
 2. Chat gaps: mute chat, pin message, contact share, delete-for-me /
    delete-for-everyone check. — DONE 2026-11-15 (Stage 1 above).
-3. Status gaps: text/audio status, delete, viewers, privacy, reply/react.
+3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
 4. Calls: history + missed, in-call controls, group calls (signaling).
 5. Polls + pinned message (groups).
 6. Channels: view counter + search.

@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/vyro/backend/internal/auth"
 	"github.com/vyro/backend/internal/middleware"
@@ -132,8 +133,11 @@ func (h *Handler) Presence(w http.ResponseWriter, r *http.Request) {
 // --- Stories (24h) ---
 
 type createStoryReq struct {
-	MediaURL string `json:"media_url"`
-	Caption  string `json:"caption"`
+	MediaURL        string `json:"media_url"`
+	Caption         string `json:"caption"`
+	Kind            string `json:"kind"`
+	TextContent     string `json:"text_content"`
+	BackgroundColor string `json:"background_color"`
 }
 
 func (h *Handler) CreateStory(w http.ResponseWriter, r *http.Request) {
@@ -145,11 +149,51 @@ func (h *Handler) CreateStory(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
-	if !strings.HasPrefix(req.MediaURL, "/uploads/") || strings.Contains(req.MediaURL, "..") {
-		middleware.WriteError(w, http.StatusBadRequest, "media_url from /api/uploads is required")
+	kind := strings.ToLower(strings.TrimSpace(req.Kind))
+	if kind == "" {
+		kind = "photo"
+	}
+	switch kind {
+	case "photo", "video", "text", "audio":
+	default:
+		middleware.WriteError(w, http.StatusBadRequest, "kind must be photo, video, text or audio")
 		return
 	}
-	st := &models.Story{UserID: middleware.UserID(r), MediaURL: req.MediaURL, Caption: req.Caption}
+	caption := strings.TrimSpace(req.Caption)
+	text := strings.TrimSpace(req.TextContent)
+	bg := strings.TrimSpace(req.BackgroundColor)
+	switch kind {
+	case "text":
+		// A text status has no media: text + a background colour
+		// from the fixed palette.
+		if req.MediaURL != "" {
+			middleware.WriteError(w, http.StatusBadRequest, "text status must not have media_url")
+			return
+		}
+		if text == "" {
+			middleware.WriteError(w, http.StatusBadRequest, "text_content is required for a text status")
+			return
+		}
+		if utf8.RuneCountInString(text) > 700 {
+			middleware.WriteError(w, http.StatusBadRequest, "text status too long (max 700 characters)")
+			return
+		}
+		if bg != "" && !validStoryBackgroundColor(bg) {
+			middleware.WriteError(w, http.StatusBadRequest, "background_color is not in the allowed palette")
+			return
+		}
+		if bg == "" {
+			bg = storyBackgroundPalette[0]
+		}
+		caption = ""
+	default:
+		// photo / video / audio: media must come from /api/uploads.
+		if !strings.HasPrefix(req.MediaURL, "/uploads/") || strings.Contains(req.MediaURL, "..") {
+			middleware.WriteError(w, http.StatusBadRequest, "media_url from /api/uploads is required")
+			return
+		}
+	}
+	st := &models.Story{UserID: middleware.UserID(r), MediaURL: req.MediaURL, Caption: caption, Kind: kind, TextContent: text, BackgroundColor: bg}
 	if err := h.Store.CreateStory(st); err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not create story")
 		return
@@ -159,6 +203,7 @@ func (h *Handler) CreateStory(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) ListStories(w http.ResponseWriter, r *http.Request) {
 	userID := r.URL.Query().Get("user_id")
+	me := middleware.UserID(r)
 	var out []*models.Story
 	if userID != "" {
 		out = h.Store.ListStoriesByUser(userID)
@@ -168,7 +213,27 @@ func (h *Handler) ListStories(w http.ResponseWriter, r *http.Request) {
 	if out == nil {
 		out = []*models.Story{}
 	}
-	middleware.WriteJSON(w, http.StatusOK, out)
+	middleware.WriteJSON(w, http.StatusOK, h.visibleStories(out, me))
+}
+
+// visibleStories filters out stories the requester may not see (the
+// owner set status privacy to "nobody") and populates ViewCount
+// (owner only) and MyReaction on COPIES — the stored structs are
+// never mutated.
+func (h *Handler) visibleStories(in []*models.Story, me string) []*models.Story {
+	out := []*models.Story{}
+	for _, st := range in {
+		if st.UserID != me && h.Store.GetStatusPrivacy(st.UserID) == store.StatusNobody {
+			continue
+		}
+		cp := *st
+		if st.UserID == me {
+			cp.ViewCount = h.Store.StoryViewCount(st.ID)
+		}
+		cp.MyReaction = h.Store.MyStoryReaction(st.ID, me)
+		out = append(out, &cp)
+	}
+	return out
 }
 
 // --- Scheduled messages ---

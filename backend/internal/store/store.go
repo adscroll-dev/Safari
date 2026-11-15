@@ -85,6 +85,20 @@ type StoreIface interface {
 	CreateStory(st *models.Story) error
 	ListStories() []*models.Story
 	ListStoriesByUser(userID string) []*models.Story
+	// Stage 2 (status gaps).
+	StoryByID(id string) *models.Story
+	DeleteStory(id string) error
+	RecordStoryView(storyID, userID string) error
+	ListStoryViews(storyID string) []*models.StoryView
+	StoryViewCount(storyID string) int
+	SetStoryReaction(storyID, userID, emoji string) error
+	DeleteStoryReaction(storyID, userID string) error
+	ListStoryReactions(storyID string) []*models.StoryReaction
+	MyStoryReaction(storyID, userID string) string
+	AddStoryReply(storyID, userID, content string) (*models.StoryReply, error)
+	ListStoryReplies(storyID string) []*models.StoryReply
+	GetStatusPrivacy(userID string) string
+	SetStatusPrivacy(userID, privacy string) error
 	CreateScheduled(sm *models.ScheduledMessage) error
 	DueScheduled(now time.Time) []*models.ScheduledMessage
 	MarkScheduledSent(id, messageID string) error
@@ -192,6 +206,18 @@ type MemoryStore struct {
 	// and delete-for-me (message id -> user ids who hid it).
 	pinnedMessages map[string]string
 	deletedForMe   map[string]map[string]bool
+	// Stage 2: story viewers (story id -> user id -> viewed at),
+	// reactions (story id -> user id -> reaction) and replies
+	// (story id -> replies in order); status privacy per user.
+	storyViews     map[string]map[string]time.Time
+	storyReactions map[string]map[string]storyReaction
+	storyReplies   map[string][]*models.StoryReply
+	statusPrivacy  map[string]string
+}
+
+type storyReaction struct {
+	emoji     string
+	createdAt time.Time
 }
 
 type receipt struct {
@@ -230,6 +256,10 @@ func NewMemoryStore() *MemoryStore {
 		lastSeenVisibility: map[string]string{},
 		pinnedMessages:     map[string]string{},
 		deletedForMe:       map[string]map[string]bool{},
+		storyViews:         map[string]map[string]time.Time{},
+		storyReactions:     map[string]map[string]storyReaction{},
+		storyReplies:       map[string][]*models.StoryReply{},
+		statusPrivacy:      map[string]string{},
 	}
 }
 

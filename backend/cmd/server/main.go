@@ -175,6 +175,16 @@ func main() {
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	})))
+	mux.Handle("/api/users/me/status-privacy", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetStatusPrivacy(w, r)
+		case http.MethodPut:
+			h.SetStatusPrivacy(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
 	mux.Handle("/api/users", authMW(http.HandlerFunc(h.ListUsers)))
 	mux.Handle("/api/users/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/presence") {
@@ -380,6 +390,31 @@ func main() {
 			h.CreateStory(w, r)
 		default:
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
+	mux.Handle("/api/stories/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch handlers.StorySuffix(r) {
+		case "":
+			h.DeleteStory(w, r)
+		case "view":
+			h.RecordStoryView(w, r)
+		case "views":
+			h.ListStoryViews(w, r)
+		case "reactions":
+			switch r.Method {
+			case http.MethodPost:
+				h.SetStoryReaction(w, r)
+			case http.MethodDelete:
+				h.DeleteStoryReaction(w, r)
+			default:
+				h.ListStoryReactions(w, r)
+			}
+		case "replies":
+			h.ListStoryReplies(w, r)
+		case "reply":
+			h.ReplyToStory(w, r)
+		default:
+			middleware.WriteError(w, http.StatusNotFound, "not found")
 		}
 	})))
 	mux.Handle("/api/bots", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
