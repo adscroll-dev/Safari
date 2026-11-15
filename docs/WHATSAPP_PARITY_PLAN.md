@@ -42,10 +42,15 @@ Never present a demo feature as complete.
   flutter analyze clean, flutter test 33/33.
 - Also fixed: pin-chat menu used to replace the open chat with the
   settings response; it now re-reads the fresh chat from the list.
-- NOTE: Postgres SQL for migration 011 could NOT be validated from
-  the VM (raw TCP to Supabase is intercepted by the sandbox), so
-  the Render deploy is the first live run of it — verify the deploy
-  succeeds and /health stays ok before calling it live.
+- DELIVERED 2026-11-15 ~10:30 +0430 (commit 056c03e, pushed to
+  adscroll-dev/Safari, remote HEAD verified): fresh split APKs
+  arm64 33,425,019 B SHA-256 8cfb77d3…c67e, armeabi 26,536,037 B
+  d5c08563…35b1, x86_64 35,961,213 B df201cc3…0f2c; download page
+  hashes/sizes updated (33.4/26.5/36.0 MB). VERIFIED LIVE: landing
+  HTTP 200 with the new hash, live APK download matches SHA-256,
+  /api/chats/{id}/mute probe returns 401 (new route live) and
+  /health ok with store postgres — migration 011 applied cleanly
+  on the first live run.
 
 ## Gap list (verify each by code inspection before building)
 
