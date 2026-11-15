@@ -217,6 +217,24 @@ type StoreIface interface {
 	// the online state nor the last-seen time.
 	GetLastSeenVisibility(userID string) string
 	SetLastSeenVisibility(userID, visibility string) error
+
+	// Stage 11 (Settings parity, WhatsApp-style): read receipts,
+	// profile-photo / about / groups privacy. "everyone" is the
+	// default everywhere; "nobody" hides it from everyone except
+	// the user themself. Read receipts off means the user sends no
+	// read receipts AND sees no blue ticks.
+	GetReadReceipts(userID string) bool
+	SetReadReceipts(userID string, enabled bool) error
+	GetAvatarPrivacy(userID string) string
+	SetAvatarPrivacy(userID, privacy string) error
+	GetAboutPrivacy(userID string) string
+	SetAboutPrivacy(userID, privacy string) error
+	GetGroupsPrivacy(userID string) string
+	SetGroupsPrivacy(userID, privacy string) error
+	// DeleteUser removes the account and everything it owns
+	// (Postgres: FK cascades; memory: explicit cleanup). After it,
+	// the user's tokens stop working and the email/username are free.
+	DeleteUser(userID string) error
 }
 
 // MemoryStore is a thread-safe in-memory StoreIface.
@@ -283,6 +301,13 @@ type MemoryStore struct {
 	communities        map[string]*models.Community
 	communityMembers   map[string]map[string]*models.CommunityMember
 	communitySubgroups map[string]map[string]bool
+	// Stage 11: Settings parity — read receipts (user id -> enabled,
+	// default true when absent) and profile-photo / about / groups
+	// privacy (user id -> "everyone" | "nobody", default "everyone").
+	readReceipts  map[string]bool
+	avatarPrivacy map[string]string
+	aboutPrivacy  map[string]string
+	groupsPrivacy map[string]string
 }
 
 type storyReaction struct {
@@ -338,6 +363,10 @@ func NewMemoryStore() *MemoryStore {
 		communities:        map[string]*models.Community{},
 		communityMembers:   map[string]map[string]*models.CommunityMember{},
 		communitySubgroups: map[string]map[string]bool{},
+		readReceipts:       map[string]bool{},
+		avatarPrivacy:      map[string]string{},
+		aboutPrivacy:       map[string]string{},
+		groupsPrivacy:      map[string]string{},
 	}
 }
 

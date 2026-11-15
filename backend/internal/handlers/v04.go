@@ -84,6 +84,14 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if me != msg.SenderID {
+		// Stage 11: with read receipts off, the reader sends no
+		// read receipts at all — the sender never sees blue ticks
+		// from them, and no message_read event is broadcast.
+		if !h.Store.GetReadReceipts(me) {
+			updated, _ := h.Store.MessageByID(id)
+			middleware.WriteJSON(w, http.StatusOK, updated)
+			return
+		}
 		if err := h.Store.MarkRead(id, me); err != nil {
 			middleware.WriteError(w, http.StatusInternalServerError, "could not mark read")
 			return
@@ -377,6 +385,13 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	// Admins may only add plain members; only the owner may promote admins.
 	if req.Role == "admin" && h.Store.MemberRole(chatID, middleware.UserID(r)) != "owner" {
 		middleware.WriteError(w, http.StatusForbidden, "only the owner can add admins")
+		return
+	}
+	// Stage 11: a user who set groups privacy to "nobody" cannot
+	// be added to a group by anyone else (they can still join via
+	// an invite link — that path does not go through here).
+	if req.UserID != middleware.UserID(r) && h.Store.GetGroupsPrivacy(req.UserID) == store.LastSeenNobody {
+		middleware.WriteError(w, http.StatusForbidden, "this user does not allow being added to groups")
 		return
 	}
 	if err := h.Store.AddMember(chatID, req.UserID, req.Role); err != nil {

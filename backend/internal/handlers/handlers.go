@@ -283,7 +283,16 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			!strings.Contains(strings.ToLower(u.Email), q) {
 			continue
 		}
-		out = append(out, u.Public())
+		pub := u.Public()
+		// Stage 11: a user who set photo/about privacy to "nobody"
+		// shows neither to anyone else.
+		if h.Store.GetAvatarPrivacy(u.ID) == store.LastSeenNobody {
+			pub.AvatarURL = ""
+		}
+		if h.Store.GetAboutPrivacy(u.ID) == store.LastSeenNobody {
+			pub.Bio = ""
+		}
+		out = append(out, pub)
 	}
 	middleware.WriteJSON(w, http.StatusOK, out)
 }
@@ -394,6 +403,17 @@ func (h *Handler) CreateChat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Stage 11: creating a group must not add someone who set
+	// groups privacy to "nobody" (DMs are not groups, so the
+	// check does not apply to them).
+	if typ == models.ChatGroup {
+		for _, id := range req.MemberIDs {
+			if h.Store.GetGroupsPrivacy(id) == store.LastSeenNobody {
+				middleware.WriteError(w, http.StatusBadRequest, "user does not allow being added to groups")
+				return
+			}
+		}
+	}
 	if typ == models.ChatDM {
 		if len(members) != 2 {
 			middleware.WriteError(w, http.StatusBadRequest, "dm requires exactly one other member")
@@ -475,6 +495,15 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 				m.DeliveredTo = append(m.DeliveredTo, me)
 			}
 			m.Status = m.StatusFor(otherMembers(h.Store, m))
+		}
+	}
+	// Stage 11: with read receipts off, the viewer sees no blue
+	// ticks either — their own messages top out at "delivered".
+	if !h.Store.GetReadReceipts(me) {
+		for _, m := range msgs {
+			if m.SenderID == me && m.Status == "read" {
+				m.Status = "delivered"
+			}
 		}
 	}
 	middleware.WriteJSON(w, http.StatusOK, msgs)

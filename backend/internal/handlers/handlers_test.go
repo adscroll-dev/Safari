@@ -291,12 +291,22 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.GetPrivacy(w, r)
 				}
+			case path == "/api/users/me/privacy-settings":
+				if method == http.MethodPut {
+					h.SetPrivacySettings(w, r)
+				} else {
+					h.GetPrivacySettings(w, r)
+				}
 			case path == "/api/users/me":
 				if method == http.MethodPatch {
 					h.UpdateMe(w, r)
+				} else if method == http.MethodDelete {
+					h.DeleteMe(w, r)
 				} else {
 					h.Me(w, r)
 				}
+			case path == "/api/users":
+				h.ListUsers(w, r)
 			case path == "/api/users/me/blocked":
 				h.GetBlockedUsers(w, r)
 			case path == "/api/users/me/change-email":

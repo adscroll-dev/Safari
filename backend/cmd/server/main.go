@@ -170,6 +170,9 @@ func main() {
 			h.Me(w, r)
 		case http.MethodPatch:
 			h.UpdateMe(w, r)
+		case http.MethodDelete:
+			// Stage 11: delete the account and everything it owns.
+			h.DeleteMe(w, r)
 		default:
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
@@ -227,6 +230,18 @@ func main() {
 			h.GetStatusPrivacy(w, r)
 		case http.MethodPut:
 			h.SetStatusPrivacy(w, r)
+		default:
+			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		}
+	})))
+	// Stage 11: combined privacy settings (last seen, status,
+	// avatar, about, groups, read receipts) in one call.
+	mux.Handle("/api/users/me/privacy-settings", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			h.GetPrivacySettings(w, r)
+		case http.MethodPut:
+			h.SetPrivacySettings(w, r)
 		default:
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
