@@ -95,9 +95,21 @@ Never present a demo feature as complete.
   migration 013 applied cleanly). NOTE: the first auto-deploy of
   f4ddb09 stalled on Render (log silent after cache download) —
   canceled and manually redeployed, Live in 1m 20s.
+- DONE 2026-11-15 (speaker toggle, commit 05007bb, DELIVERED
+  ~21:05): CallController.toggleSpeaker() via the forked plugin's
+  Helper.setSpeakerphoneOn (verified to exist at
+  helper.dart:113); only flips state on success, so the UI never
+  claims a route that is not active (web returns false); _cleanup()
+  restores the earpiece when a call ends. Button in the in-call
+  controls row beside mute (volume_up when on, volume_down when
+  off), voice + video. flutter analyze clean, flutter test 34/34;
+  "Speaker on" string verified inside the built binary. APKs
+  arm64 33,866,430 B (b098e64e…ffb1), armeabi 26,961,064 B
+  (29e8ebb6…c8b09), x86_64 36,337,079 B (1b09055d…f332); verified
+  live (landing hash, live APK SHA-256 match, /health ok).
 - MISSING: live two-phone media test still never done — needs her
-  phone + a second phone. Speaker toggle not built (no API in the
-  WebRTC fork). No "busy" handling when a second call arrives
+  phone + a second phone, so the speaker route itself is unproven
+  on hardware. No "busy" handling when a second call arrives
   mid-call.
 
 ### 4. Status / Updates
@@ -345,3 +357,9 @@ Never present a demo feature as complete.
 9. Extras: app lock, link preview, notification settings, chat share/export, account transfer. — DONE 2026-11-15 (Stage 8, commit 39d681e, DELIVERED).
 10. Extras 2: backup/restore, storage page, anti-spam. — DONE 2026-11-15 (Stage 9, commit 6391721, DELIVERED).
 11. iOS/desktop feasibility check (no Mac — report honestly). — DONE 2026-11-15 (Stage 10).
+12. Settings parity (Stage 11): read receipts, avatar/about/groups
+    privacy, delete account. — BACKEND DONE 2026-11-15 (commit
+    559d2ab, migration 017; go test ./... all pass; live on Render,
+    /api/users/me/privacy-settings probe 401). Mobile Settings UI
+    pending: privacy page, blocked-contacts list, delete account,
+    chat wallpaper.
