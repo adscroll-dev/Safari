@@ -160,7 +160,7 @@ Never present a demo feature as complete.
 
 ### 7. Channels
 - DONE: channel type, create, open/follow (as a chat), invite links.
-- DONE 2026-11-15 (Stage 5, IN PROGRESS — build running): view counter
+- DONE 2026-11-15 (Stage 5): view counter
   on posts (migration 015: chats.is_public, message_views table with
   PK message+user so re-views never inflate the count; Message.ViewCount
   populated in ListMessages for channel chats; POST /api/messages/{id}/view
@@ -175,7 +175,12 @@ Never present a demo feature as complete.
   create-channel dialog has a Public/Private switch and allows
   zero members; members sheet "Edit channel" tile for admins).
   TestStage5Channels passes; backend go test ./... all pass; mobile
-  analyze clean, flutter test 33/33.
+  analyze clean, flutter test 33/33. DELIVERED 2026-11-15 ~13:00
+  (commit 391c10d): APKs arm64 33,622,328 B (2eb8f550…0ca16a3b85),
+  armeabi 26,700,569 B (d1b9edd0…995c36), x86_64 36,092,977 B
+  (18aaa4bf…93a09); verified live (landing hash, live APK SHA-256
+  match, /api/channels/search probe 401, /health ok, migration 015
+  applied cleanly).
 
 ### 8. Extras
 - DONE: disappearing messages, chat lock PIN, Data Saver + usage
@@ -207,7 +212,8 @@ Never present a demo feature as complete.
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
 4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above), DELIVERED ~11:55.
 5. Polls + pinned message (groups). — DONE 2026-11-15 (Stage 4 above), DELIVERED ~12:25.
-6. Channels: view counter, search, admin management. — IN PROGRESS 2026-11-15 (Stage 5; backend + mobile done and tested, APK build running).
+6. Channels: view counter, search, admin management. — DONE 2026-11-15 (Stage 5 above), DELIVERED ~13:00.
+7. Communities: real model (subgroups + announcement group). — NEXT (Stage 6).
 6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group).
 8. Accounts: phone OTP (if a free route exists), profile photo/about,
