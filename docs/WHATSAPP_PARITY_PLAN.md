@@ -91,7 +91,13 @@ Never present a demo feature as complete.
   join/leave handling, per-member video tiles), incoming-call banner
   on every screen (with caller/group name) + "return to call" bar,
   call-back from history. Backend go test ./... all pass; mobile
-  analyze clean, flutter test 33/33.
+  analyze clean, flutter test 33/33. DELIVERED 2026-11-15 ~11:55
+  (commit f4ddb09): APKs arm64 33,491,056 B (85996c71…9cd1),
+  armeabi 26,618,446 B, x86_64 36,027,236 B; verified live (landing
+  hash, live APK SHA-256 match, /api/calls probe 401, /health ok,
+  migration 013 applied cleanly). NOTE: the first auto-deploy of
+  f4ddb09 stalled on Render (log silent after cache download) —
+  canceled and manually redeployed, Live in 1m 20s.
 - MISSING: live two-phone media test still never done — needs her
   phone + a second phone. Speaker toggle not built (no API in the
   WebRTC fork). No "busy" handling when a second call arrives
@@ -180,8 +186,8 @@ Never present a demo feature as complete.
 2. Chat gaps: mute chat, pin message, contact share, delete-for-me /
    delete-for-everyone check. — DONE 2026-11-15 (Stage 1 above).
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
-4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above).
-5. Polls + pinned message (groups).
+4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above), DELIVERED ~11:55.
+5. Polls + pinned message (groups). — NEXT (Stage 4, planned above).
 6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group).
 8. Accounts: phone OTP (if a free route exists), profile photo/about,
