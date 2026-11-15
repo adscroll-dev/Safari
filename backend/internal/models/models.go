@@ -129,7 +129,7 @@ type Message struct {
 	ChatID          string              `json:"chat_id"`
 	SenderID        string              `json:"sender_id"`
 	Content         string              `json:"content"`
-	Kind            string              `json:"kind"` // text | image | video | file | voice | location | sticker | contact
+	Kind            string              `json:"kind"` // text | image | video | file | voice | location | sticker | contact | e2ee | poll | system (server-only)
 	FileURL         string              `json:"file_url,omitempty"`
 	FileName        string              `json:"file_name,omitempty"`
 	FileSize        int64               `json:"file_size,omitempty"`
@@ -388,4 +388,22 @@ type CallRecordView struct {
 	PeerName     string `json:"peer_name"`
 	PeerUsername string `json:"peer_username,omitempty"`
 	ChatTitle    string `json:"chat_title,omitempty"`
+}
+
+// Poll is a group (or DM) poll (Stage 4). It appears in the chat
+// flow as a message of kind "poll" whose content is JSON
+// {"poll_id": "...", "question": "..."}. Votes/MyVotes/TotalVotes
+// are computed at read time and are never stored on the row.
+type Poll struct {
+	ID            string    `json:"id"`
+	ChatID        string    `json:"chat_id"`
+	CreatorID     string    `json:"creator_id"`
+	MessageID     string    `json:"message_id,omitempty"`
+	Question      string    `json:"question"`
+	Options       []string  `json:"options"`
+	AllowMultiple bool      `json:"allow_multiple"`
+	Votes         []int     `json:"votes"`
+	MyVotes       []int     `json:"my_votes,omitempty"`
+	TotalVotes    int       `json:"total_votes"`
+	CreatedAt     time.Time `json:"created_at"`
 }

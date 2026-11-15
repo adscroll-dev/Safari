@@ -4,15 +4,19 @@ import (
 	"net/http"
 
 	"github.com/vyro/backend/internal/middleware"
+	"github.com/vyro/backend/internal/models"
 )
 
 // Stage 1 chat gaps (WhatsApp parity): pin message and
 // delete-for-me. Mute chat reuses SetChatSetting ("mute"/"unmute");
 // contact share is a message kind handled in SendMessage.
 
-// PinMessage pins one message in a chat (any member can pin; the
-// pin replaces any previous pin in that chat). The pinned message
-// is returned by ListChats/GetChat as chat.pinned_message.
+// PinMessage pins one message in a chat (any member can pin in a
+// DM; in a group only admins and the owner can pin — WhatsApp
+// parity, Stage 4). The pin replaces any previous pin in that chat.
+// The pinned message is returned by ListChats/GetChat as
+// chat.pinned_message. Pinning posts a system notice in the chat
+// ("X pinned a message").
 func (h *Handler) PinMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -23,6 +27,11 @@ func (h *Handler) PinMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.Store.IsMember(chatID, me) {
 		middleware.WriteError(w, http.StatusForbidden, "not a member of this chat")
 		return
+	}
+	if chat, err := h.Store.ChatByID(chatID); err == nil && chat.Type == models.ChatGroup {
+		if !h.requireRole(w, r, chatID, "admin", "owner") {
+			return
+		}
 	}
 	var req struct {
 		MessageID string `json:"message_id"`
@@ -43,10 +52,18 @@ func (h *Handler) PinMessage(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not pin message")
 		return
 	}
+	if u, err := h.Store.UserByID(me); err == nil {
+		name := u.DisplayName
+		if name == "" {
+			name = u.Username
+		}
+		h.systemNotice(r, chatID, me, name+" pinned a message")
+	}
 	middleware.WriteJSON(w, http.StatusOK, h.Store.PinnedMessageForChat(chatID))
 }
 
-// UnpinMessage clears the chat's pinned message.
+// UnpinMessage clears the chat's pinned message (group: admin/owner
+// only, like pinning).
 func (h *Handler) UnpinMessage(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -56,6 +73,11 @@ func (h *Handler) UnpinMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.Store.IsMember(chatID, middleware.UserID(r)) {
 		middleware.WriteError(w, http.StatusForbidden, "not a member of this chat")
 		return
+	}
+	if chat, err := h.Store.ChatByID(chatID); err == nil && chat.Type == models.ChatGroup {
+		if !h.requireRole(w, r, chatID, "admin", "owner") {
+			return
+		}
 	}
 	if err := h.Store.SetPinnedMessage(chatID, ""); err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not unpin message")

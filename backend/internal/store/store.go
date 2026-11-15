@@ -103,6 +103,15 @@ type StoreIface interface {
 	// by the caller when the call ends.
 	CreateCallRecord(rec *models.CallRecord) error
 	ListCallRecordsForUser(userID string) []*models.CallRecord
+	// Stage 4 (polls): a poll in a chat, voted on by its members.
+	CreatePoll(p *models.Poll) error
+	PollByID(id string) *models.Poll
+	ListPollsForChat(chatID string) []*models.Poll
+	VotePoll(pollID, userID string, indexes []int) error
+	PollVotes(pollID string) (map[int]int, int)
+	MyPollVotes(pollID, userID string) []int
+	DeletePoll(id string) error
+	SetPollMessageID(pollID, messageID string) error
 	CreateScheduled(sm *models.ScheduledMessage) error
 	DueScheduled(now time.Time) []*models.ScheduledMessage
 	MarkScheduledSent(id, messageID string) error
@@ -220,6 +229,10 @@ type MemoryStore struct {
 	// Stage 3: call history, newest first per user (call records in
 	// insertion order; ListCallRecordsForUser sorts them).
 	callRecords []*models.CallRecord
+	// Stage 4: polls (poll id -> poll) and votes
+	// (poll id -> user id -> option indexes).
+	polls     map[string]*models.Poll
+	pollVotes map[string]map[string][]int
 }
 
 type storyReaction struct {
@@ -268,6 +281,8 @@ func NewMemoryStore() *MemoryStore {
 		storyReplies:       map[string][]*models.StoryReply{},
 		statusPrivacy:      map[string]string{},
 		callRecords:        []*models.CallRecord{},
+		polls:              map[string]*models.Poll{},
+		pollVotes:          map[string]map[string][]int{},
 	}
 }
 

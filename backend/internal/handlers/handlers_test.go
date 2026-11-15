@@ -163,6 +163,20 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				}
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/folder"):
 				h.SetChatSetting(w, r, "folder")
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/polls"):
+				if method == http.MethodPost {
+					h.CreatePoll(w, r)
+				} else {
+					h.ListPolls(w, r)
+				}
+			case strings.HasPrefix(path, "/api/polls/") && strings.HasSuffix(path, "/vote"):
+				h.VotePoll(w, r)
+			case strings.HasPrefix(path, "/api/polls/"):
+				if method == http.MethodDelete {
+					h.DeletePoll(w, r)
+				} else {
+					h.GetPoll(w, r)
+				}
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/invites"):
 				if method == http.MethodPost {
 					h.CreateInvite(w, r)

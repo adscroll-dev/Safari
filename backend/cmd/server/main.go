@@ -277,6 +277,16 @@ func main() {
 			default:
 				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 			}
+		case strings.HasSuffix(path, "/polls"):
+			// Group polls (Stage 4): create + list.
+			switch r.Method {
+			case http.MethodGet:
+				h.ListPolls(w, r)
+			case http.MethodPost:
+				h.CreatePoll(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
 		case strings.HasSuffix(path, "/invites"):
 			// Group/channel invite links (Telegram-style).
 			switch r.Method {
@@ -393,6 +403,25 @@ func main() {
 		}
 	})))
 	// Stage 3: call history (POST record, GET list).
+	// Polls (Stage 4): /api/polls/{id} (GET/DELETE) and
+	// /api/polls/{id}/vote (POST).
+	mux.Handle("/api/polls/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch handlers.PollSuffix(r) {
+		case "vote":
+			h.VotePoll(w, r)
+		case "":
+			switch r.Method {
+			case http.MethodGet:
+				h.GetPoll(w, r)
+			case http.MethodDelete:
+				h.DeletePoll(w, r)
+			default:
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+		default:
+			middleware.WriteError(w, http.StatusNotFound, "not found")
+		}
+	})))
 	mux.Handle("/api/calls", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

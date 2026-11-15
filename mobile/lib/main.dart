@@ -1618,6 +1618,27 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ],
+            // Stage 4: delete the whole poll (creator or admin/owner).
+            // The server deletes the poll and its chat message.
+            if ((m['kind'] as String? ?? 'text') == 'poll' &&
+                _canDeletePoll(m))
+              ListTile(
+                leading: const Icon(Icons.bar_chart_outlined),
+                title: const Text('Delete poll'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final pollId = _parsePollId(m['content'] as String?);
+                  if (pollId == null) return;
+                  try {
+                    await _api.deletePoll(pollId);
+                    await _refreshChats();
+                    setState(() => _messages.removeWhere(
+                        (x) => (x as Map)['id'] == m['id']));
+                  } catch (e) {
+                    setState(() => _error = e.toString());
+                  }
+                },
+              ),
             // Stage 1: WhatsApp-style delete choice — for me, or for
             // everyone (own messages only).
             ListTile(
@@ -2927,6 +2948,12 @@ class _HomePageState extends State<HomePage> {
         break;
       case 'contact':
         body = 'Contact';
+        break;
+      case 'poll':
+        body = _pollPreviewText(lm['content'] as String?);
+        break;
+      case 'system':
+        body = (lm['content'] as String?) ?? '';
         break;
       default:
         body = (lm['content'] as String?) ?? '';
@@ -5305,6 +5332,15 @@ class _HomePageState extends State<HomePage> {
                 _showContactPicker();
               },
             ),
+            // Stage 4: create a poll in this chat.
+            ListTile(
+              leading: const Icon(Icons.bar_chart_outlined),
+              title: const Text('Poll'),
+              onTap: () {
+                Navigator.pop(context);
+                _showPollComposer();
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.schedule_outlined),
               title: const Text('Schedule message'),
@@ -5354,8 +5390,36 @@ class _HomePageState extends State<HomePage> {
   /// corner, time + ticks inline at the bottom-right (blue ticks
   /// when read).
   Widget _messageBubble(Map<String, dynamic> m) {
-    final mine = m['sender_id'] == _user!['id'];
     final kind = m['kind'] as String? ?? 'text';
+    // Stage 4: system notices ("X pinned a message") render as a
+    // centered grey chip, like WhatsApp — no bubble, no actions.
+    if (kind == 'system') {
+      final dark = Theme.of(context).brightness == Brightness.dark;
+      return Align(
+        alignment: Alignment.center,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: dark
+                ? WaColors.darkChatBackground
+                : const Color(0xFFF0F2F5),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            (m['content'] as String?) ?? '',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12.5,
+              color: dark
+                  ? WaColors.darkTextSecondary
+                  : WaColors.lightTextSecondary,
+            ),
+          ),
+        ),
+      );
+    }
+    final mine = m['sender_id'] == _user!['id'];
     final status = m['status'] as String?;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final time = (m['created_at'] as String?) ?? '';
@@ -5546,7 +5610,291 @@ class _HomePageState extends State<HomePage> {
   /// Message body: text, location, voice, or media. Data Saver:
   /// media is only downloaded after a tap (or immediately when
   /// Data Saver is off).
+  /// Stage 4 — Polls (WhatsApp parity). A poll message's content is
+  /// JSON {"poll_id": "...", "question": "..."}.
+  String? _parsePollId(String? content) {
+    if (content == null) return null;
+    try {
+      final parsed = jsonDecode(content) as Map<String, dynamic>;
+      return parsed['poll_id'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _pollPreviewText(String? content) {
+    if (content == null) return '📊 Poll';
+    try {
+      final parsed = jsonDecode(content) as Map<String, dynamic>;
+      final q = (parsed['question'] as String?)?.trim() ?? '';
+      return q.isEmpty ? '📊 Poll' : '📊 Poll: $q';
+    } catch (_) {
+      return '📊 Poll';
+    }
+  }
+
+  bool _canDeletePoll(Map<String, dynamic> m) {
+    // The poll creator is the message sender; group admins/owners
+    // may also delete it (the server enforces both).
+    if (m['sender_id'] == _user!['id']) return true;
+    final roles = _activeChat?['roles'] as Map?;
+    final role = roles?[_user!['id']] as String?;
+    return role == 'admin' || role == 'owner';
+  }
+
+  /// Stage 4: poll composer — question + 2..12 options + the
+  /// "allow multiple answers" switch.
+  void _showPollComposer() {
+    final chat = _activeChat;
+    if (chat == null) return;
+    final question = TextEditingController();
+    final optionControllers =
+        List.generate(2, (_) => TextEditingController());
+    bool allowMultiple = false;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Create poll'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: question,
+                  decoration: const InputDecoration(
+                    labelText: 'Question',
+                    hintText: 'Ask something…',
+                  ),
+                  maxLength: 300,
+                ),
+                const SizedBox(height: 8),
+                ...optionControllers.asMap().entries.map((e) {
+                  final i = e.key;
+                  final c = e.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: c,
+                            decoration: InputDecoration(
+                              labelText: 'Option ${i + 1}',
+                            ),
+                            maxLength: 100,
+                          ),
+                        ),
+                        if (optionControllers.length > 2)
+                          IconButton(
+                            icon: const Icon(Icons.remove_circle_outline),
+                            onPressed: () => setDialogState(() {
+                              optionControllers.removeAt(i);
+                            }),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+                if (optionControllers.length < 12)
+                  TextButton.icon(
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add option'),
+                    onPressed: () => setDialogState(() {
+                      optionControllers.add(TextEditingController());
+                    }),
+                  ),
+                SwitchListTile(
+                  title: const Text('Allow multiple answers'),
+                  value: allowMultiple,
+                  onChanged: (v) =>
+                      setDialogState(() => allowMultiple = v),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final q = question.text.trim();
+                final options = optionControllers
+                    .map((c) => c.text.trim())
+                    .where((o) => o.isNotEmpty)
+                    .toList();
+                if (q.isEmpty || options.length < 2) {
+                  return;
+                }
+                Navigator.pop(context);
+                try {
+                  await _api.createPoll(
+                      chat['id'] as String, q, options, allowMultiple);
+                  await _refreshMessages();
+                  await _refreshChats();
+                } catch (e) {
+                  setState(() => _error = e.toString());
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stage 4: poll bubble — question, options with live vote counts
+  /// and percentage bars; tap to vote (or change / clear the vote).
+  Widget _pollBubble(Map<String, dynamic> m, String content) {
+    final pollId = _parsePollId(content);
+    final fallbackQuestion = _pollPreviewText(content).replaceFirst('📊 Poll: ', '');
+    if (pollId == null) {
+      return const Text('📊 Poll');
+    }
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _api.getPoll(pollId),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(fallbackQuestion,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              const Text('Loading poll…'),
+            ],
+          );
+        }
+        final poll = snap.data!;
+        final question = (poll['question'] as String?) ?? fallbackQuestion;
+        final options = (poll['options'] as List?) ?? [];
+        final votes = (poll['votes'] as List?) ?? [];
+        final myVotes = ((poll['my_votes'] as List?) ?? [])
+            .map((v) => (v as num).toInt())
+            .toSet();
+        final allowMultiple = poll['allow_multiple'] == true;
+        final total = (poll['total_votes'] as num?)?.toInt() ?? 0;
+        final dark = Theme.of(context).brightness == Brightness.dark;
+        final barBg = dark ? Colors.white12 : Colors.black12;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(question,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ...options.asMap().entries.map((e) {
+              final i = e.key;
+              final label = e.value.toString();
+              final count = i < votes.length
+                  ? (votes[i] as num).toInt()
+                  : 0;
+              final pct = total == 0 ? 0.0 : count / total;
+              final mine = myVotes.contains(i);
+              return InkWell(
+                onTap: () async {
+                  List<int> next;
+                  if (allowMultiple) {
+                    next = myVotes.toList();
+                    if (mine) {
+                      next.remove(i);
+                    } else {
+                      next.add(i);
+                    }
+                  } else {
+                    next = mine ? [] : [i];
+                  }
+                  try {
+                    await _api.votePoll(pollId, next);
+                    // The FutureBuilder re-fetches the poll on the
+                    // next build, so the counts update right away.
+                    await _refreshMessages();
+                  } catch (e) {
+                    setState(() => _error = e.toString());
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            mine
+                                ? (allowMultiple
+                                    ? Icons.check_box
+                                    : Icons.radio_button_checked)
+                                : (allowMultiple
+                                    ? Icons.check_box_outline_blank
+                                    : Icons.radio_button_unchecked),
+                            size: 18,
+                            color: mine
+                                ? WaColors.accent
+                                : (dark
+                                    ? WaColors.darkTextSecondary
+                                    : WaColors.lightTextSecondary),
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(child: Text(label)),
+                          const SizedBox(width: 8),
+                          Text('$count',
+                              style: TextStyle(
+                                color: dark
+                                    ? WaColors.darkTextSecondary
+                                    : WaColors.lightTextSecondary,
+                                fontSize: 12,
+                              )),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 5,
+                          backgroundColor: barBg,
+                          color: mine
+                              ? WaColors.accent
+                              : (dark
+                                  ? WaColors.darkTextSecondary
+                                  : WaColors.lightTextSecondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 4),
+            Text(
+              total == 0
+                  ? 'No votes yet'
+                  : '$total ${total == 1 ? 'vote' : 'votes'}',
+              style: TextStyle(
+                fontSize: 12,
+                color: dark
+                    ? WaColors.darkTextSecondary
+                    : WaColors.lightTextSecondary,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _messageContent(Map<String, dynamic> m, String kind, String content) {
+    if (kind == 'poll') {
+      // Stage 4: poll bubble — question + live vote counts.
+      return _pollBubble(m, content);
+    }
     if (kind == 'voice') {
       final fileUrl = m['file_url'] as String?;
       if (fileUrl == null) return Text(content);

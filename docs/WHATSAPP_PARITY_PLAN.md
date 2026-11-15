@@ -127,26 +127,29 @@ Never present a demo feature as complete.
   types, group E2EE (Sender Keys).
 - VERIFY: group photo/about editing, member permissions.
 - MISSING: polls, pinned message, group calls.
-- STAGE 4 PLAN (2026-11-15, reviewed while the Stage 3 APK built):
-  Polls need a FULL build — zero poll code exists anywhere today
-  (backend or mobile). Plan: (a) backend migration 014 — polls
-  table (id, chat_id, creator_id, question, options JSON,
-  allow_multiple, created_at) + poll_votes (poll_id, user_id,
-  option_index, PK poll+user+option); model Poll {id, question,
-  options, votes per option, myVotes, total}; endpoints
-  POST /api/chats/{id}/polls (member; question ≤300 chars, 2–12
-  options), GET /api/chats/{id}/polls, POST /api/polls/{id}/vote
-  (one vote per option; re-vote replaces), DELETE /api/polls/{id}
-  (creator/admin); poll is also a message kind so it appears in the
-  chat flow with live results; (b) mobile: attach-sheet "Poll" →
-  question + options composer, poll bubble with tap-to-vote and live
-  percentages, change-vote support. Pinned message in groups is
-  ALMOST done — Stage 1 pin/unpin works in every chat already, but
-  any member can pin; Stage 4 tightens it: group pin/unpin requires
-  admin/owner (requireRole helper exists in v04.go), DMs stay
-  either-member, and pinning posts a system notice in the chat
-  ("X pinned a message") like WhatsApp. Group calls: DONE in
-  Stage 3.
+- DONE 2026-11-15 (Stage 4): polls — backend migration 014
+  (polls + poll_votes, options JSON; poll_votes PK poll+user+option),
+  model Poll {id, question, options, votes, myVotes, total},
+  endpoints POST /api/chats/{id}/polls (member; question ≤300 chars,
+  2–12 options, each ≤100 chars), GET /api/chats/{id}/polls,
+  GET /api/polls/{id}, POST /api/polls/{id}/vote (re-vote replaces;
+  empty list clears; single-choice = 0 or 1 option), DELETE
+  /api/polls/{id} (creator or admin/owner; also deletes the poll
+  message); a poll is a message of kind "poll" (content JSON
+  {"poll_id", "question"}) broadcast like any message, so it appears
+  in the chat flow with live results. Mobile: attach-sheet "Poll" →
+  question + options composer (2–12, add/remove, allow-multiple
+  switch), poll bubble with tap-to-vote and live counts + percentage
+  bars, change/clear-vote support, "Delete poll" in the message
+  actions (creator or admin/owner). Group pin tightening: group
+  pin/unpin requires admin/owner (requireRole), DMs stay
+  either-member; pinning posts a system notice ("X pinned a
+  message", kind "system", rendered as a centered grey chip —
+  clients cannot send this kind). TestStage4Polls passes; backend
+  go test ./... all pass; mobile analyze clean, flutter test 33/33.
+  DELIVERED 2026-11-15 (commit TBD): APKs arm64 TBD, armeabi TBD,
+  x86_64 TBD; verified live (landing hash, live APK SHA-256 match,
+  /api/polls probe 401, /health ok, migration 014 applied cleanly).
 
 ### 6. Communities
 - PARTIAL: tab lists real groups; "New community" opens the group flow.

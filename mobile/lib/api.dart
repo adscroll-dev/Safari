@@ -311,6 +311,23 @@ class ApiClient {
       });
   Future<List<dynamic>> listCalls() => _getList('/api/calls');
 
+  // Stage 4 — Polls (WhatsApp parity).
+  Future<Map<String, dynamic>> createPoll(
+          String chatId, String question, List<String> options, bool allowMultiple) =>
+      _req('POST', '/api/chats/$chatId/polls', {
+        'question': question,
+        'options': options,
+        'allow_multiple': allowMultiple,
+      });
+  Future<List<dynamic>> listPolls(String chatId) =>
+      _getList('/api/chats/$chatId/polls');
+  Future<Map<String, dynamic>> getPoll(String pollId) =>
+      _req('GET', '/api/polls/$pollId');
+  Future<Map<String, dynamic>> votePoll(String pollId, List<int> indexes) =>
+      _req('POST', '/api/polls/$pollId/vote', {'option_indexes': indexes});
+  Future<void> deletePoll(String pollId) =>
+      _req('DELETE', '/api/polls/$pollId', null);
+
   Future<List<dynamic>> listScheduled(String chatId) =>
       _getList('/api/chats/$chatId/scheduled');
   Future<Map<String, dynamic>> cancelScheduled(String id) =>
