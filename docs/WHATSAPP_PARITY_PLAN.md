@@ -260,6 +260,32 @@ Never present a demo feature as complete.
 - MISSING: nothing in Extras — the master-brief scope is now
   complete except the known blockers (below).
 
+### 12. Platforms (Stage 10, DONE 2026-11-15 — feasibility check, no APK)
+- Web: PROVEN — `flutter build web` SUCCEEDED in 77.5 s (build/web
+  written; the CupertinoIcons font warning is a harmless
+  tree-shaking note). NOT published: the public site stays
+  download-only per her rule, so the web build stays local until
+  she asks for it.
+- iOS: BLOCKED — this machine is Linux; Flutter here has NO
+  `build ios` / `build macos` subcommands at all (only aar, apk,
+  appbundle, bundle, linux, web). Building for iPhone needs a Mac
+  with Xcode, and the App Store needs the Apple Developer Program
+  ($99/year) — a cost that breaks the zero-cost rule until she
+  approves it. The ios/ Runner folder already exists in the
+  project, so a Mac build is one command away.
+- Windows: BLOCKED — needs a Windows machine to build. The
+  windows/ folder was added to the project (flutter create) so a
+  Windows build is one command away there.
+- macOS desktop: BLOCKED — needs a Mac with Xcode. The macos/
+  folder was added to the project.
+- Linux desktop: BLOCKED on this VM only — ninja + clang were
+  installed free via apt, but libgtk-3-dev cannot install: its
+  dependency libzstd-dev wants the stock libzstd1, while this VM
+  carries a patched libzstd1 (+hatch1). The GTK 3 runtime IS
+  present (3.24.41) but the headers are missing, so the Linux
+  build cannot compile here. Not a cost problem — a package
+  conflict on this computer.
+
 ### 7. Accounts (Stage 7, DONE 2026-11-15, commit 20b2093, DELIVERED ~14:00 +0430)
 - DONE 2026-11-15: profile editing — PATCH /api/users/me
   (display_name 1-100, bio/about max 500, avatar_url must be an
@@ -318,4 +344,4 @@ Never present a demo feature as complete.
 8. Accounts: profile photo/about, block/report, contact search, linked devices. — DONE 2026-11-15 (Stage 7, commit 20b2093, DELIVERED).
 9. Extras: app lock, link preview, notification settings, chat share/export, account transfer. — DONE 2026-11-15 (Stage 8, commit 39d681e, DELIVERED).
 10. Extras 2: backup/restore, storage page, anti-spam. — DONE 2026-11-15 (Stage 9, commit 6391721, DELIVERED).
-11. iOS/desktop feasibility check (no Mac — report honestly). — NEXT (Stage 10).
+11. iOS/desktop feasibility check (no Mac — report honestly). — DONE 2026-11-15 (Stage 10).
