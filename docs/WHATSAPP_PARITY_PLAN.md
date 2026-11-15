@@ -212,10 +212,31 @@ Never present a demo feature as complete.
   meter, media upload/download, light/dark themes, FCM push, block
   (backend + mobile UI), report user, contact search, linked-devices
   page, profile photo/about editing.
-- MISSING: app lock (PIN/fingerprint for the whole app), backup &
-  restore, storage-management page, website link preview,
-  notification settings, chat share (export), account transfer,
-  anti-spam tools.
+- DONE 2026-11-15 (Stage 8, commit 39d681e, DELIVERED ~14:45 +0430):
+  app lock (whole-app PIN, salted SHA-256, lock on background via
+  WidgetsBindingObserver; fingerprint via local_auth when the device
+  has biometrics — androidx.biometric:biometric:1.1.0 fetched into
+  the local Maven repo), website link preview (page title card above
+  a text message with a link; 5 s timeout, 1 MB cap, in-memory
+  cache; no preview on failure), notification settings
+  (Notifications/Sound/Vibrate switches in Settings; foreground FCM
+  banner respects the master switch), chat export (chat menu ->
+  Export chat: loaded messages as a .txt via the system share sheet
+  — a tiny MethodChannel in MainActivity + FileProvider, NO
+  share_plus: that plugin wants AGP 8.12.1, unresolvable on the
+  offline Gradle 8.3 build; share_plus 8.0.0 is retracted, 8.0.1
+  wants AGP 8.3.0 which needs Gradle 8.4+), account transfer
+  (change email: POST /api/users/me/change-email sends a 6-digit
+  code to the NEW address, POST .../change-email/verify moves the
+  account; TestStage8ChangeEmail passes; go test ./... all pass;
+  flutter analyze clean, flutter test 34/34).
+- APKs safari-0.6.0 built 14:38 +0430: arm64 33,800,377 B
+  SHA-256 290b20cc…3df68, armeabi 26,927,788 B 0489f58c…0f4e,
+  x86_64 36,271,034 B c1c08418…f702 — VERIFIED LIVE (landing hash,
+  live APK SHA match, POST /api/users/me/change-email probe 401,
+  /health ok).
+- MISSING: backup & restore, storage-management page, anti-spam
+  tools. (Stage 9.)
 
 ### 7. Accounts (Stage 7, DONE 2026-11-15, commit 20b2093, DELIVERED ~14:00 +0430)
 - DONE 2026-11-15: profile editing — PATCH /api/users/me
@@ -245,9 +266,8 @@ Never present a demo feature as complete.
   SHA-256 24f380fc…cc14f, armeabi 26,750,186 B 385c266e…55c9d,
   x86_64 36,158,972 B ea255277…7f731 — VERIFIED LIVE (landing hash,
   live APK SHA match, PATCH /api/users/me probe 401, /health ok).
-- STILL MISSING (Stage 8): app lock, backup/restore, storage page,
-  link preview, notification settings, chat share/export, account
-  transfer, anti-spam. Phone OTP still blocked-with-reason.
+- STILL MISSING (Stage 9): backup/restore, storage page,
+  anti-spam. Phone OTP still blocked-with-reason.
 
 ### 9. Platforms
 - DONE: Android APK (split per ABI), Flutter web build (used for
@@ -274,5 +294,6 @@ Never present a demo feature as complete.
 6. Channels: view counter, search, admin management. — DONE 2026-11-15 (Stage 5 above), DELIVERED ~13:00.
 7. Communities: real model (subgroups + announcement group). — DONE 2026-11-15 (Stage 6, commit f47b9e0, DELIVERED).
 8. Accounts: profile photo/about, block/report, contact search, linked devices. — DONE 2026-11-15 (Stage 7, commit 20b2093, DELIVERED).
-9. Extras: app lock, backup/restore, storage page, link preview, notification settings, chat share/export, account transfer, anti-spam. — NEXT (Stage 8).
-10. iOS/desktop feasibility check (no Mac — report honestly). — NEXT (Stage 9).
+9. Extras: app lock, link preview, notification settings, chat share/export, account transfer. — DONE 2026-11-15 (Stage 8, commit 39d681e, DELIVERED).
+10. Extras 2: backup/restore, storage page, anti-spam. — NEXT (Stage 9).
+11. iOS/desktop feasibility check (no Mac — report honestly). — NEXT (Stage 10).
