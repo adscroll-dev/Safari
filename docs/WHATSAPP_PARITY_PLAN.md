@@ -68,15 +68,12 @@ Never present a demo feature as complete.
   sent/delivered/read ticks, typing, message search, pin chat,
   archive, delete chat, folders, drafts, chat lock PIN, scheduled,
   disappearing.
-- VERIFIED 2026-11-15 by code inspection: delete is a single
-  sender-only hard delete (DELETE /api/messages/{id}, broadcast
-  `message_deleted` to the chat; mobile shows one "Delete" option) —
-  effectively delete-for-everyone for own messages, with NO
-  delete-for-me option and no choice UI. Mute chat: NOT built (only
-  the word "muted" as a colour name in theme.dart). Pin MESSAGE: NOT
-  built (zero references; only pin *chat* exists). Share contact: NOT
-  built (no contact message kind; only "View contact" in the members
-  sheet).
+- DONE 2026-11-15 (Stage 1, commit 056c03e, DELIVERED ~10:30): mute
+  chat (per-user, bell-off icon + grey unread badge), pin message
+  (one per chat, banner + unpin, long-press Pin/Unpin), contact
+  share (attach → Share contact → contact card, tap opens a DM),
+  delete-for-me / delete-for-everyone choice dialog. Backend
+  migration 011; verified live.
 
 ### 3. Calls
 - DONE: 1:1 voice/video signaling (WebRTC), Opus 12 kbps cap, video
@@ -212,11 +209,45 @@ Never present a demo feature as complete.
 
 ### 8. Extras
 - DONE: disappearing messages, chat lock PIN, Data Saver + usage
-  meter, media upload/download, light/dark themes, FCM push, block.
+  meter, media upload/download, light/dark themes, FCM push, block
+  (backend + mobile UI), report user, contact search, linked-devices
+  page, profile photo/about editing.
 - MISSING: app lock (PIN/fingerprint for the whole app), backup &
   restore, storage-management page, website link preview,
   notification settings, chat share (export), account transfer,
-  linked-devices page, contact search, report user, anti-spam tools.
+  anti-spam tools.
+
+### 7. Accounts (Stage 7, DONE 2026-11-15, commit 20b2093, DELIVERED ~14:00 +0430)
+- DONE 2026-11-15: profile editing — PATCH /api/users/me
+  (display_name 1-100, bio/about max 500, avatar_url must be an
+  /uploads/ path); bio now included in PublicUser and GET /me.
+  Mobile: Settings profile card shows bio and opens the edit dialog
+  (name + about + photo via gallery pick + upload).
+- DONE 2026-11-15: user reports — POST /api/users/{id}/report
+  (reason 1-500; stored in the reports table from migration 001
+  with status "open"; self-report 400, unknown user 404). Mobile:
+  DM chat menu -> Report (reason + "Also block this user").
+- DONE 2026-11-15: block enforcement — SendMessage now 403s in a DM
+  when either side blocked the other (IsBlocked is symmetric);
+  DELETE /api/users/{id}/block unblocks; GET /api/users/me/blocked
+  lists my blocks. Mobile: DM chat menu Block/Unblock (label from
+  the blocked list, loaded at login).
+- DONE 2026-11-15: contact search — the search sheet filters users
+  by name/username live (up to 8, tap opens a DM); "New direct
+  message" is now a searchable picker instead of taking the first
+  user.
+- DONE 2026-11-15: linked devices — GET /api/devices + DELETE
+  /api/devices/{id} already existed (v0.6); mobile Settings ->
+  Linked devices lists them (name/platform, "This device" marked)
+  with remove. TestStage7Accounts passes; go test ./... all pass;
+  mobile analyze clean, flutter test 33/33.
+- APKs safari-0.6.0 built 13:55 +0430: arm64 33,622,787 B
+  SHA-256 24f380fc…cc14f, armeabi 26,750,186 B 385c266e…55c9d,
+  x86_64 36,158,972 B ea255277…7f731 — VERIFIED LIVE (landing hash,
+  live APK SHA match, PATCH /api/users/me probe 401, /health ok).
+- STILL MISSING (Stage 8): app lock, backup/restore, storage page,
+  link preview, notification settings, chat share/export, account
+  transfer, anti-spam. Phone OTP still blocked-with-reason.
 
 ### 9. Platforms
 - DONE: Android APK (split per ABI), Flutter web build (used for
@@ -241,9 +272,7 @@ Never present a demo feature as complete.
 4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above), DELIVERED ~11:55.
 5. Polls + pinned message (groups). — DONE 2026-11-15 (Stage 4 above), DELIVERED ~12:25.
 6. Channels: view counter, search, admin management. — DONE 2026-11-15 (Stage 5 above), DELIVERED ~13:00.
-7. Communities: real model (subgroups + announcement group). — NEXT (Stage 6).
-6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group). — DONE 2026-11-15 (Stage 6, commit f47b9e0, DELIVERED).
-8. Accounts: phone OTP (if a free route exists), profile photo/about,
-   linked devices, app lock, backup/restore, storage page, link preview.
-9. iOS/desktop feasibility check (no Mac — report honestly).
+8. Accounts: profile photo/about, block/report, contact search, linked devices. — DONE 2026-11-15 (Stage 7, commit 20b2093, DELIVERED).
+9. Extras: app lock, backup/restore, storage page, link preview, notification settings, chat share/export, account transfer, anti-spam. — NEXT (Stage 8).
+10. iOS/desktop feasibility check (no Mac — report honestly). — NEXT (Stage 9).
