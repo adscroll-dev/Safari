@@ -181,6 +181,21 @@ func main() {
 		}
 		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 	})))
+	// Stage 8: change the account email (code to the new address).
+	mux.Handle("/api/users/me/change-email", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.RequestEmailChange(w, r)
+			return
+		}
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	})))
+	mux.Handle("/api/users/me/change-email/verify", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			h.VerifyEmailChange(w, r)
+			return
+		}
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	})))
 	mux.Handle("/api/users/me/privacy", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

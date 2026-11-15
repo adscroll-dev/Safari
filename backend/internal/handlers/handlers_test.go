@@ -299,6 +299,10 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				}
 			case path == "/api/users/me/blocked":
 				h.GetBlockedUsers(w, r)
+			case path == "/api/users/me/change-email":
+				h.RequestEmailChange(w, r)
+			case path == "/api/users/me/change-email/verify":
+				h.VerifyEmailChange(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/report"):
 				h.ReportUser(w, r)
 			case strings.HasPrefix(path, "/api/users/") && strings.HasSuffix(path, "/block"):

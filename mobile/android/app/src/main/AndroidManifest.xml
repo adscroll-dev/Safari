@@ -35,6 +35,19 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Stage 8: chat export shares a file from the app cache
+             dir through the system share sheet. A file:// URI is
+             refused on Android 7+, so the file goes out through
+             this FileProvider as a content:// URI. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="app.vyro.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths" />
+        </provider>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

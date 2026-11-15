@@ -79,6 +79,10 @@ type StoreIface interface {
 	UpdateProfile(userID string, displayName, bio, avatarURL *string) error
 	CreateReport(r *models.Report) error
 
+	// Stage 8: change the account email (after a 6-digit code to
+	// the NEW address). The handler checks the address is free.
+	ChangeEmail(userID, newEmail string) error
+
 	// v0.4: admin roles, receipts, presence, stories, scheduled, bots, keys, settings.
 	MemberRole(chatID, userID string) string
 	ChatMembers(chatID string) []*models.ChatMember

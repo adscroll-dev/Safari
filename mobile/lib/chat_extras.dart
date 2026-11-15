@@ -181,6 +181,67 @@ class ChatLock {
   }
 }
 
+/// Whole-app lock (Stage 8, WhatsApp-style).
+///
+/// Same salted SHA-256 PIN scheme as ChatLock (4-8 digits), but with
+/// separate keys, so the app PIN and the chat PIN are independent.
+/// Fingerprint is a UI preference here; the UI drives local_auth
+/// and only unlocks after the platform check succeeds.
+class AppLock {
+  AppLock(this._prefs);
+  final SharedPreferences _prefs;
+
+  static const _hashKey = 'vyro_app_lock_pin_hash_v1';
+  static const _saltKey = 'vyro_app_lock_pin_salt_v1';
+  static const _enabledKey = 'vyro_app_lock_enabled_v1';
+  static const _biometricKey = 'vyro_app_lock_biometric_v1';
+
+  bool get hasPin => _prefs.getString(_hashKey) != null;
+
+  /// The lock is armed only when a PIN exists AND the user enabled it.
+  bool get enabled => (_prefs.getBool(_enabledKey) ?? false) && hasPin;
+
+  bool get biometric => _prefs.getBool(_biometricKey) ?? false;
+
+  /// Sets (or replaces) the PIN and arms the lock. Returns an error
+  /// string, or null.
+  Future<String?> setPin(String pin) async {
+    final err = ChatLock.validatePin(pin);
+    if (err != null) return err;
+    var salt = _prefs.getString(_saltKey);
+    salt ??= DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+    final hash = await ChatLock.hashPin(pin, salt);
+    await _prefs.setString(_saltKey, salt);
+    await _prefs.setString(_hashKey, hash);
+    await _prefs.setBool(_enabledKey, true);
+    return null;
+  }
+
+  /// Checks a PIN against the stored hash. False when no PIN is set.
+  Future<bool> verifyPin(String pin) async {
+    final hash = _prefs.getString(_hashKey);
+    final salt = _prefs.getString(_saltKey);
+    if (hash == null || salt == null) return false;
+    return await ChatLock.hashPin(pin, salt) == hash;
+  }
+
+  /// Removes the PIN and disarms the lock entirely.
+  Future<void> removePin() async {
+    await _prefs.remove(_hashKey);
+    await _prefs.remove(_saltKey);
+    await _prefs.remove(_enabledKey);
+    await _prefs.remove(_biometricKey);
+  }
+
+  Future<void> setEnabled(bool on) async {
+    await _prefs.setBool(_enabledKey, on);
+  }
+
+  Future<void> setBiometric(bool on) async {
+    await _prefs.setBool(_biometricKey, on);
+  }
+}
+
 /// Per-chat message drafts (v0.7, on-device only).
 ///
 /// The unsent text of each chat is saved as the user types (debounced

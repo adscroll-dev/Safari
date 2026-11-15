@@ -33,6 +33,7 @@ dependencies:
   # is already in android/app/; see lib/fcm_push.dart.
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.0
+  local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:

@@ -97,6 +97,28 @@ void main() {
       expect(ChatLock.validatePin('12345678'), isNull);
     });
 
+    test('AppLock: PIN arms the lock, wrong PIN fails, remove disarms', () async {
+      final lock = AppLock(prefs);
+      expect(lock.hasPin, isFalse);
+      expect(lock.enabled, isFalse);
+      expect(await lock.verifyPin('1234'), isFalse);
+      expect(await lock.setPin('12'), isNotNull);
+      expect(await lock.setPin('1234'), isNull);
+      expect(lock.hasPin, isTrue);
+      expect(lock.enabled, isTrue);
+      expect(await lock.verifyPin('1234'), isTrue);
+      expect(await lock.verifyPin('9999'), isFalse);
+      await lock.setEnabled(false);
+      expect(lock.enabled, isFalse);
+      expect(await lock.verifyPin('1234'), isTrue);
+      await lock.setBiometric(true);
+      expect(lock.biometric, isTrue);
+      await lock.removePin();
+      expect(lock.hasPin, isFalse);
+      expect(lock.enabled, isFalse);
+      expect(lock.biometric, isFalse);
+    });
+
     test('set / verify / lock / unlock / remove round-trip', () async {
       final lock = ChatLock(prefs);
       expect(lock.hasPin, isFalse);

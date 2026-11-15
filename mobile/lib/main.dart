@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,8 +21,10 @@ import 'chat_extras.dart';
 import 'data_saver.dart';
 import 'e2ee_client.dart';
 import 'fcm_push.dart';
+import 'link_preview.dart';
 import 'local_ai.dart';
 import 'recording_bytes.dart';
+import 'share_file.dart';
 import 'sponsored_stories.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
@@ -114,7 +117,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   final _api = ApiClient();
   final _usage = DataUsageTracker();
   final _email = TextEditingController();
@@ -126,6 +129,15 @@ class _HomePageState extends State<HomePage> {
   List<dynamic> _chats = [];
   // Stage 7: the user IDs I blocked (loaded at login).
   final Set<String> _blockedUserIds = {};
+  // Stage 8: whole-app lock (PIN + fingerprint) and notification
+  // settings (local preferences).
+  AppLock? _appLock;
+  bool _locked = false;
+  final _pinCtrl = TextEditingController();
+  bool _notifyEnabled = true;
+  bool _notifySound = true;
+  bool _notifyVibrate = true;
+  final _linkPreviews = LinkPreviewCache();
   // Stage 6: the communities I belong to (real model, not groups).
   List<dynamic> _communities = [];
   // Users by id, loaded with the chat list so a DM can show the other
@@ -198,6 +210,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _remoteRenderer.initialize();
     _initPrefs();
     // Stage 3: refresh the in-call duration label once a second
@@ -240,6 +253,10 @@ class _HomePageState extends State<HomePage> {
     _api.usage = _usage;
     _folders = ChatFolders(prefs);
     _chatLock = ChatLock(prefs);
+    _appLock = AppLock(prefs);
+    _notifyEnabled = prefs.getBool('vyro_notify_enabled_v1') ?? true;
+    _notifySound = prefs.getBool('vyro_notify_sound_v1') ?? true;
+    _notifyVibrate = prefs.getBool('vyro_notify_vibrate_v1') ?? true;
     _drafts = MessageDrafts(prefs);
     _folderNames = _folders!.list();
     if (mounted) setState(() {});
@@ -285,7 +302,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Stage 8: arm the app lock when the app leaves the foreground
+    // (WhatsApp locks on background). Unlocking needs the PIN or a
+    // fingerprint — the chats stay hidden until then.
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      if (_appLock?.enabled == true && _user != null && !_locked) {
+        setState(() => _locked = true);
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ws?.sink.close();
     _call?.dispose();
     _remoteRenderer.dispose();
@@ -467,7 +499,7 @@ class _HomePageState extends State<HomePage> {
       deviceId: _deviceId,
       onOpenChat: (chatId) => _openChatById(chatId),
       onForegroundMessage: (title, body, chatId) {
-        if (!mounted) return;
+        if (!mounted || !_notifyEnabled) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$title: $body'),
@@ -2271,6 +2303,8 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final isFa = Localizations.localeOf(context).languageCode == 'fa';
+    // Stage 8: app lock — PIN or fingerprint before any chat is shown.
+    if (_locked) return _buildLockScreen();
     // Email verification step (v0.6): 6-digit code, 10-minute expiry,
     // resend after a 60-second cooldown. No token until verified.
     if (_user == null && _codeStep) {
@@ -2745,6 +2779,9 @@ class _HomePageState extends State<HomePage> {
               case 'search':
                 _showSearchSheet();
                 break;
+              case 'export':
+                await _exportChat(chat);
+                break;
               case 'block':
                 final peerId = _peerId(chat);
                 if (peerId.isEmpty) break;
@@ -2798,6 +2835,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const PopupMenuItem(value: 'search', child: Text('Search')),
+            const PopupMenuItem(value: 'export', child: Text('Export chat')),
             if (type == 'dm')
               PopupMenuItem(
                 value: 'block',
@@ -4141,6 +4179,308 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // --- Stage 8 helpers: app lock, notifications, export, email ---
+
+  /// Stage 8: app lock screen — PIN entry, plus a fingerprint
+  /// button when the user enabled biometrics.
+  Widget _buildLockScreen() {
+    return Scaffold(
+      backgroundColor: WaColors.lightHeader,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/safari-logo.png', width: 72, height: 72),
+              const SizedBox(height: 16),
+              const Text('Safari is locked',
+                  style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
+              const SizedBox(height: 8),
+              const Text('Enter your PIN to continue',
+                  style: TextStyle(color: Colors.white70)),
+              const SizedBox(height: 24),
+              TextField(
+                controller: _pinCtrl,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 8,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    color: Colors.white, fontSize: 24, letterSpacing: 8),
+                decoration: const InputDecoration(
+                  counterText: '',
+                  enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white54)),
+                  focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Colors.white)),
+                ),
+                onSubmitted: (_) => _unlockWithPin(),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                  onPressed: _unlockWithPin,
+                  child: const Text('Unlock')),
+              if (_appLock?.biometric == true) ...[
+                const SizedBox(height: 12),
+                IconButton(
+                  icon: const Icon(Icons.fingerprint,
+                      color: Colors.white, size: 36),
+                  tooltip: 'Unlock with fingerprint',
+                  onPressed: _tryBiometric,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _unlockWithPin() async {
+    final ok = await _appLock?.verifyPin(_pinCtrl.text.trim());
+    _pinCtrl.clear();
+    if (ok == true) {
+      setState(() => _locked = false);
+    } else {
+      setState(() => _error = 'Wrong PIN');
+    }
+  }
+
+  /// Stage 8: fingerprint unlock. A failure (no sensor, not
+  /// enrolled, cancelled) leaves the PIN field as the way in.
+  Future<void> _tryBiometric() async {
+    try {
+      final auth = LocalAuthentication();
+      final ok = await auth.authenticate(localizedReason: 'Unlock Safari');
+      if (ok && mounted) setState(() => _locked = false);
+    } catch (_) {}
+  }
+
+  /// Stage 8: app lock settings — set/change/remove the PIN,
+  /// enable/disable the lock, fingerprint on/off (only when the
+  /// device has biometrics).
+  Future<void> _showAppLockSettings() async {
+    final lock = _appLock;
+    if (lock == null) return;
+    var canBiometric = false;
+    try {
+      canBiometric =
+          await LocalAuthentication().canCheckBiometrics;
+    } catch (_) {}
+    final pinCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    var enable = lock.enabled;
+    var biometric = lock.biometric;
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('App lock'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                title: const Text('Lock Safari'),
+                subtitle: const Text(
+                    'Ask for the PIN when the app returns from the background.'),
+                value: enable,
+                onChanged: (v) => setDialogState(() => enable = v),
+              ),
+              if (canBiometric)
+                SwitchListTile(
+                  title: const Text('Fingerprint'),
+                  subtitle:
+                      const Text('Also unlock with your fingerprint.'),
+                  value: biometric,
+                  onChanged: (v) => setDialogState(() => biometric = v),
+                ),
+              TextField(
+                controller: pinCtrl,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 8,
+                decoration:
+                    const InputDecoration(labelText: 'New PIN (4-8 digits)'),
+              ),
+              TextField(
+                controller: confirmCtrl,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 8,
+                decoration:
+                    const InputDecoration(labelText: 'Confirm PIN'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            if (lock.hasPin)
+              TextButton(
+                  onPressed: () async {
+                    await lock.removePin();
+                    if (context.mounted) Navigator.pop(context, true);
+                  },
+                  child: const Text('Remove PIN',
+                      style: TextStyle(color: Colors.red))),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      if (pinCtrl.text.isNotEmpty) {
+        if (pinCtrl.text != confirmCtrl.text) {
+          setState(() => _error = 'PINs do not match');
+          return;
+        }
+        final err = await lock.setPin(pinCtrl.text.trim());
+        if (err != null) {
+          setState(() => _error = err);
+          return;
+        }
+      }
+      await lock.setEnabled(enable);
+      await lock.setBiometric(biometric && canBiometric);
+      setState(() {});
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 8: save one notification preference (local only).
+  Future<void> _setNotifyPref(String which, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    switch (which) {
+      case 'enabled':
+        await prefs.setBool('vyro_notify_enabled_v1', value);
+        setState(() => _notifyEnabled = value);
+        break;
+      case 'sound':
+        await prefs.setBool('vyro_notify_sound_v1', value);
+        setState(() => _notifySound = value);
+        break;
+      case 'vibrate':
+        await prefs.setBool('vyro_notify_vibrate_v1', value);
+        setState(() => _notifyVibrate = value);
+        break;
+    }
+  }
+
+  /// Stage 8: export the loaded messages of this chat as a text
+  /// file and open the system share sheet. Only messages already
+  /// loaded on this device are included.
+  Future<void> _exportChat(Map<String, dynamic> chat) async {
+    final lines = <String>['Safari chat export — ${_chatTitle(chat)}'];
+    for (final m in _messages) {
+      final map = m as Map<String, dynamic>;
+      final when = (map['created_at'] as String?) ?? '';
+      final sender = (map['sender_id'] == _user?['id'])
+          ? 'You'
+          : (_usersById[map['sender_id'] as String? ?? '']
+                      ?['display_name'] as String?) ??
+                  'Someone';
+      final kind = map['kind'] as String? ?? 'text';
+      final body = kind == 'text'
+          ? (map['content'] as String? ?? '')
+          : '[$kind]';
+      lines.add('[$when] $sender: $body');
+    }
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File(
+          '${dir.path}/safari-chat-${DateTime.now().millisecondsSinceEpoch}.txt');
+      await file.writeAsString(lines.join('\n'));
+      final shared = await ShareFile.shareFile(file.path,
+          text: 'Safari chat export');
+      if (!shared) {
+        setState(() =>
+            _error = 'Sharing is not available here — the export is saved at ${file.path}');
+      }
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 8: change the account email — a 6-digit code goes to the
+  /// NEW address first, then the account moves to it.
+  Future<void> _changeEmail() async {
+    final emailCtrl = TextEditingController();
+    final codeCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Change email'),
+        content: TextField(
+          controller: emailCtrl,
+          keyboardType: TextInputType.emailAddress,
+          decoration:
+              const InputDecoration(labelText: 'New email address'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Send code')),
+        ],
+      ),
+    );
+    if (ok != true || emailCtrl.text.trim().isEmpty) return;
+    final newEmail = emailCtrl.text.trim();
+    try {
+      await _api.requestEmailChange(newEmail);
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enter the code'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('A 6-digit code was sent to $newEmail.'),
+            TextField(
+              controller: codeCtrl,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              decoration: const InputDecoration(labelText: 'Code'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Change email')),
+        ],
+      ),
+    );
+    if (confirmed != true || codeCtrl.text.trim().isEmpty) return;
+    try {
+      final updated =
+          await _api.verifyEmailChange(newEmail, codeCtrl.text.trim());
+      setState(() => _user = updated);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
   // --- Calls tab (WhatsApp) -----------------------------------------
   // No call history is stored yet, so the tab honestly shows the
   // empty state until the first call happens.
@@ -4651,6 +4991,12 @@ class _HomePageState extends State<HomePage> {
           subtitle: const Text('See and remove your other devices'),
           onTap: _showLinkedDevices,
         ),
+        ListTile(
+          leading: const Icon(Icons.email_outlined),
+          title: const Text('Change email'),
+          subtitle: Text(_user?['email'] as String? ?? ''),
+          onTap: _changeEmail,
+        ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
@@ -4704,6 +5050,25 @@ class _HomePageState extends State<HomePage> {
           onChanged: (v) {
             if (v != null) _setStatusPrivacy(v);
           },
+        ),
+        header('Notifications'),
+        SwitchListTile(
+          title: const Text('Notifications'),
+          subtitle: const Text('Show message notifications while the app is open.'),
+          value: _notifyEnabled,
+          onChanged: (v) => _setNotifyPref('enabled', v),
+        ),
+        SwitchListTile(
+          title: const Text('Sound'),
+          subtitle: const Text('Play a sound with notifications.'),
+          value: _notifySound,
+          onChanged: (v) => _setNotifyPref('sound', v),
+        ),
+        SwitchListTile(
+          title: const Text('Vibrate'),
+          subtitle: const Text('Vibrate with notifications.'),
+          value: _notifyVibrate,
+          onChanged: (v) => _setNotifyPref('vibrate', v),
         ),
         header('Chats'),
         SwitchListTile(
@@ -4795,6 +5160,14 @@ class _HomePageState extends State<HomePage> {
               ? 'Ready on this device (device $_deviceId). Private keys '
                   'never leave the device.'
               : 'Not set up yet — log in to generate keys.'),
+        ),
+        ListTile(
+          leading: const Icon(Icons.screen_lock_portrait_outlined),
+          title: const Text('App lock'),
+          subtitle: Text(_appLock?.enabled == true
+              ? 'On — PIN${_appLock?.biometric == true ? ' + fingerprint' : ''} required when the app returns from the background.'
+              : 'Off — set a PIN to lock Safari when it goes to the background.'),
+          onTap: _showAppLockSettings,
         ),
         header('About'),
         const ListTile(
@@ -7100,7 +7473,45 @@ class _HomePageState extends State<HomePage> {
       return Text('📎 ${(m['file_name'] as String?) ?? 'File'} '
           '(${(bytes.length / 1024).toStringAsFixed(0)} KB downloaded)');
     }
-    return Text(content);
+    // Stage 8: link preview — a text message with a link shows the
+    // page title as a small card above the text.
+    final url = LinkPreviewCache.extractUrl(content);
+    if (url == null) return Text(content);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FutureBuilder<String?>(
+          future: _linkPreviews.titleFor(url),
+          builder: (context, snap) {
+            final title = snap.data;
+            if (title == null) return const SizedBox.shrink();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.link, size: 16),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(title,
+                        style: const TextStyle(fontSize: 13),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        Text(content),
+      ],
+    );
   }
 
   Widget _downloadPlaceholder(String label, int? fileSize, String fileUrl) {

@@ -200,6 +200,14 @@ class ApiClient {
         if (public != null) 'public': public,
       });
 
+  // Stage 8 — change the account email (code to the new address).
+  Future<Map<String, dynamic>> requestEmailChange(String newEmail) =>
+      _req('POST', '/api/users/me/change-email', {'new_email': newEmail});
+  Future<Map<String, dynamic>> verifyEmailChange(
+          String newEmail, String code) =>
+      _req('POST', '/api/users/me/change-email/verify',
+          {'new_email': newEmail, 'code': code});
+
   // Stage 7 — Accounts: profile, block/report, linked devices.
   Future<Map<String, dynamic>> updateProfile(
           {String? displayName, String? bio, String? avatarUrl}) =>

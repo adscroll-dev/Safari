@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stage 8: the chat-export file lives in the app cache dir
+     (getTemporaryDirectory); only that dir is shared out. -->
+<paths>
+    <cache-path name="cache" path="." />
+</paths>
