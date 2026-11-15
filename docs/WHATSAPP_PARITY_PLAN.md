@@ -147,9 +147,11 @@ Never present a demo feature as complete.
   message", kind "system", rendered as a centered grey chip —
   clients cannot send this kind). TestStage4Polls passes; backend
   go test ./... all pass; mobile analyze clean, flutter test 33/33.
-  DELIVERED 2026-11-15 (commit TBD): APKs arm64 TBD, armeabi TBD,
-  x86_64 TBD; verified live (landing hash, live APK SHA-256 match,
-  /api/polls probe 401, /health ok, migration 014 applied cleanly).
+  DELIVERED 2026-11-15 ~12:25 (commit e26df31): APKs arm64
+  33,622,324 B (a20fbfb4…118ac), armeabi 26,667,807 B
+  (aa24ebf8…8ccac), x86_64 36,092,977 B (c89b961f…7df6408e7d7);
+  verified live (landing hash, live APK SHA-256 match, /api/polls
+  probe 401, /health ok, migration 014 applied cleanly).
 
 ### 6. Communities
 - PARTIAL: tab lists real groups; "New community" opens the group flow.
@@ -190,7 +192,8 @@ Never present a demo feature as complete.
    delete-for-everyone check. — DONE 2026-11-15 (Stage 1 above).
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
 4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above), DELIVERED ~11:55.
-5. Polls + pinned message (groups). — NEXT (Stage 4, planned above).
+5. Polls + pinned message (groups). — DONE 2026-11-15 (Stage 4 above), DELIVERED ~12:25.
+6. Channels: view counter, search, admin management. — NEXT (Stage 5).
 6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group).
 8. Accounts: phone OTP (if a free route exists), profile photo/about,
