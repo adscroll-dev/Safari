@@ -81,6 +81,9 @@ var migration013SQL string
 //go:embed migrations/014_stage4_polls.sql
 var migration014SQL string
 
+//go:embed migrations/015_stage5_channels.sql
+var migration015SQL string
+
 // The embedded migration is a copy of backend/migrations/001_init.sql
 // (go:embed cannot reach outside the package directory).
 // TestMigrationMatchesFile fails if the two ever drift apart.
@@ -174,6 +177,10 @@ func NewPostgresStore(ctx context.Context, databaseURL string) (*PostgresStore, 
 	if _, err := pool.Exec(ctx, migration014SQL); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("apply migration 014_stage4_polls.sql: %w", err)
+	}
+	if _, err := pool.Exec(ctx, migration015SQL); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("apply migration 015_stage5_channels.sql: %w", err)
 	}
 	return &PostgresStore{pool: pool}, nil
 }
@@ -309,7 +316,7 @@ func (s *PostgresStore) ListUsers() []*models.User {
 func scanChat(row pgx.Row, memberIDs []string) (*models.Chat, error) {
 	var c models.Chat
 	var ownerID *string
-	err := row.Scan(&c.ID, &c.Type, &c.Title, &ownerID, &c.CreatedAt, &c.UpdatedAt)
+	err := row.Scan(&c.ID, &c.Type, &c.Title, &ownerID, &c.IsPublic, &c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, mapStoreErr(err)
 	}
@@ -362,14 +369,14 @@ func (s *PostgresStore) CreateChat(c *models.Chat) error {
 	}
 	if isUUID(c.ID) {
 		err = tx.QueryRow(ctx,
-			`INSERT INTO chats (id, type, title, owner_id) VALUES ($1, $2, $3, $4)
+			`INSERT INTO chats (id, type, title, owner_id, is_public) VALUES ($1, $2, $3, $4, $5)
 			 RETURNING id::text, created_at, updated_at`,
-			c.ID, string(c.Type), c.Title, owner).Scan(&id, &createdAt, &updatedAt)
+			c.ID, string(c.Type), c.Title, owner, c.IsPublic).Scan(&id, &createdAt, &updatedAt)
 	} else {
 		err = tx.QueryRow(ctx,
-			`INSERT INTO chats (type, title, owner_id) VALUES ($1, $2, $3)
+			`INSERT INTO chats (type, title, owner_id, is_public) VALUES ($1, $2, $3, $4)
 			 RETURNING id::text, created_at, updated_at`,
-			string(c.Type), c.Title, owner).Scan(&id, &createdAt, &updatedAt)
+			string(c.Type), c.Title, owner, c.IsPublic).Scan(&id, &createdAt, &updatedAt)
 	}
 	if err != nil {
 		return mapStoreErr(err)
@@ -399,7 +406,7 @@ func (s *PostgresStore) ChatByID(id string) (*models.Chat, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	c, err := scanChat(s.pool.QueryRow(ctx,
-		`SELECT id::text, type, title, owner_id::text, created_at, updated_at
+		`SELECT id::text, type, title, owner_id::text, is_public, created_at, updated_at
 		 FROM chats WHERE id = $1`, id), nil)
 	if err != nil {
 		return nil, err
@@ -415,7 +422,7 @@ func (s *PostgresStore) ChatsForUser(userID string) []*models.Chat {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := s.pool.Query(ctx,
-		`SELECT c.id::text, c.type, c.title, c.owner_id::text, c.created_at, c.updated_at
+		`SELECT c.id::text, c.type, c.title, c.owner_id::text, c.is_public, c.created_at, c.updated_at
 		 FROM chats c JOIN chat_members m ON m.chat_id = c.id
 		 WHERE m.user_id = $1 ORDER BY c.updated_at DESC`, userID)
 	if err != nil {

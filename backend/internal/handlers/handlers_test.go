@@ -169,6 +169,12 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.ListPolls(w, r)
 				}
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/follow"):
+				h.FollowChannel(w, r)
+			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/unfollow"):
+				h.UnfollowChannel(w, r)
+			case strings.HasPrefix(path, "/api/chats/") && method == http.MethodPatch:
+				h.UpdateChat(w, r)
 			case strings.HasPrefix(path, "/api/polls/") && strings.HasSuffix(path, "/vote"):
 				h.VotePoll(w, r)
 			case strings.HasPrefix(path, "/api/polls/"):
@@ -295,6 +301,12 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.MarkRead(w, r)
 			case strings.HasPrefix(path, "/api/messages/") && strings.HasSuffix(path, "/delete-for-me"):
 				h.DeleteMessageForMe(w, r)
+			case strings.HasPrefix(path, "/api/messages/") && strings.HasSuffix(path, "/view"):
+				h.RecordMessageView(w, r)
+			case strings.HasPrefix(path, "/api/messages/") && strings.HasSuffix(path, "/views"):
+				h.GetMessageViews(w, r)
+			case path == "/api/channels/search":
+				h.SearchChannels(w, r)
 			case path == "/api/messages/search":
 				h.SearchMessages(w, r)
 			case strings.HasPrefix(path, "/api/messages/"):

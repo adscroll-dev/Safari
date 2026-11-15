@@ -20,17 +20,17 @@ const apks: Apk[] = [
     abi: "arm64-v8a",
     href: "/downloads/safari-0.6.0-arm64-v8a.apk",
     size: "33.5 MB",
-    bytes: "33,622,324 bytes",
+    bytes: "33,622,328 bytes",
     sha256:
-      "a20fbfb434e635c57f4539ee1842d4ccc3ccc2ad897a2f756a1466c5427118ac",
+      "2eb8f5505cb66b97d459c427c463cc9fc9eacb9b580a6ddb97768c0ca16a3b85",
   },
   {
     abi: "armeabi-v7a",
     href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
     size: "26.6 MB",
-    bytes: "26,667,807 bytes",
+    bytes: "26,700,569 bytes",
     sha256:
-      "aa24ebf8d33e0edfd0a9863eb1d28b185f0a2033610cae2a92af6a0f2148ccac",
+      "d1b9edd02d84e716bff5c0b7704aca51e00b8998c58c1a636fb57ee384995c36",
   },
   {
     abi: "x86_64",
@@ -38,7 +38,7 @@ const apks: Apk[] = [
     size: "36.0 MB",
     bytes: "36,092,977 bytes",
     sha256:
-      "c89b961f0b3976dde87c399f5dc48715d72d9d3027f2eb4365f9c7df6408e7d7",
+      "18aaa4bf4f61ef88140d3ef310cebdc6071d877161f2972a8a7cc0f940a93a09",
   },
 ];
 

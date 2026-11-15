@@ -326,10 +326,20 @@ func main() {
 			default:
 				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 			}
+		case strings.HasSuffix(path, "/follow"):
+			// Follow a public channel (Stage 5).
+			h.FollowChannel(w, r)
+		case strings.HasSuffix(path, "/unfollow"):
+			// Leave a channel or group (Stage 5).
+			h.UnfollowChannel(w, r)
+		case r.Method == http.MethodPatch:
+			// Edit a chat's title / public flag (Stage 5).
+			h.UpdateChat(w, r)
 		default:
 			middleware.WriteError(w, http.StatusNotFound, "not found")
 		}
 	})))
+	mux.Handle("/api/channels/search", authMW(http.HandlerFunc(h.SearchChannels)))
 	mux.Handle("/api/messages/search", authMW(http.HandlerFunc(h.SearchMessages)))
 	// Invite-link preview/join (Telegram-style): /api/invites/{token}
 	// and /api/invites/{token}/join.
@@ -349,6 +359,24 @@ func main() {
 		}
 	})))
 	mux.Handle("/api/messages/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/view") {
+			// Record my view of a channel post (Stage 5).
+			if r.Method == http.MethodPost {
+				h.RecordMessageView(w, r)
+			} else {
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/views") {
+			// View count of a channel post (Stage 5).
+			if r.Method == http.MethodGet {
+				h.GetMessageViews(w, r)
+			} else {
+				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			}
+			return
+		}
 		if strings.HasSuffix(r.URL.Path, "/delete-for-me") {
 			if r.Method == http.MethodPost {
 				h.DeleteMessageForMe(w, r)

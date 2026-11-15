@@ -693,6 +693,18 @@ class _HomePageState extends State<HomePage> {
         for (final m in msgs) {
           _maybeDecrypt(m as Map<String, dynamic>);
         }
+        // Stage 5: opening a channel counts my view of each post
+        // from others (one row per viewer; fire-and-forget).
+        if (_activeChat!['type'] == 'channel') {
+          for (final m in msgs) {
+            final mm = m as Map<String, dynamic>;
+            if (mm['sender_id'] != _user?['id']) {
+              unawaited(_api
+                  .recordMessageView(mm['id'] as String)
+                  .catchError((_) => <String, dynamic>{}));
+            }
+          }
+        }
       }
     } catch (_) {}
   }
@@ -850,6 +862,9 @@ class _HomePageState extends State<HomePage> {
     final users = await _api.listUsers();
     if (!mounted) return;
     String type = 'group';
+    // Stage 5: channels are public (discoverable) unless the
+    // creator marks them private.
+    bool channelPublic = true;
     final titleCtrl = TextEditingController();
     final selected = <String>{};
     final ok = await showDialog<bool>(
@@ -874,6 +889,16 @@ class _HomePageState extends State<HomePage> {
                       onSelected: (_) =>
                           setDialogState(() => type = 'channel')),
                 ]),
+                if (type == 'channel')
+                  SwitchListTile(
+                    title: const Text('Public channel'),
+                    subtitle: const Text(
+                        'Anyone can find and follow it'),
+                    value: channelPublic,
+                    onChanged: (v) =>
+                        setDialogState(() => channelPublic = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 TextField(
                     controller: titleCtrl,
                     decoration: const InputDecoration(labelText: 'Title')),
@@ -913,10 +938,11 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-    if (ok != true || selected.isEmpty) return;
+    if (ok != true || (selected.isEmpty && type != 'channel')) return;
     try {
       final chat = await _api.createChat(type, selected.toList(),
-          title: titleCtrl.text.trim());
+          title: titleCtrl.text.trim(),
+          public: type == 'channel' ? channelPublic : null);
       await _refreshChats();
       await _openChat(chat);
     } catch (e) {
@@ -988,6 +1014,58 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  /// Stage 5: rename a channel and flip it between public and
+  /// private (admins and owner only).
+  Future<void> _editChannel() async {
+    if (_activeChat == null) return;
+    final chatId = _activeChat!['id'] as String;
+    final titleCtrl = TextEditingController(
+        text: (_activeChat!['title'] as String?) ?? '');
+    bool isPublic = _activeChat!['is_public'] == true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Edit channel'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleCtrl,
+                decoration: const InputDecoration(labelText: 'Channel name'),
+                maxLength: 100,
+              ),
+              SwitchListTile(
+                title: const Text('Public channel'),
+                subtitle: const Text('Anyone can find and follow it'),
+                value: isPublic,
+                onChanged: (v) => setDialogState(() => isPublic = v),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final updated = await _api.updateChat(chatId,
+          title: titleCtrl.text.trim(), public: isPublic);
+      await _refreshChats();
+      setState(() => _activeChat = updated);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    }
+  }
+
   /// Members + admin sheet for a group/channel.
   Future<void> _showMembers() async {
     if (_activeChat == null) return;
@@ -1023,6 +1101,21 @@ class _HomePageState extends State<HomePage> {
               Text('Members (${members.length})',
                   style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
+              // Stage 5: channel admins can rename the channel and
+              // flip it between public and private.
+              if (canManageInvite && _activeChat!['type'] == 'channel')
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit channel'),
+                  subtitle: Text(_activeChat!['is_public'] == true
+                      ? 'Public channel'
+                      : 'Private channel'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _editChannel();
+                  },
+                ),
               // Invite link (Telegram-style): owners/admins create one
               // link anyone can join with; revoke it to close the door.
               if (canManageInvite) ...[
@@ -3107,6 +3200,13 @@ class _HomePageState extends State<HomePage> {
           onTap: _showPromoteSheet,
         ),
         _sectionHeader('Channels'),
+        // Stage 5: find public channels to follow.
+        ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.search, size: 20)),
+          title: const Text('Find channels'),
+          subtitle: const Text('Search public channels to follow'),
+          onTap: _showChannelSearch,
+        ),
         if (channels.isEmpty)
           const ListTile(
             title: Text('No channels yet'),
@@ -3127,6 +3227,116 @@ class _HomePageState extends State<HomePage> {
           onTap: _showNewChatSheet,
         ),
       ],
+    );
+  }
+
+  /// Stage 5: search public channels and follow them.
+  void _showChannelSearch() {
+    final ctrl = TextEditingController();
+    List<dynamic> results = [];
+    bool searching = false;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 16,
+              right: 16,
+              top: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: ctrl,
+                    decoration: const InputDecoration(
+                        hintText: 'Search channels…',
+                        prefixIcon: Icon(Icons.search)),
+                    onSubmitted: (_) async {
+                      setSheetState(() => searching = true);
+                      try {
+                        final r = await _api.searchChannels(ctrl.text.trim());
+                        setSheetState(() {
+                          results = r;
+                          searching = false;
+                        });
+                      } catch (e) {
+                        setSheetState(() => searching = false);
+                        setState(() => _error = e.toString());
+                      }
+                    },
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () async {
+                    setSheetState(() => searching = true);
+                    try {
+                      final r = await _api.searchChannels(ctrl.text.trim());
+                      setSheetState(() {
+                        results = r;
+                        searching = false;
+                      });
+                    } catch (e) {
+                      setSheetState(() => searching = false);
+                      setState(() => _error = e.toString());
+                    }
+                  },
+                ),
+              ]),
+              const SizedBox(height: 8),
+              if (searching) const CircularProgressIndicator(),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: results.length,
+                  itemBuilder: (context, i) {
+                    final ch = results[i] as Map<String, dynamic>;
+                    final id = ch['id'] as String;
+                    final joined = _chats.any((c) => (c as Map)['id'] == id);
+                    final followers = ch['follower_count'] as int? ?? 0;
+                    return ListTile(
+                      leading: WaAvatar(
+                          label: (ch['title'] as String?) ?? 'Channel',
+                          radius: 26),
+                      title: Text((ch['title'] as String?) ?? 'Channel'),
+                      subtitle: Text(
+                          '$followers ${followers == 1 ? 'follower' : 'followers'}'),
+                      trailing: joined
+                          ? const Text('Following',
+                              style: TextStyle(color: WaColors.accent))
+                          : FilledButton(
+                              onPressed: () async {
+                                try {
+                                  await _api.followChannel(id);
+                                  await _refreshChats();
+                                  setSheetState(() {});
+                                } catch (e) {
+                                  setState(() => _error = e.toString());
+                                }
+                              },
+                              child: const Text('Follow'),
+                            ),
+                      onTap: joined
+                          ? () async {
+                              Navigator.pop(context);
+                              final chat = _chats.firstWhere(
+                                  (c) => (c as Map)['id'] == id);
+                              await _openChat(chat as Map<String, dynamic>);
+                            }
+                          : null,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -5019,37 +5229,57 @@ class _HomePageState extends State<HomePage> {
               ]),
             ),
           if (_draftEmpty) _smartReplyChips(),
-          Container(
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
-            color: chatBg,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: dark
-                          ? WaColors.darkInputBackground
-                          : WaColors.lightInputBackground,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.06),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _draft,
-                            decoration: const InputDecoration(
-                              hintText: 'Message',
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
+          // Stage 5: in a channel only admins and the owner may
+          // post — followers see a read-only notice instead of
+          // the input bar.
+          if (_activeChat?['type'] == 'channel' &&
+              ((_activeChat?['roles'] as Map?)?[_user?['id']] ?? 'member') ==
+                  'member')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              color: chatBg,
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.campaign_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Only admins can post in this channel',
+                      style: TextStyle(fontSize: 13)),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+              color: chatBg,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: dark
+                            ? WaColors.darkInputBackground
+                            : WaColors.lightInputBackground,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _draft,
+                              decoration: const InputDecoration(
+                                hintText: 'Message',
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
                               filled: false,
                               contentPadding: EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 12),
@@ -5582,6 +5812,17 @@ class _HomePageState extends State<HomePage> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Stage 5: view count on channel posts.
+                        if (_activeChat?['type'] == 'channel' &&
+                            (m['view_count'] as int? ?? 0) > 0)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Text(
+                              '👁 ${m['view_count']}',
+                              style:
+                                  TextStyle(fontSize: 11, color: metaColor),
+                            ),
+                          ),
                         Text(
                           timeLabel,
                           style: TextStyle(fontSize: 11, color: metaColor),

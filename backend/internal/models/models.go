@@ -55,6 +55,12 @@ type Chat struct {
 	Title     string   `json:"title,omitempty"`
 	OwnerID   string   `json:"owner_id,omitempty"`
 	MemberIDs []string `json:"member_ids"`
+	// IsPublic marks a channel as discoverable (Stage 5); only
+	// meaningful for type "channel". Public by default.
+	IsPublic bool `json:"is_public"`
+	// FollowerCount is the member count, populated by channel search
+	// (Stage 5) only.
+	FollowerCount int `json:"follower_count,omitempty"`
 	// Roles maps user id -> role (member | admin | owner). Populated by
 	// handlers from chat_members; empty in older callers.
 	Roles map[string]string `json:"roles,omitempty"`
@@ -147,6 +153,9 @@ type Message struct {
 	EditedAt        *time.Time          `json:"edited_at,omitempty"`
 	DeletedAt       *time.Time          `json:"deleted_at,omitempty"`
 	Reactions       map[string][]string `json:"reactions,omitempty"` // emoji -> user ids
+	// ViewCount is the number of distinct viewers (Stage 5); only
+	// populated for channel posts.
+	ViewCount       int                 `json:"view_count,omitempty"`
 	CreatedAt       time.Time           `json:"created_at"`
 	UpdatedAt       time.Time           `json:"updated_at"`
 }

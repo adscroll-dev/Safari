@@ -112,6 +112,13 @@ type StoreIface interface {
 	MyPollVotes(pollID, userID string) []int
 	DeletePoll(id string) error
 	SetPollMessageID(pollID, messageID string) error
+	// Stage 5 (channels): view counter on channel posts, public
+	// channel search, channel info edits.
+	RecordMessageView(messageID, userID string) error
+	MessageViewCount(messageID string) int
+	MessageViewCounts(chatID string) map[string]int
+	SearchPublicChannels(query string) []*models.Chat
+	UpdateChat(chatID string, title *string, isPublic *bool) error
 	CreateScheduled(sm *models.ScheduledMessage) error
 	DueScheduled(now time.Time) []*models.ScheduledMessage
 	MarkScheduledSent(id, messageID string) error
@@ -233,6 +240,10 @@ type MemoryStore struct {
 	// (poll id -> user id -> option indexes).
 	polls     map[string]*models.Poll
 	pollVotes map[string]map[string][]int
+	// Stage 5: channel post views (message id -> user ids who
+	// viewed it). One row per viewer, so re-views never inflate
+	// the count.
+	messageViews map[string]map[string]bool
 }
 
 type storyReaction struct {
@@ -283,6 +294,7 @@ func NewMemoryStore() *MemoryStore {
 		callRecords:        []*models.CallRecord{},
 		polls:              map[string]*models.Poll{},
 		pollVotes:          map[string]map[string][]int{},
+		messageViews:       map[string]map[string]bool{},
 	}
 }
 

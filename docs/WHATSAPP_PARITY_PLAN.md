@@ -160,8 +160,22 @@ Never present a demo feature as complete.
 
 ### 7. Channels
 - DONE: channel type, create, open/follow (as a chat), invite links.
-- MISSING: view counter on posts, channel search, admin management
-  beyond the members sheet.
+- DONE 2026-11-15 (Stage 5, IN PROGRESS — build running): view counter
+  on posts (migration 015: chats.is_public, message_views table with
+  PK message+user so re-views never inflate the count; Message.ViewCount
+  populated in ListMessages for channel chats; POST /api/messages/{id}/view
+  + GET /api/messages/{id}/views, channel-only), channel search
+  (GET /api/channels/search?q= — public channels by title, most-followed
+  first, max 20; private channels never appear), follow/unfollow
+  (POST /api/chats/{id}/follow — public only, 403 for private; POST
+  /api/chats/{id}/unfollow — leaves a channel or group, owner cannot
+  leave), admin management (only admins/owner may post in a channel —
+  followers get 403 and see a read-only notice instead of the input
+  bar; PATCH /api/chats/{id} — admin/owner edit title + public flag;
+  create-channel dialog has a Public/Private switch and allows
+  zero members; members sheet "Edit channel" tile for admins).
+  TestStage5Channels passes; backend go test ./... all pass; mobile
+  analyze clean, flutter test 33/33.
 
 ### 8. Extras
 - DONE: disappearing messages, chat lock PIN, Data Saver + usage
@@ -193,7 +207,7 @@ Never present a demo feature as complete.
 3. Status gaps: text/audio status, delete, viewers, privacy, reply/react. — DONE 2026-11-15 (Stage 2 above).
 4. Calls: history + missed, in-call controls, group calls (signaling). — DONE 2026-11-15 (Stage 3 above), DELIVERED ~11:55.
 5. Polls + pinned message (groups). — DONE 2026-11-15 (Stage 4 above), DELIVERED ~12:25.
-6. Channels: view counter, search, admin management. — NEXT (Stage 5).
+6. Channels: view counter, search, admin management. — IN PROGRESS 2026-11-15 (Stage 5; backend + mobile done and tested, APK build running).
 6. Channels: view counter + search.
 7. Communities: real model (subgroups + announcement group).
 8. Accounts: phone OTP (if a free route exists), profile photo/about,

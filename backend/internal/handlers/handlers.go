@@ -307,6 +307,9 @@ type createChatReq struct {
 	Type      string   `json:"type"`
 	Title     string   `json:"title"`
 	MemberIDs []string `json:"member_ids"`
+	// Public marks a channel as discoverable (Stage 5); nil means
+	// public. Ignored for DMs and groups.
+	Public *bool `json:"public"`
 }
 
 func (h *Handler) ListChats(w http.ResponseWriter, r *http.Request) {
@@ -397,6 +400,11 @@ func (h *Handler) CreateChat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	chat := &models.Chat{Type: typ, Title: req.Title, OwnerID: me, MemberIDs: members}
+	if typ == models.ChatChannel {
+		// Channels are public (discoverable) unless the creator
+		// marks them private (Stage 5).
+		chat.IsPublic = req.Public == nil || *req.Public
+	}
 	if err := h.Store.CreateChat(chat); err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not create chat")
 		return
@@ -445,6 +453,14 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	msgs = visible
+	// Stage 5: channel posts carry their view count (distinct
+	// viewers) so the client can show it like WhatsApp.
+	if chat, err := h.Store.ChatByID(chatID); err == nil && chat.Type == models.ChatChannel {
+		counts := h.Store.MessageViewCounts(chatID)
+		for _, m := range msgs {
+			m.ViewCount = counts[m.ID]
+		}
+	}
 	// Fetching a chat delivers its messages to the reader (WhatsApp-style
 	// second tick) — except the reader's own messages.
 	for _, m := range msgs {
@@ -504,6 +520,15 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	if !h.Store.IsMember(chatID, me) {
 		middleware.WriteError(w, http.StatusForbidden, "not a member of this chat")
 		return
+	}
+	// Stage 5: in a channel only admins and the owner may post —
+	// followers are read-only, like WhatsApp.
+	if chat, err := h.Store.ChatByID(chatID); err == nil && chat.Type == models.ChatChannel {
+		role := h.Store.MemberRole(chatID, me)
+		if role != "admin" && role != "owner" {
+			middleware.WriteError(w, http.StatusForbidden, "only channel admins can post")
+			return
+		}
 	}
 	var req sendMessageReq
 	if !decode(w, r, &req) {

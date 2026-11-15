@@ -192,9 +192,31 @@ class ApiClient {
 
   /// v0.6 parity: create a group or channel (title + members).
   Future<Map<String, dynamic>> createChat(String type, List<String> memberIds,
-          {String title = ''}) =>
-      _req('POST', '/api/chats',
-          {'type': type, 'member_ids': memberIds, 'title': title});
+          {String title = '', bool? public}) =>
+      _req('POST', '/api/chats', {
+        'type': type,
+        'member_ids': memberIds,
+        'title': title,
+        if (public != null) 'public': public,
+      });
+
+  // Stage 5 — Channels (WhatsApp parity).
+  Future<List<dynamic>> searchChannels(String q) => _getList(
+      '/api/channels/search?q=${Uri.encodeQueryComponent(q)}');
+  Future<Map<String, dynamic>> followChannel(String chatId) =>
+      _req('POST', '/api/chats/$chatId/follow', null);
+  Future<void> unfollowChannel(String chatId) =>
+      _req('POST', '/api/chats/$chatId/unfollow', null);
+  Future<Map<String, dynamic>> updateChat(String chatId,
+          {String? title, bool? public}) =>
+      _req('PATCH', '/api/chats/$chatId', {
+        if (title != null) 'title': title,
+        if (public != null) 'public': public,
+      });
+  Future<Map<String, dynamic>> recordMessageView(String messageId) =>
+      _req('POST', '/api/messages/$messageId/view', null);
+  Future<Map<String, dynamic>> getMessageViews(String messageId) =>
+      _req('GET', '/api/messages/$messageId/views');
 
   /// v0.6 parity: edit / delete a message. deleteMessage is
   /// delete-for-everyone (sender only); deleteMessageForMe hides a
