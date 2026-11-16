@@ -56,14 +56,24 @@ func main() {
 	}
 	hub := ws.NewHub()
 	h := handlers.New(s, hub, cfg.JWTSecret, cfg.JWTExpiry)
-	// Email verification (v0.7): Resend HTTPS API when RESEND_API_KEY
-	// is set (preferred: plain SMTP hangs from some hosts — on Render's
-	// free tier an SMTP dial to Resend never completed, hanging every
-	// registration with no error at all), else SMTP via env (defaults
-	// to Gmail's relay, smtp.gmail.com:587). No sender means email is
-	// not configured: register/login answer 503 and never fake a code.
+	// Email verification (v0.7): Gmail API over HTTPS when its OAuth
+	// credentials are set (preferred: Render's free tier blocks
+	// outbound SMTP TCP entirely, so Gmail SMTP can never work there,
+	// while HTTPS works fine), else Resend HTTPS API when
+	// RESEND_API_KEY is set (preferred over SMTP: plain SMTP hangs
+	// from some hosts — on Render's free tier an SMTP dial to Resend
+	// never completed, hanging every registration with no error at
+	// all), else SMTP via env (defaults to Gmail's relay,
+	// smtp.gmail.com:587). No sender means email is not configured:
+	// register/login answer 503 and never fake a code.
 	// SMTP_ALLOW_NOAUTH=true skips SMTP AUTH (local test sink).
-	if cfg.ResendAPIKey != "" {
+	if cfg.GmailOAuthClientID != "" && cfg.GmailOAuthClientSecret != "" && cfg.GmailOAuthRefreshToken != "" {
+		h.Mailer = mail.NewGmailAPI(cfg.GmailOAuthClientID, cfg.GmailOAuthClientSecret, cfg.GmailOAuthRefreshToken, cfg.SMTPFrom)
+		if h.Mailer != nil {
+			log.Printf("VYRO email: configured (Gmail API, from %s)", cfg.SMTPFrom)
+		}
+	}
+	if h.Mailer == nil && cfg.ResendAPIKey != "" {
 		h.Mailer = mail.NewResend(cfg.ResendAPIKey, cfg.SMTPFrom)
 		if h.Mailer != nil {
 			log.Printf("VYRO email: configured (Resend API, from %s)", cfg.SMTPFrom)

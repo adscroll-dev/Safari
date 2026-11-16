@@ -39,6 +39,14 @@ type Config struct {
 	// ResendAPIKey selects the Resend HTTPS sender over SMTP when set
 	// (outbound SMTP hangs on some hosts; HTTPS does not).
 	ResendAPIKey string
+	// Gmail OAuth (Gmail API HTTPS sender). All three select the
+	// Gmail API sender over Resend/SMTP when set: Render's free tier
+	// blocks outbound SMTP TCP entirely, so Gmail SMTP can never
+	// work there, while the Gmail API (HTTPS) does. Scope is
+	// gmail.send only (send-only; the token cannot read the mailbox).
+	GmailOAuthClientID     string
+	GmailOAuthClientSecret string
+	GmailOAuthRefreshToken string
 }
 
 func Load() Config {
@@ -72,6 +80,9 @@ func Load() Config {
 		SMTPFrom:                   smtpFrom,
 		SMTPAllowNoAuth:            allowNoAuth,
 		ResendAPIKey:               os.Getenv("RESEND_API_KEY"),
+		GmailOAuthClientID:         os.Getenv("GMAIL_OAUTH_CLIENT_ID"),
+		GmailOAuthClientSecret:     os.Getenv("GMAIL_OAUTH_CLIENT_SECRET"),
+		GmailOAuthRefreshToken:     os.Getenv("GMAIL_OAUTH_REFRESH_TOKEN"),
 	}
 }
 
