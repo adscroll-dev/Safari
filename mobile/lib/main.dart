@@ -180,6 +180,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Status privacy (Stage 2): who may see my status — "everyone"
   // (default) or "nobody". Loaded from the server after login.
   String _statusPrivacy = 'everyone';
+  // Stage 11 (Settings parity): avatar/about/groups privacy and
+  // read receipts, from the combined /privacy-settings endpoint.
+  // "everyone" or "nobody"; read receipts default on.
+  String _avatarPrivacy = 'everyone';
+  String _aboutPrivacy = 'everyone';
+  String _groupsPrivacy = 'everyone';
+  bool _readReceipts = true;
+  // Stage 11: chat wallpaper — a solid colour picked in Settings >
+  // Chats, stored on-device. Null means the theme default.
+  int? _wallpaperColor;
   // Downloaded media bytes, keyed by file_url (Data Saver: only after
   // the user taps Download, or when Data Saver is off).
   final Map<String, Uint8List> _downloaded = {};
@@ -257,6 +267,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _notifyEnabled = prefs.getBool('vyro_notify_enabled_v1') ?? true;
     _notifySound = prefs.getBool('vyro_notify_sound_v1') ?? true;
     _notifyVibrate = prefs.getBool('vyro_notify_vibrate_v1') ?? true;
+    // Stage 11: chat wallpaper colour, if the user picked one.
+    _wallpaperColor = prefs.getInt('vyro_wallpaper_color');
     _drafts = MessageDrafts(prefs);
     _folderNames = _folders!.list();
     if (mounted) setState(() {});
@@ -299,6 +311,257 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _error = e.toString();
       });
     }
+  }
+
+  /// Stage 11: avatar / about / groups privacy. One combined
+  /// endpoint; the previous value stays if saving fails.
+  Future<void> _setPrivacyField(String field, String v) async {
+    const keys = {
+      'avatar': 'avatar_privacy',
+      'about': 'about_privacy',
+      'groups': 'groups_privacy',
+    };
+    final key = keys[field]!;
+    String current() => field == 'avatar'
+        ? _avatarPrivacy
+        : field == 'about'
+            ? _aboutPrivacy
+            : _groupsPrivacy;
+    void apply(String val) {
+      setState(() {
+        if (field == 'avatar') {
+          _avatarPrivacy = val;
+        } else if (field == 'about') {
+          _aboutPrivacy = val;
+        } else {
+          _groupsPrivacy = val;
+        }
+      });
+    }
+
+    final previous = current();
+    apply(v);
+    try {
+      await _api.setPrivacySettings({key: v});
+    } catch (e) {
+      apply(previous);
+      setState(() => _error = e.toString());
+    }
+  }
+
+  /// Stage 11: read receipts. Off means I send no blue ticks and
+  /// see none on my own messages either (enforced server-side).
+  Future<void> _setReadReceipts(bool v) async {
+    final previous = _readReceipts;
+    setState(() => _readReceipts = v);
+    try {
+      await _api.setPrivacySettings({'read_receipts': v});
+    } catch (e) {
+      setState(() {
+        _readReceipts = previous;
+        _error = e.toString();
+      });
+    }
+  }
+
+  /// Stage 11: chat wallpaper — a solid colour for the chat
+  /// background, stored on-device. Null restores the theme default.
+  Future<void> _setWallpaper(int? argb) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (argb == null) {
+      await prefs.remove('vyro_wallpaper_color');
+    } else {
+      await prefs.setInt('vyro_wallpaper_color', argb);
+    }
+    setState(() => _wallpaperColor = argb);
+  }
+
+  /// Stage 11: pick a chat wallpaper colour (WhatsApp-style solid
+  /// colours; the default is the theme chat background).
+  Future<void> _showWallpaperPicker() async {
+    // -1 is the "Default" sentinel: showDialog returns null when
+    // the dialog is dismissed, so Default needs its own value.
+    const options = <String, int>{
+      'Default': -1,
+      'Beige': 0xFFECE5DD,
+      'Mint': 0xFFD8F3DC,
+      'Sky': 0xFFDCEFFA,
+      'Rose': 0xFFF6DCE0,
+      'Slate': 0xFF2A2F2B,
+    };
+    if (!mounted) return;
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Chat wallpaper'),
+        children: [
+          for (final entry in options.entries)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, entry.value),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: entry.value == -1
+                          ? (Theme.of(context).brightness == Brightness.dark
+                              ? WaColors.darkChatBackground
+                              : WaColors.lightChatBackground)
+                          : Color(entry.value),
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(entry.key),
+                  const Spacer(),
+                  if (_wallpaperColor ==
+                      (entry.value == -1 ? null : entry.value))
+                    const Icon(Icons.check, size: 18),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    // Dismissed: picked is null, leave the wallpaper alone.
+    if (picked == null) return;
+    final chosen = picked == -1 ? null : picked;
+    if (chosen != _wallpaperColor) await _setWallpaper(chosen);
+  }
+
+  /// Stage 11: blocked contacts — the list from the server, with
+  /// an Unblock button per person. Names come from the loaded users.
+  Future<void> _showBlockedContacts() async {
+    List<dynamic> blocked;
+    try {
+      blocked = await _api.listBlocked();
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    if (!mounted) return;
+    final ids = blocked.cast<String>();
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Blocked contacts (${ids.length})',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            if (ids.isEmpty)
+              const ListTile(
+                title: Text('Nobody blocked'),
+                subtitle: Text('Blocked people cannot message or call you. '
+                    'Block someone from any chat menu.'),
+              ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: ids.length,
+                itemBuilder: (context, i) {
+                  final id = ids[i];
+                  final name = _usersById[id]?['display_name'] as String? ??
+                      _usersById[id]?['username'] as String? ??
+                      id;
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: WaAvatar(label: name, radius: 20),
+                    title: Text(name),
+                    trailing: TextButton(
+                      child: const Text('Unblock'),
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        try {
+                          await _api.unblockUser(id);
+                          setState(() => _blockedUserIds.remove(id));
+                        } catch (e) {
+                          setState(() => _error = e.toString());
+                        }
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Stage 11: delete my account — two confirmations, then the
+  /// server deletes the account and everything it owns. The app
+  /// signs out to the login screen; the deleted token yields
+  /// nothing afterwards.
+  Future<void> _deleteAccount() async {
+    final first = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete my account?'),
+        content: const Text('This permanently deletes your account, '
+            'messages, groups, stories and call history. '
+            'This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (first != true || !mounted) return;
+    final second = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete forever?'),
+        content: const Text('Your Safari account will be gone for good. '
+            'Tap Delete to confirm.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (second != true || !mounted) return;
+    try {
+      await _api.deleteAccount();
+    } catch (e) {
+      setState(() => _error = e.toString());
+      return;
+    }
+    await _ws?.sink.close();
+    _api.clearToken();
+    if (!mounted) return;
+    setState(() {
+      _user = null;
+      _codeStep = false;
+      _showSettings = false;
+      _activeChat = null;
+      _messages = [];
+      _chats = [];
+      _stories = [];
+      _calls = [];
+      _communities = [];
+      _blockedUserIds.clear();
+      _error = null;
+    });
   }
 
   @override
@@ -469,22 +732,39 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await _refreshCommunities();
     // Stage 3: call history for the Calls tab.
     await _refreshCalls();
-    // Last-seen privacy: load the server setting for the Settings page.
+    // Stage 11: combined privacy settings — last seen, status,
+    // avatar/about/groups privacy, read receipts — in one request
+    // instead of two. Falls back to the older single-setting
+    // endpoints if the server does not have it yet.
     try {
-      final privacy = await _api.getPrivacy();
+      final s = await _api.getPrivacySettings();
       if (mounted) {
-        setState(() => _lastSeenVisibility =
-            privacy['last_seen_visibility'] as String? ?? 'everyone');
+        setState(() {
+          _lastSeenVisibility =
+              s['last_seen_visibility'] as String? ?? 'everyone';
+          _statusPrivacy = s['status_privacy'] as String? ?? 'everyone';
+          _avatarPrivacy = s['avatar_privacy'] as String? ?? 'everyone';
+          _aboutPrivacy = s['about_privacy'] as String? ?? 'everyone';
+          _groupsPrivacy = s['groups_privacy'] as String? ?? 'everyone';
+          _readReceipts = s['read_receipts'] as bool? ?? true;
+        });
       }
-    } catch (_) {}
-    // Status privacy (Stage 2): same pattern.
-    try {
-      final statusPrivacy = await _api.getStatusPrivacy();
-      if (mounted) {
-        setState(() => _statusPrivacy =
-            statusPrivacy['status_privacy'] as String? ?? 'everyone');
-      }
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final privacy = await _api.getPrivacy();
+        if (mounted) {
+          setState(() => _lastSeenVisibility =
+              privacy['last_seen_visibility'] as String? ?? 'everyone');
+        }
+      } catch (_) {}
+      try {
+        final statusPrivacy = await _api.getStatusPrivacy();
+        if (mounted) {
+          setState(() => _statusPrivacy =
+              statusPrivacy['status_privacy'] as String? ?? 'everyone');
+        }
+      } catch (_) {}
+    }
     try {
       final stories = await _api.listStories();
       setState(() => _stories = stories);
@@ -5112,6 +5392,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ),
         );
+    // Stage 11: a privacy row — label on the left, Everyone/Nobody
+    // picker on the right (WhatsApp-style).
+    Widget privacyRow(String title, String subtitle, String value,
+            void Function(String) onPick) =>
+        ListTile(
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: DropdownButton<String>(
+            value: value,
+            underline: const SizedBox(),
+            items: const [
+              DropdownMenuItem(value: 'everyone', child: Text('Everyone')),
+              DropdownMenuItem(value: 'nobody', child: Text('Nobody')),
+            ],
+            onChanged: (v) {
+              if (v != null) onPick(v);
+            },
+          ),
+        );
     return ListView(
       children: [
         ListTile(
@@ -5195,6 +5494,51 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             if (v != null) _setStatusPrivacy(v);
           },
         ),
+        header('Privacy'),
+        SwitchListTile(
+          title: const Text('Read receipts'),
+          subtitle: const Text('When off, you send no blue ticks and see '
+              'none on your own messages either.'),
+          value: _readReceipts,
+          onChanged: _setReadReceipts,
+        ),
+        privacyRow(
+          'Profile photo',
+          'Who can see your profile photo.',
+          _avatarPrivacy,
+          (v) => _setPrivacyField('avatar', v),
+        ),
+        privacyRow(
+          'About',
+          'Who can see your About text.',
+          _aboutPrivacy,
+          (v) => _setPrivacyField('about', v),
+        ),
+        privacyRow(
+          'Groups',
+          'Who can add you to groups. "Nobody" blocks adds — '
+          'invite links still work, since joining is your choice.',
+          _groupsPrivacy,
+          (v) => _setPrivacyField('groups', v),
+        ),
+        ListTile(
+          leading: const Icon(Icons.block_outlined),
+          title: const Text('Blocked contacts'),
+          subtitle: Text(_blockedUserIds.isEmpty
+              ? 'Nobody blocked'
+              : '${_blockedUserIds.length} blocked'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _showBlockedContacts,
+        ),
+        ListTile(
+          leading: const Icon(Icons.delete_forever_outlined,
+              color: Colors.red),
+          title: const Text('Delete my account',
+              style: TextStyle(color: Colors.red)),
+          subtitle: const Text('Permanently delete your account, messages, '
+              'groups, stories and call history.'),
+          onTap: _deleteAccount,
+        ),
         header('Notifications'),
         SwitchListTile(
           title: const Text('Notifications'),
@@ -5221,6 +5565,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               'and voice messages; low-quality previews.'),
           value: _dataSaver,
           onChanged: _setDataSaver,
+        ),
+        ListTile(
+          leading: const Icon(Icons.wallpaper_outlined),
+          title: const Text('Chat wallpaper'),
+          subtitle: Text(_wallpaperColor == null
+              ? 'Default'
+              : 'Custom colour'),
+          trailing: _wallpaperColor == null
+              ? const Icon(Icons.chevron_right)
+              : Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: Color(_wallpaperColor!),
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                ),
+          onTap: _showWallpaperPicker,
         ),
         ListTile(
           leading: const Icon(Icons.lock_outlined),
@@ -6435,8 +6798,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _buildChatBody() {
     final callState = _call?.state ?? CallState.idle;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final chatBg =
-        dark ? WaColors.darkChatBackground : WaColors.lightChatBackground;
+    final chatBg = _wallpaperColor != null
+        ? Color(_wallpaperColor!)
+        : (dark ? WaColors.darkChatBackground : WaColors.lightChatBackground);
     final isE2ee = _e2eeChats.contains(_activeChat!['id']);
     return Container(
       color: chatBg,

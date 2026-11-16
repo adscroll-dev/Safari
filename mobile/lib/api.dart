@@ -451,6 +451,19 @@ class ApiClient {
   Future<Map<String, dynamic>> setPrivacy(String visibility) =>
       _req('PUT', '/api/users/me/privacy', {'last_seen_visibility': visibility});
 
+  /// Stage 11 (Settings parity): one combined endpoint for every
+  /// privacy setting — last seen, status, avatar, about, groups and
+  /// read receipts. Partial update: only the fields present change.
+  Future<Map<String, dynamic>> getPrivacySettings() =>
+      _req('GET', '/api/users/me/privacy-settings');
+  Future<Map<String, dynamic>> setPrivacySettings(
+          Map<String, dynamic> patch) =>
+      _req('PUT', '/api/users/me/privacy-settings', patch);
+
+  /// Stage 11: delete my account and everything it owns. The
+  /// server answers {"status": "deleted"}.
+  Future<void> deleteAccount() => _req('DELETE', '/api/users/me');
+
   /// v0.6 E2EE key management (public keys only — private keys never
   /// leave the device).
   Future<Map<String, dynamic>> uploadIdentityKey(
@@ -635,4 +648,8 @@ class ApiClient {
       };
 
   String? get token => _token;
+
+  /// Stage 11: forget the token (after account deletion), so the
+  /// app returns to the login screen and sends no more authed calls.
+  void clearToken() => _token = null;
 }

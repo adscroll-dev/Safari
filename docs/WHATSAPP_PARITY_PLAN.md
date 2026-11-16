@@ -360,6 +360,11 @@ Never present a demo feature as complete.
 12. Settings parity (Stage 11): read receipts, avatar/about/groups
     privacy, delete account. — BACKEND DONE 2026-11-15 (commit
     559d2ab, migration 017; go test ./... all pass; live on Render,
-    /api/users/me/privacy-settings probe 401). Mobile Settings UI
-    pending: privacy page, blocked-contacts list, delete account,
-    chat wallpaper.
+    /api/users/me/privacy-settings probe 401). MOBILE UI DONE
+    2026-11-16: Privacy section (read receipts, avatar/about/groups
+    pickers), blocked-contacts list with Unblock, delete account
+    (two confirmations, signs out to login), chat wallpaper picker;
+    flutter analyze clean, 34/34 mobile tests pass; APKs published
+    to the download site (arm64 33,932,234 B, armeabi 27,076,028 B,
+    x86_64 36,468,427 B; aapt2 verified app.vyro 0.6.0 Safari). Still
+    untested on a real phone.
