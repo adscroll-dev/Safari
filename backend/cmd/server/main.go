@@ -429,11 +429,14 @@ func main() {
 	mux.Handle("/api/channels/search", authMW(http.HandlerFunc(h.SearchChannels)))
 	mux.Handle("/api/messages/search", authMW(http.HandlerFunc(h.SearchMessages)))
 	// Invite-link preview/join (Telegram-style): /api/invites/{token}
-	// and /api/invites/{token}/join.
-	mux.Handle("/api/invites/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// and /api/invites/{token}/join. The preview is PUBLIC: a visitor
+	// who clicked an invite link has no account yet, so the download
+	// site's /join page fetches it without a token. Joining still
+	// needs an account, so POST /join stays behind auth.
+	mux.Handle("/api/invites/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/join") {
 			if r.Method == http.MethodPost {
-				h.JoinViaInvite(w, r)
+				authMW(http.HandlerFunc(h.JoinViaInvite)).ServeHTTP(w, r)
 			} else {
 				middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 			}
@@ -444,7 +447,7 @@ func main() {
 		} else {
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
-	})))
+	}))
 	mux.Handle("/api/messages/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/view") {
 			// Record my view of a channel post (Stage 5).

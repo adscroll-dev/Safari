@@ -23,9 +23,8 @@ import (
 //   GET    /api/invites/{token}             preview (any user)
 //   POST   /api/invites/{token}/join        join (any user)
 
-// inviteLinkBase is the shareable link prefix. The download site does
-// not serve /join yet, so the token itself is what the app needs; the
-// link text is what users copy and share.
+// inviteLinkBase is the shareable link prefix. The download site serves
+// /join/{token} with the chat preview and a download button.
 const inviteLinkBase = "https://vyro-web-8p4l.onrender.com/join/"
 
 func inviteLink(token string) string { return inviteLinkBase + token }
