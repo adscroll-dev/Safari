@@ -77,30 +77,36 @@ input, button { font: inherit; }
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 150px;
-  height: 56px;
-  margin-left: -75px;
-  margin-top: -28px;
+  /* The ring sits ON the planet's own ring ellipse, measured from the
+     logo image: center (258,275), a=212, b=76.7, tilt -18.1deg in the
+     512px square. At the 96px hero size that is an 80px circle
+     flattened by rotateX(69deg) and tilted -18deg, centered on the
+     image's ring center. */
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  margin-top: -36px;
   pointer-events: none;
 }
-.safari-ring-back { clip-path: inset(0 0 50% 0); opacity: 0.45; }
-.safari-ring-front { clip-path: inset(50% 0 0 0); }
+/* Front/back split along the ring's tilted major axis (-18deg). */
+.safari-ring-back { clip-path: polygon(0 0, 100% 0, 100% 33%, 0 66%); opacity: 0.45; }
+.safari-ring-front { clip-path: polygon(0 66%, 100% 33%, 100% 100%, 0 100%); }
 .safari-ring-spin {
   position: absolute;
   left: 0;
   top: 50%;
-  width: 150px;
-  height: 150px;
-  margin-top: -75px;
+  width: 80px;
+  height: 80px;
+  margin-top: -40px;
   border-radius: 50%;
   background: conic-gradient(from 0deg, #2563eb, #7c3aed, #00c2ff, #2563eb);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
   animation: safari-ring-spin 6s linear infinite;
 }
 @keyframes safari-ring-spin {
-  from { transform: rotateX(72deg) rotateZ(0deg); }
-  to { transform: rotateX(72deg) rotateZ(360deg); }
+  from { transform: rotate(-18deg) rotateX(69deg) rotateZ(0deg); }
+  to { transform: rotate(-18deg) rotateX(69deg) rotateZ(360deg); }
 }
 @media (prefers-reduced-motion: reduce) {
   .safari-orb-a, .safari-orb-b, .safari-float { animation: none; }
