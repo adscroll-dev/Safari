@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   // Placeholder domain — replace metadataBase with the real domain before going live.
-  metadataBase: new URL("https://vyro.example"),
+  metadataBase: new URL("https://safari-web-l0du.onrender.com"),
   title: "Safari — Connect Beyond Limits | پیام‌رسان Safari",
   description:
     "Safari is a fast, secure, multi-platform messenger: chats, groups, channels, voice calls, stories and end-to-end encrypted DMs. Safari یک پیام‌رسان سریع، امن و چندسکویی است.",

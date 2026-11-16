@@ -139,7 +139,7 @@ type ChatMember struct {
 // ChatInvite is a Telegram-style invite link for a group or channel.
 // Anyone with the token can preview the chat and join it; the owner or
 // an admin can revoke the link, after which the token stops working.
-// The shareable link is https://vyro-web-8p4l.onrender.com/join/<token>
+// The shareable link is https://safari-web-l0du.onrender.com/join/<token>
 // (the token is what the app needs; the web page is only a landing
 // page until a join page exists there).
 type ChatInvite struct {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import JoinContent, { type InvitePreview } from "./join-content";
 
-// Invite links point here: https://vyro-web-8p4l.onrender.com/join/<token>.
+// Invite links point here: https://safari-web-l0du.onrender.com/join/<token>.
 // The page is a server component so the preview is fetched
 // server-to-server from the API (no CORS issue), then rendered.
 // No messaging happens in the browser — the site stays download-only;

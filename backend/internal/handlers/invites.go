@@ -25,7 +25,7 @@ import (
 
 // inviteLinkBase is the shareable link prefix. The download site serves
 // /join/{token} with the chat preview and a download button.
-const inviteLinkBase = "https://vyro-web-8p4l.onrender.com/join/"
+const inviteLinkBase = "https://safari-web-l0du.onrender.com/join/"
 
 func inviteLink(token string) string { return inviteLinkBase + token }
 
