@@ -11,34 +11,37 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-15 with aapt2 (package app.vyro, version 0.6.0, label
-// "Safari"). Rebuilt 2026-11-15 21:00 +0430 — speaker toggle in
-// calls (commit 05007bb); live API
+// 2026-11-16 with aapt2 (package app.vyro, version 0.6.0, label
+// "Safari"; "Delete my account", "Chat wallpaper", "Read receipts",
+// "Blocked contacts" strings present in all three). Rebuilt
+// 2026-11-16 06:46 +0430 — Stage 11 Settings UI: privacy page
+// (read receipts, avatar/about/groups), blocked contacts, delete
+// account, chat wallpaper; live API
 // https://vyro-api-wf4b.onrender.com.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
     href: "/downloads/safari-0.6.0-arm64-v8a.apk",
     size: "33.9 MB",
-    bytes: "33,866,430 bytes",
+    bytes: "33,932,234 bytes",
     sha256:
-      "b098e64e04bc36e08fc2962b787054da782775f01e6ed4b7fa86dc244cffffb1",
+      "595e2e16708c644d284b44f6ec88ea31dadd1f1ba1454e125798ec133970f76c",
   },
   {
     abi: "armeabi-v7a",
     href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
-    size: "27.0 MB",
-    bytes: "26,961,064 bytes",
+    size: "27.1 MB",
+    bytes: "27,076,028 bytes",
     sha256:
-      "29e8ebb669e5e6b66522ea50031ba38fd09ab85b9b26f8456edda86b78cf8b09",
+      "6e12d47891c1f195d411ddbb2dd648d560927b2606a1020e2941525f84d4576b",
   },
   {
     abi: "x86_64",
     href: "/downloads/safari-0.6.0-x86_64.apk",
-    size: "36.3 MB",
-    bytes: "36,337,079 bytes",
+    size: "36.5 MB",
+    bytes: "36,468,427 bytes",
     sha256:
-      "1b09055db39ac9ec93b4ad8a7a97be1c74547bb547a580d5a5921e1abec8f332",
+      "ef22cbf86e6316c8c7319dadacdb0286dc8ac9c2e4c0a181a6460dc3c4395a21",
   },
 ];
 
