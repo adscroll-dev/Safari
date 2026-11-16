@@ -108,41 +108,80 @@ class _VyroAppState extends State<VyroApp> {
   }
 }
 
-/// Saturn-style orbit ring for the planet logo on the auth screens.
-/// Draws one half of a tilted ellipse (a 3D-tilted ring) with a
-/// blue-purple sweep gradient; the gradient rotates with [angle], so
-/// the bright part travels around the ring forever — like the iPhone
+/// The ring ON the planet logo, drawn as a bright GLINT that travels
+/// around the ring's own ellipse — the ring itself is the thick glossy
+/// one in the original logo image, which the hero shows unchanged.
+/// Ellipse measured from the logo (512px square): center (258,275),
+/// a=212, b=76.7, tilt -18.1deg. The auth hero shows the logo at
+/// 112px inside a 176x112 canvas, tile x-offset 32 — so the ring
+/// center is (88.4, 60.2), a=46.4, b=16.8 here. The sweep gradient
+/// is mostly transparent with one bright cyan-white-blue segment
+/// (~25% of the circle); it travels around forever — like the iPhone
 /// Clock, it never stops. [front] selects the bottom half (drawn over
-/// the logo tile, brighter) or the top half (drawn behind it, dimmer).
+/// the planet, brighter) or the top half (drawn behind it, dimmer).
 class _OrbitRingPainter extends CustomPainter {
   _OrbitRingPainter({required this.angle, required this.front});
 
   final double angle;
   final bool front;
 
+  static const _cx = 88.4;
+  static const _cy = 60.2;
+  static const _a = 46.4;
+  static const _b = 16.8;
+  static const _tilt = -0.3159; // -18.1deg in radians
+
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final rect = Rect.fromCenter(center: center, width: 164, height: 58);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = front ? 7 : 6
-      ..strokeCap = StrokeCap.round
-      ..shader = SweepGradient(
-        center: FractionalOffset.center,
-        startAngle: angle,
-        endAngle: angle + 6.28318,
-        colors: const [
-          Color(0xFF2563EB),
-          Color(0xFF7C3AED),
-          Color(0xFF00C2FF),
-          Color(0xFF2563EB),
-        ],
-        stops: const [0.0, 0.38, 0.72, 1.0],
-      ).createShader(Rect.fromCircle(center: center, radius: 82));
-    // Canvas angles run clockwise from 3 o'clock (y grows downward):
-    // 0..pi is the bottom half (front, over the tile), pi..2pi the top.
-    canvas.drawArc(rect, front ? 0.0 : 3.14159, 3.14159, false, paint);
+    final Shader shader = SweepGradient(
+      center: FractionalOffset.center,
+      startAngle: angle,
+      endAngle: angle + 6.28318,
+      colors: const [
+        Color(0x00000000),
+        Color(0x00000000),
+        Color(0xFFFFFFFF),
+        Color(0xFF7DD3FC),
+        Color(0xFF00C2FF),
+        Color(0xFF2563EB),
+        Color(0x00000000),
+      ],
+      stops: const [0.0, 0.72, 0.80, 0.86, 0.92, 0.96, 1.0],
+    ).createShader(Rect.fromCircle(center: Offset.zero, radius: _a));
+    final Rect rect = Rect.fromCenter(
+        center: Offset.zero, width: _a * 2, height: _b * 2);
+    canvas.save();
+    canvas.translate(_cx, _cy);
+    canvas.rotate(_tilt);
+    // In the rotated frame the ellipse's major axis is horizontal;
+    // canvas angles run clockwise from 3 o'clock (y grows downward):
+    // 0..pi is the bottom half (front, over the planet), pi..2pi the top.
+    // Glow pass: same glint, wider + blurred, so it shines.
+    canvas.drawArc(
+      rect,
+      front ? 0.0 : 3.14159,
+      3.14159,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = front ? 16.0 : 14.0
+        ..strokeCap = StrokeCap.round
+        ..shader = shader
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+    // Core pass: fat bright glint sitting on the ring band.
+    canvas.drawArc(
+      rect,
+      front ? 0.0 : 3.14159,
+      3.14159,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = front ? 11.0 : 9.0
+        ..strokeCap = StrokeCap.round
+        ..shader = shader,
+    );
+    canvas.restore();
   }
 
   @override
@@ -3357,7 +3396,7 @@ class _HomePageState extends State<HomePage>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Orbit ring, back half: behind the tile, dimmed.
+                // Orbit ring, back half: behind the planet, dimmed.
                 AnimatedBuilder(
                   animation: _ringAnim,
                   builder: (context, _) => Opacity(
@@ -3400,7 +3439,7 @@ class _HomePageState extends State<HomePage>
                     ),
                   ),
                 ),
-                // Orbit ring, front half: over the tile, bright.
+                // Orbit ring, front half: over the planet, bright.
                 AnimatedBuilder(
                   animation: _ringAnim,
                   builder: (context, _) => CustomPaint(
