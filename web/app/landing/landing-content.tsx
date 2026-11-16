@@ -13,10 +13,11 @@ function isLangCode(value: string): value is LangCode {
 const GRADIENT = "linear-gradient(135deg,#2563eb,#7c3aed)";
 
 // 3D landing page (matches the app's animated registration page):
-// deep teal-to-emerald gradient, drifting glass orbs and chat
-// bubbles, frosted glass cards, a floating glossy logo tile.
-// The download flow is unchanged: one auto-detected button, 11
-// languages, no fake ratings or download counts.
+// bright teal-to-emerald gradient, big drifting glass orbs and soft
+// light blobs, frosted glass cards, the real app icon floating with
+// a deep shadow, phone screenshots tilted in 3D. The download flow
+// is unchanged: one auto-detected button, 11 languages, no fake
+// ratings or download counts.
 
 // Real screenshots of the Safari Flutter app (captured from the actual
 // app running against the local test backend; see
@@ -25,7 +26,7 @@ const GRADIENT = "linear-gradient(135deg,#2563eb,#7c3aed)";
 function ShotFrame({ src, alt }: { src: string; alt: string }) {
   return (
     <div
-      className="safari-shot"
+      className="safari-shot safari-shot-3d"
       style={{
         flex: "0 0 220px",
         borderRadius: 28,
@@ -33,7 +34,7 @@ function ShotFrame({ src, alt }: { src: string; alt: string }) {
         background: "#f8fafc",
         overflow: "hidden",
         boxShadow:
-          "0 24px 50px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2)",
+          "0 30px 60px rgba(0,0,0,0.45), 0 6px 16px rgba(0,0,0,0.25)",
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -46,7 +47,9 @@ function ShotFrame({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-// Floating glass orbs and chat bubbles drifting behind the content.
+// Big bright glass orbs, soft light blobs and chat bubbles drifting
+// behind the content — visible on a phone screen, not hidden at the
+// edges.
 function Orbs() {
   return (
     <div
@@ -59,52 +62,86 @@ function Orbs() {
       }}
     >
       <div
+        className="safari-blob"
+        style={{
+          width: 260,
+          height: 260,
+          top: -40,
+          right: -60,
+          background: "rgba(220,255,235,0.55)",
+        }}
+      />
+      <div
+        className="safari-blob"
+        style={{
+          width: 220,
+          height: 220,
+          top: 620,
+          left: -70,
+          background: "rgba(255,255,255,0.35)",
+        }}
+      />
+      <div
+        className="safari-blob"
+        style={{
+          width: 240,
+          height: 240,
+          top: 1350,
+          right: -80,
+          background: "rgba(190,255,210,0.45)",
+        }}
+      />
+      <div
         className="safari-orb safari-orb-a"
-        style={{ width: 90, height: 90, top: 70, left: "4%" }}
+        style={{ width: 110, height: 110, top: 90, left: "5%" }}
       />
       <div
         className="safari-orb safari-orb-b"
-        style={{ width: 56, height: 56, top: 200, right: "6%" }}
+        style={{ width: 64, height: 64, top: 300, right: "5%" }}
       />
       <div
         className="safari-orb safari-orb-a"
-        style={{ width: 34, height: 34, top: 480, left: "8%" }}
+        style={{ width: 42, height: 42, top: 560, left: "12%" }}
       />
       <div
         className="safari-orb safari-orb-b"
-        style={{ width: 72, height: 72, top: 900, right: "4%" }}
+        style={{ width: 88, height: 88, top: 1020, right: "7%" }}
       />
       <div
         className="safari-orb safari-orb-a"
-        style={{ width: 44, height: 44, top: 1400, left: "5%" }}
+        style={{ width: 52, height: 52, top: 1560, left: "6%" }}
       />
       <div
         className="safari-orb safari-orb-b"
-        style={{ width: 28, height: 28, top: 1750, right: "9%" }}
+        style={{ width: 36, height: 36, top: 1950, right: "10%" }}
       />
       <div
         className="safari-bubble safari-orb-a"
-        style={{ width: 130, height: 130, top: 320, right: "-30px" }}
+        style={{ width: 130, height: 130, top: 420, right: "2%" }}
       />
       <div
         className="safari-bubble safari-orb-b"
-        style={{ width: 100, height: 100, top: 1150, left: "-24px" }}
+        style={{ width: 100, height: 100, top: 1250, left: "1%" }}
       />
     </div>
   );
 }
 
+// Frosted glass card: translucent white, blurred backdrop, bright top
+// edge, deep layered shadow — real depth on the gradient.
 const glassCard: React.CSSProperties = {
-  background: "rgba(255,255,255,0.94)",
-  border: "1px solid rgba(255,255,255,0.8)",
+  background: "rgba(255,255,255,0.92)",
+  backdropFilter: "blur(14px)",
+  WebkitBackdropFilter: "blur(14px)",
+  border: "1px solid rgba(255,255,255,0.95)",
   borderRadius: 28,
   boxShadow:
-    "0 28px 60px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2)",
+    "0 30px 60px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.9)",
 };
 
 const headingWhite: React.CSSProperties = {
   color: "#ffffff",
-  textShadow: "0 2px 12px rgba(0,0,0,0.35)",
+  textShadow: "0 2px 14px rgba(0,0,0,0.4)",
 };
 
 export default function LandingContent() {
@@ -143,7 +180,7 @@ export default function LandingContent() {
       style={{
         fontFamily: "system-ui, sans-serif",
         background:
-          "linear-gradient(180deg,#013B34 0%,#008069 45%,#00A884 75%,#25D366 100%)",
+          "linear-gradient(180deg,#008069 0%,#00A884 42%,#25D366 100%)",
         color: "#111827",
         lineHeight: 1.7,
         minHeight: "100vh",
@@ -166,32 +203,24 @@ export default function LandingContent() {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
+          <img
+            src="/safari-logo.png"
+            alt="Safari logo"
+            width={40}
+            height={40}
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.20)",
-              border: "1.5px solid rgba(255,255,255,0.6)",
-              boxShadow: "0 8px 20px rgba(0,0,0,0.3)",
-              overflow: "hidden",
-              flexShrink: 0,
+              borderRadius: 11,
+              display: "block",
+              boxShadow:
+                "0 10px 22px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.25)",
             }}
-          >
-            <img
-              src="/safari-logo.png"
-              alt="Safari logo"
-              width={40}
-              height={40}
-              style={{ display: "block" }}
-            />
-          </div>
+          />
           <strong
             style={{
-              fontSize: 18,
+              fontSize: 19,
               letterSpacing: 1,
               color: "#ffffff",
-              textShadow: "0 2px 8px rgba(0,0,0,0.35)",
+              textShadow: "0 2px 10px rgba(0,0,0,0.4)",
             }}
           >
             Safari
@@ -204,7 +233,7 @@ export default function LandingContent() {
               fontSize: 14,
               color: "#ffffff",
               fontWeight: 600,
-              textShadow: "0 1px 6px rgba(0,0,0,0.35)",
+              textShadow: "0 1px 8px rgba(0,0,0,0.4)",
             }}
           >
             🌐 {t.languageLabel}
@@ -217,11 +246,11 @@ export default function LandingContent() {
               fontSize: 14,
               padding: "8px 12px",
               borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.6)",
+              border: "1px solid rgba(255,255,255,0.7)",
               background: "#ffffff",
               color: "#111827",
               cursor: "pointer",
-              boxShadow: "0 6px 16px rgba(0,0,0,0.25)",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.3)",
             }}
           >
             {languages.map((l) => (
@@ -257,27 +286,19 @@ export default function LandingContent() {
               alignItems: "flex-start",
             }}
           >
-            <div
-              className="safari-float"
-              style={{
-                width: 96,
-                height: 96,
-                borderRadius: 24,
-                background:
-                  "linear-gradient(135deg,#008069,#00A884)",
-                border: "2px solid rgba(255,255,255,0.7)",
-                boxShadow:
-                  "0 16px 32px rgba(0,0,0,0.35), 0 2px 6px rgba(255,255,255,0.4)",
-                overflow: "hidden",
-                flexShrink: 0,
-              }}
-            >
+            {/* The real app icon, floating with a deep 3D shadow. */}
+            <div className="safari-float" style={{ flexShrink: 0 }}>
               <img
                 src="/safari-logo.png"
                 alt="Safari logo"
                 width={96}
                 height={96}
-                style={{ display: "block" }}
+                style={{
+                  display: "block",
+                  borderRadius: 24,
+                  boxShadow:
+                    "0 22px 44px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.25)",
+                }}
               />
             </div>
             <div style={{ flex: "1 1 280px", minWidth: 0 }}>
@@ -411,10 +432,12 @@ export default function LandingContent() {
             borderRadius: 28,
             padding: 28,
             background:
-              "linear-gradient(135deg,rgba(255,255,255,0.94),rgba(220,245,232,0.94))",
-            border: "1px solid rgba(255,255,255,0.8)",
+              "linear-gradient(135deg,rgba(255,255,255,0.94),rgba(215,245,228,0.94))",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            border: "1px solid rgba(255,255,255,0.95)",
             boxShadow:
-              "0 28px 60px rgba(0,0,0,0.35), 0 4px 12px rgba(0,0,0,0.2)",
+              "0 30px 60px rgba(0,0,0,0.30), 0 4px 12px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.9)",
           }}
         >
           <h2 style={{ margin: "0 0 6px", fontSize: 22 }}>📶 {t.slowTitle}</h2>
@@ -437,13 +460,16 @@ export default function LandingContent() {
           {t.features.map((f) => (
             <section
               key={f.title}
+              className="safari-feature"
               style={{
-                background: "rgba(255,255,255,0.94)",
-                border: "1px solid rgba(255,255,255,0.8)",
+                background: "rgba(255,255,255,0.92)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                border: "1px solid rgba(255,255,255,0.95)",
                 borderRadius: 20,
                 padding: 18,
                 boxShadow:
-                  "0 16px 36px rgba(0,0,0,0.3), 0 3px 8px rgba(0,0,0,0.15)",
+                  "0 18px 38px rgba(0,0,0,0.28), 0 3px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.9)",
               }}
             >
               <h3 style={{ margin: "0 0 4px", fontSize: 17 }}>{f.title}</h3>
@@ -460,12 +486,14 @@ export default function LandingContent() {
         </h2>
         <section
           style={{
-            background: "rgba(255,255,255,0.94)",
-            border: "1px solid rgba(255,255,255,0.8)",
+            background: "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            border: "1px solid rgba(255,255,255,0.95)",
             borderRadius: 20,
             overflow: "hidden",
             boxShadow:
-              "0 16px 36px rgba(0,0,0,0.3), 0 3px 8px rgba(0,0,0,0.15)",
+              "0 18px 38px rgba(0,0,0,0.28), 0 3px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.9)",
           }}
         >
           {[
@@ -494,10 +522,10 @@ export default function LandingContent() {
 
         <p
           style={{
-            color: "rgba(255,255,255,0.9)",
+            color: "rgba(255,255,255,0.95)",
             fontSize: 14,
             marginTop: 32,
-            textShadow: "0 1px 8px rgba(0,0,0,0.35)",
+            textShadow: "0 1px 10px rgba(0,0,0,0.4)",
           }}
         >
           {t.footer}
