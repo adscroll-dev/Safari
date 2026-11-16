@@ -12,10 +12,9 @@
 
 - **Slogan / شعار:** Connect Beyond Limits — فراتر از مرزها وصل شو
 - **Brand / برند:** آبی و بنفش (`#2563EB` → `#7C3AED`) — see `brand/BRAND.md`
-- **Version / نسخه:** 0.6.0 (dev / آزمایشی) — mobile 0.6.0 with a real
-  Android APK (`app.vyro`, see below); backend health still reports
-  0.6.0, email verification (v0.7) is implemented but the version bump
-  is pending.
+- **Version / نسخه:** 0.7.3 — mobile 0.7.3 with a real Android APK
+  (`app.vyro`, see below); backend health reports 0.7.3, and email
+  verification (v0.7) is implemented.
 
 ---
 

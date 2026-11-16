@@ -129,7 +129,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 		storeName = "memory"
 	}
 	middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"status": "ok", "service": "vyro-backend", "version": "0.6.0",
+		"status": "ok", "service": "vyro-backend", "version": "0.7.3",
 		"store": storeName, "fcm": h.fcmStatus(),
 		"time": time.Now().UTC().Format(time.RFC3339),
 	})
