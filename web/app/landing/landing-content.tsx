@@ -469,9 +469,9 @@ export default function LandingContent() {
           }}
         >
           {[
-            [t.versionLabel, "0.6.0 (Beta)"],
-            [t.sizeLabel, "33.9 MB · 27.1 MB · 36.5 MB"],
-            [t.updated, "Nov 14, 2026"],
+            [t.versionLabel, "0.7.0 (Beta)"],
+            [t.sizeLabel, "34.0 MB · 27.1 MB · 36.5 MB"],
+            [t.updated, "Nov 16, 2026"],
             [t.requires, "Android 6.0+"],
             [t.offeredBy, "Safari Team"],
           ].map(([label, value], i) => (

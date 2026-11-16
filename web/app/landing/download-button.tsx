@@ -11,37 +11,36 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-16 with aapt2 (package app.vyro, version 0.6.0, label
-// "Safari"; "Delete my account", "Chat wallpaper", "Read receipts",
-// "Blocked contacts" strings present in all three). Rebuilt
-// 2026-11-16 06:46 +0430 — Stage 11 Settings UI: privacy page
-// (read receipts, avatar/about/groups), blocked contacts, delete
-// account, chat wallpaper; live API
-// https://vyro-api-wf4b.onrender.com.
+// 2026-11-16 with aapt2 (package app.vyro, version 0.7.0, label
+// "Safari"; live API https://vyro-api-wf4b.onrender.com present in
+// libapp.so, no localhost URL). Rebuilt 2026-11-16 17:29 +0430 —
+// v0.7.0: 3D animated registration + language picker, per-chat
+// wallpapers (12 colours + 6 gradients), offline mode (cached chats,
+// outbox queue).
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.6.0-arm64-v8a.apk",
-    size: "33.9 MB",
-    bytes: "33,932,234 bytes",
+    href: "/downloads/safari-0.7.0-arm64-v8a.apk",
+    size: "34.0 MB",
+    bytes: "33,998,350 bytes",
     sha256:
-      "595e2e16708c644d284b44f6ec88ea31dadd1f1ba1454e125798ec133970f76c",
+      "5be99d03cb95c74c32b73c81df0e856d9ec2d4ace2c4c3967aacc76bf8323901",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.6.0-armeabi-v7a.apk",
+    href: "/downloads/safari-0.7.0-armeabi-v7a.apk",
     size: "27.1 MB",
-    bytes: "27,076,028 bytes",
+    bytes: "27,109,363 bytes",
     sha256:
-      "6e12d47891c1f195d411ddbb2dd648d560927b2606a1020e2941525f84d4576b",
+      "fa8099610cc878ed5d13d9e7b65288c739225cc0799ea51a597bf76b8e28d7de",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.6.0-x86_64.apk",
+    href: "/downloads/safari-0.7.0-x86_64.apk",
     size: "36.5 MB",
-    bytes: "36,468,427 bytes",
+    bytes: "36,468,992 bytes",
     sha256:
-      "ef22cbf86e6316c8c7319dadacdb0286dc8ac9c2e4c0a181a6460dc3c4395a21",
+      "872b7c4c0e9536510d0dae3a69614af5229ea48028c50cb25fe9a993fa94cebc",
   },
 ];
 
