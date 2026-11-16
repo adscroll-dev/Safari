@@ -286,20 +286,43 @@ export default function LandingContent() {
               alignItems: "flex-start",
             }}
           >
-            {/* The real app icon, floating with a deep 3D shadow. */}
-            <div className="safari-float" style={{ flexShrink: 0 }}>
-              <img
-                src="/safari-logo.png"
-                alt="Safari logo"
-                width={96}
-                height={96}
-                style={{
-                  display: "block",
-                  borderRadius: 24,
-                  boxShadow:
-                    "0 22px 44px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.25)",
-                }}
-              />
+            {/* The real app icon, floating with a deep 3D shadow,
+                orbited by a ring that rotates forever, like the
+                iPhone Clock — never still. */}
+            <div
+              style={{
+                flexShrink: 0,
+                position: "relative",
+                width: 150,
+                height: 112,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div aria-hidden="true" className="safari-ring safari-ring-back">
+                <div className="safari-ring-spin" />
+              </div>
+              <div className="safari-float">
+                <img
+                  src="/safari-logo.png"
+                  alt="Safari logo"
+                  width={96}
+                  height={96}
+                  style={{
+                    display: "block",
+                    borderRadius: 24,
+                    boxShadow:
+                      "0 22px 44px rgba(0,0,0,0.4), 0 4px 10px rgba(0,0,0,0.25)",
+                  }}
+                />
+              </div>
+              <div
+                aria-hidden="true"
+                className="safari-ring safari-ring-front"
+              >
+                <div className="safari-ring-spin" />
+              </div>
             </div>
             <div style={{ flex: "1 1 280px", minWidth: 0 }}>
               <h1 style={{ fontSize: 34, margin: "0 0 2px" }}>Safari</h1>
@@ -497,8 +520,8 @@ export default function LandingContent() {
           }}
         >
           {[
-            [t.versionLabel, "0.7.0 (Beta)"],
-            [t.sizeLabel, "34.0 MB · 27.1 MB · 36.5 MB"],
+            [t.versionLabel, "0.7.1 (Beta)"],
+            [t.sizeLabel, "34.1 MB · 27.2 MB · 36.5 MB"],
             [t.updated, "Nov 16, 2026"],
             [t.requires, "Android 6.0+"],
             [t.offeredBy, "Safari Team"],

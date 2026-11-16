@@ -108,6 +108,48 @@ class _VyroAppState extends State<VyroApp> {
   }
 }
 
+/// Saturn-style orbit ring for the planet logo on the auth screens.
+/// Draws one half of a tilted ellipse (a 3D-tilted ring) with a
+/// blue-purple sweep gradient; the gradient rotates with [angle], so
+/// the bright part travels around the ring forever — like the iPhone
+/// Clock, it never stops. [front] selects the bottom half (drawn over
+/// the logo tile, brighter) or the top half (drawn behind it, dimmer).
+class _OrbitRingPainter extends CustomPainter {
+  _OrbitRingPainter({required this.angle, required this.front});
+
+  final double angle;
+  final bool front;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final rect = Rect.fromCenter(center: center, width: 164, height: 58);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = front ? 7 : 6
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        center: FractionalOffset.center,
+        startAngle: angle,
+        endAngle: angle + 6.28318,
+        colors: const [
+          Color(0xFF2563EB),
+          Color(0xFF7C3AED),
+          Color(0xFF00C2FF),
+          Color(0xFF2563EB),
+        ],
+        stops: const [0.0, 0.38, 0.72, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: 82));
+    // Canvas angles run clockwise from 3 o'clock (y grows downward):
+    // 0..pi is the bottom half (front, over the tile), pi..2pi the top.
+    canvas.drawArc(rect, front ? 0.0 : 3.14159, 3.14159, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(_OrbitRingPainter old) =>
+      old.angle != angle || old.front != front;
+}
+
 class HomePage extends StatefulWidget {
   const HomePage(
       {super.key, required this.onToggleTheme, required this.onToggleLang});
@@ -118,7 +160,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+    with WidgetsBindingObserver, TickerProviderStateMixin {
   final _api = ApiClient();
   final _usage = DataUsageTracker();
   final _email = TextEditingController();
@@ -158,6 +200,9 @@ class _HomePageState extends State<HomePage>
   final List<Map<String, dynamic>> _outbox = [];
   // Animated registration page: the orbs, bubbles and logo drift.
   late final AnimationController _authAnim;
+  // Planet logo orbit: the ring around the logo tile rotates forever,
+  // like the iPhone Clock — never still (8s per revolution).
+  late final AnimationController _ringAnim;
   int _tabIndex = 0; // 0 = chats, 1 = updates, 2 = communities, 3 = calls
   // WhatsApp navigation: Settings lives in the ⋮ menu, not a tab.
   bool _showSettings = false;
@@ -278,6 +323,9 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.addObserver(this);
     _authAnim =
         AnimationController(vsync: this, duration: const Duration(seconds: 7))
+          ..repeat();
+    _ringAnim =
+        AnimationController(vsync: this, duration: const Duration(seconds: 8))
           ..repeat();
     _remoteRenderer.initialize();
     _initPrefs();
@@ -812,6 +860,7 @@ class _HomePageState extends State<HomePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authAnim.dispose();
+    _ringAnim.dispose();
     _ws?.sink.close();
     _call?.dispose();
     _remoteRenderer.dispose();
@@ -3302,33 +3351,67 @@ class _HomePageState extends State<HomePage>
             offset: Offset(0, sin(_authAnim.value * 6.28318 + 1.0) * 7),
             child: child,
           ),
-          child: Container(
-            width: 112,
+          child: SizedBox(
+            width: 176,
             height: 112,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(32),
-              color: Colors.white.withOpacity(0.20),
-              border:
-                  Border.all(color: Colors.white.withOpacity(0.7), width: 2),
-              boxShadow: const [
-                BoxShadow(
-                    color: Color(0x40000000),
-                    blurRadius: 24,
-                    offset: Offset(0, 12)),
-                BoxShadow(
-                    color: Color(0x33FFFFFF),
-                    blurRadius: 2,
-                    offset: Offset(0, -1)),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Orbit ring, back half: behind the tile, dimmed.
+                AnimatedBuilder(
+                  animation: _ringAnim,
+                  builder: (context, _) => Opacity(
+                    opacity: 0.45,
+                    child: CustomPaint(
+                      size: const Size(176, 112),
+                      painter: _OrbitRingPainter(
+                        angle: _ringAnim.value * 6.28318,
+                        front: false,
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 112,
+                  height: 112,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(32),
+                    color: Colors.white.withOpacity(0.20),
+                    border: Border.all(
+                        color: Colors.white.withOpacity(0.7), width: 2),
+                    boxShadow: const [
+                      BoxShadow(
+                          color: Color(0x40000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 12)),
+                      BoxShadow(
+                          color: Color(0x33FFFFFF),
+                          blurRadius: 2,
+                          offset: Offset(0, -1)),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: Image.asset(
+                      'assets/safari-logo.png',
+                      width: 112,
+                      height: 112,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                ),
+                // Orbit ring, front half: over the tile, bright.
+                AnimatedBuilder(
+                  animation: _ringAnim,
+                  builder: (context, _) => CustomPaint(
+                    size: const Size(176, 112),
+                    painter: _OrbitRingPainter(
+                      angle: _ringAnim.value * 6.28318,
+                      front: true,
+                    ),
+                  ),
+                ),
               ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(30),
-              child: Image.asset(
-                'assets/safari-logo.png',
-                width: 112,
-                height: 112,
-                fit: BoxFit.cover,
-              ),
             ),
           ),
         ),

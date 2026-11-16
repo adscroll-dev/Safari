@@ -11,36 +11,35 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-16 with aapt2 (package app.vyro, version 0.7.0, label
+// 2026-11-16 with aapt2 (package app.vyro, version 0.7.1, label
 // "Safari"; live API https://vyro-api-wf4b.onrender.com present in
-// libapp.so, no localhost URL). Rebuilt 2026-11-16 17:29 +0430 —
-// v0.7.0: 3D animated registration + language picker, per-chat
-// wallpapers (12 colours + 6 gradients), offline mode (cached chats,
-// outbox queue).
+// libapp.so, no localhost URL). Rebuilt 2026-11-16 19:40 +0430 —
+// v0.7.1: new planet logo (replaces the swift) + a ring that rotates
+// forever around the logo on the login screens and the website hero.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.7.0-arm64-v8a.apk",
-    size: "34.0 MB",
-    bytes: "33,998,350 bytes",
+    href: "/downloads/safari-0.7.1-arm64-v8a.apk",
+    size: "34.1 MB",
+    bytes: "34,073,366 bytes",
     sha256:
-      "5be99d03cb95c74c32b73c81df0e856d9ec2d4ace2c4c3967aacc76bf8323901",
+      "4126adf1a9c4cee8b710b538c077f77f77cbab7efa851b71e6f298747fea8f1c",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.7.0-armeabi-v7a.apk",
-    size: "27.1 MB",
-    bytes: "27,109,363 bytes",
+    href: "/downloads/safari-0.7.1-armeabi-v7a.apk",
+    size: "27.2 MB",
+    bytes: "27,200,766 bytes",
     sha256:
-      "fa8099610cc878ed5d13d9e7b65288c739225cc0799ea51a597bf76b8e28d7de",
+      "bb9c66e49fe011316f967ed6534f29ae61c4591c449bd94830fae353c6935399",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.7.0-x86_64.apk",
+    href: "/downloads/safari-0.7.1-x86_64.apk",
     size: "36.5 MB",
-    bytes: "36,468,992 bytes",
+    bytes: "36,544,025 bytes",
     sha256:
-      "872b7c4c0e9536510d0dae3a69614af5229ea48028c50cb25fe9a993fa94cebc",
+      "b41532e620181120f546b2a40a30dff3bdbe3febb708e8f76e7cbde2a90b370c",
   },
 ];
 

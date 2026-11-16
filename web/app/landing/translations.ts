@@ -69,7 +69,7 @@ export const translations: Record<LangCode, Strings> = {
       "Meet Safari — a fast, private messenger for Android. Chat one-to-one or in groups, follow channels, call your friends, share stories, and send photos, files and voice notes — all protected by end-to-end encryption. Safari sips data instead of gulping it, so it flies even on slow internet. Free to download and use.",
     downloadTitle: "Download Safari for Android",
     versionLine:
-      "Version 0.7.0 (Beta) · Android 6.0 and up · Your phone is detected automatically — just tap the button below and the right version downloads for you.",
+      "Version 0.7.1 (Beta) · Android 6.0 and up · Your phone is detected automatically — just tap the button below and the right version downloads for you.",
     warning:
       "Only download Safari from this official website. APKs from other sites are not safe — don't install them.",
     featuresTitle: "Features",
@@ -89,7 +89,7 @@ export const translations: Record<LangCode, Strings> = {
       "Free to download and use. The Android beta is available above; iPhone is coming later.",
     aboutTitle: "About Safari",
     languageLabel: "Language",
-    forYourPhone: "Safari 0.7.0 — for your phone",
+    forYourPhone: "Safari 0.7.1 — for your phone",
     detected: "Detected for your phone:",
     downloadButton: "Download Safari for Android",
     verify: "Verify the download (SHA-256):",
@@ -112,7 +112,7 @@ export const translations: Record<LangCode, Strings> = {
       "با Safari آشنا شوید — پیام‌رسانی سریع و امن برای اندروید. خصوصی یا گروهی چت کنید، کانال‌ها را دنبال کنید، با دوستانتان تماس بگیرید، استوری بگذارید و عکس، فایل و پیام صوتی بفرستید — همه با رمزنگاری سرتاسری. Safari خیلی کم اینترنت مصرف می‌کند، پس حتی با اینترنت کند هم سریع کار می‌کند. دانلود و استفاده‌اش رایگان است.",
     downloadTitle: "دانلود Safari برای اندروید",
     versionLine:
-      "نسخه ۰٫۷٫۰ (بتا) · اندروید ۶٫۰ به بالا · گوشی شما به‌صورت خودکار تشخیص داده می‌شود — فقط دکمه زیر را بزنید و نسخه مناسب گوشی شما دانلود می‌شود.",
+      "نسخه ۰٫۷٫۱ (بتا) · اندروید ۶٫۰ به بالا · گوشی شما به‌صورت خودکار تشخیص داده می‌شود — فقط دکمه زیر را بزنید و نسخه مناسب گوشی شما دانلود می‌شود.",
     warning:
       "Safari را فقط از همین وب‌سایت رسمی دانلود کنید. فایل‌های APK از سایت‌های دیگر امن نیستند — نصبشان نکنید.",
     featuresTitle: "قابلیت‌ها",
@@ -132,7 +132,7 @@ export const translations: Record<LangCode, Strings> = {
       "دانلود و استفاده رایگان است. نسخه بتای اندروید در بالا در دسترس است؛ آیفون بعداً می‌آید.",
     aboutTitle: "درباره Safari",
     languageLabel: "زبان",
-    forYourPhone: "Safari ۰٫۷٫۰ — برای گوشی شما",
+    forYourPhone: "Safari ۰٫۷٫۱ — برای گوشی شما",
     detected: "برای گوشی شما تشخیص داده شد:",
     downloadButton: "دانلود Safari برای اندروید",
     verify: "بررسی دانلود (SHA-256):",
@@ -155,7 +155,7 @@ export const translations: Record<LangCode, Strings> = {
       "تعرّف على Safari — مراسل سريع وخاص لأندرويد. تحدّث مع أصدقائك فرديًا أو في مجموعات، وتابع القنوات، واتصل بأصدقائك، وشارك القصص، وأرسل الصور والملفات والرسائل الصوتية — كل ذلك محمي بالتشفير الكامل. يستهلك Safari بيانات أقل بكثير من غيره، فيعمل بسرعة حتى مع الإنترنت البطيء. تنزيله واستخدامه مجاني.",
     downloadTitle: "تنزيل Safari لأندرويد",
     versionLine:
-      "الإصدار 0.7.0 (تجريبي) · يتطلب أندرويد 6.0 أو أحدث · يكتشف الموقع هاتفك تلقائيًا — فقط اضغط الزر أدناه وستُنزَّل النسخة المناسبة لهاتفك.",
+      "الإصدار 0.7.1 (تجريبي) · يتطلب أندرويد 6.0 أو أحدث · يكتشف الموقع هاتفك تلقائيًا — فقط اضغط الزر أدناه وستُنزَّل النسخة المناسبة لهاتفك.",
     warning:
       "حمّل Safari من هذا الموقع الرسمي فقط. ملفات APK من مواقع أخرى غير آمنة — لا تثبّتها.",
     featuresTitle: "الميزات",
@@ -175,7 +175,7 @@ export const translations: Record<LangCode, Strings> = {
       "التنزيل والاستخدام مجاني. نسخة أندرويد التجريبية متاحة أعلاه؛ ونسخة iOS قادمة لاحقًا.",
     aboutTitle: "عن Safari",
     languageLabel: "اللغة",
-    forYourPhone: "Safari 0.7.0 — لهاتفك",
+    forYourPhone: "Safari 0.7.1 — لهاتفك",
     detected: "تم الكشف لهاتفك:",
     downloadButton: "تنزيل Safari لأندرويد",
     verify: "تحقق من التنزيل (SHA-256):",
@@ -198,7 +198,7 @@ export const translations: Record<LangCode, Strings> = {
       "Safari سے ملیں — اینڈرائیڈ کے لیے ایک تیز اور نجی میسنجر۔ دوستوں سے اکیلے یا بڑے گروپس میں چیٹ کریں، چینلز فالو کریں، دوستوں کو کال کریں، اسٹوریز شیئر کریں، اور تصاویر، فائلیں اور وائس نوٹس بھیجیں — سب مکمل خفیہ کاری کے ساتھ۔ Safari دوسرے میسنجرز کے مقابلے میں بہت کم ڈیٹا استعمال کرتا ہے، اس لیے سست انٹرنیٹ پر بھی تیز چلتا ہے۔ ڈاؤن لوڈ اور استعمال مفت ہے۔",
     downloadTitle: "اینڈرائیڈ کے لیے Safari ڈاؤن لوڈ کریں",
     versionLine:
-      "ورژن 0.7.0 (بیٹا) · اینڈرائیڈ 6.0 یا اس سے اوپر · سائٹ آپ کے فون کو خود بخود پہچانتی ہے — بس نیچے والا بٹن دبائیں اور آپ کے فون کے لیے صحیح ورژن ڈاؤن لوڈ ہو جائے گا۔",
+      "ورژن 0.7.1 (بیٹا) · اینڈرائیڈ 6.0 یا اس سے اوپر · سائٹ آپ کے فون کو خود بخود پہچانتی ہے — بس نیچے والا بٹن دبائیں اور آپ کے فون کے لیے صحیح ورژن ڈاؤن لوڈ ہو جائے گا۔",
     warning:
       "Safari صرف اسی سرکاری ویب سائٹ سے ڈاؤن لوڈ کریں۔ دوسری سائٹس کی APK فائلیں محفوظ نہیں ہیں — انہیں انسٹال نہ کریں۔",
     featuresTitle: "خصوصیات",
@@ -218,7 +218,7 @@ export const translations: Record<LangCode, Strings> = {
       "ڈاؤن لوڈ اور استعمال مفت ہے۔ اینڈرائیڈ بیٹا اوپر دستیاب ہے؛ آئی فون بعد میں آئے گا۔",
     aboutTitle: "Safari کے بارے میں",
     languageLabel: "زبان",
-    forYourPhone: "Safari 0.7.0 — آپ کے فون کے لیے",
+    forYourPhone: "Safari 0.7.1 — آپ کے فون کے لیے",
     detected: "آپ کے فون کے لیے پہچانا گیا:",
     downloadButton: "اینڈرائیڈ کے لیے Safari ڈاؤن لوڈ کریں",
     verify: "ڈاؤن لوڈ کی تصدیق کریں (SHA-256):",
@@ -241,7 +241,7 @@ export const translations: Record<LangCode, Strings> = {
       "Safari ile tanışın — Android için hızlı ve özel bir mesajlaşma uygulaması. Arkadaşlarınızla bire bir veya büyük gruplarda sohbet edin, kanalları takip edin, arkadaşlarınızı arayın, hikâyeler paylaşın, fotoğraf, dosya ve sesli notlar gönderin — hepsi uçtan uca şifreleme ile korunuyor. Safari diğer mesajlaşma uygulamalarından çok daha az veri kullanır, bu yüzden yavaş internette bile uçar. İndirmesi ve kullanımı ücretsizdir.",
     downloadTitle: "Android için Safari'yu indirin",
     versionLine:
-      "Sürüm 0.7.0 (Beta) · Android 6.0 ve üzeri · Site telefonunuzu otomatik olarak algılar — aşağıdaki düğmeye dokunmanız yeterli, telefonunuza uygun sürüm indirilir.",
+      "Sürüm 0.7.1 (Beta) · Android 6.0 ve üzeri · Site telefonunuzu otomatik olarak algılar — aşağıdaki düğmeye dokunmanız yeterli, telefonunuza uygun sürüm indirilir.",
     warning:
       "Safari'yu yalnızca bu resmî web sitesinden indirin. Diğer sitelerdeki APK'lar güvenli değildir — yüklemeyin.",
     featuresTitle: "Özellikler",
@@ -261,7 +261,7 @@ export const translations: Record<LangCode, Strings> = {
       "İndirmesi ve kullanımı ücretsizdir. Android beta sürümü yukarıda mevcuttur; iPhone daha sonra gelecektir.",
     aboutTitle: "Safari Hakkında",
     languageLabel: "Dil",
-    forYourPhone: "Safari 0.7.0 — telefonunuz için",
+    forYourPhone: "Safari 0.7.1 — telefonunuz için",
     detected: "Telefonunuz için algılandı:",
     downloadButton: "Android için Safari'yu indirin",
     verify: "İndirmeyi doğrulayın (SHA-256):",
@@ -284,7 +284,7 @@ export const translations: Record<LangCode, Strings> = {
       "Познакомьтесь с Safari — быстрым и приватным мессенджером для Android. Общайтесь с друзьями один на один или в больших группах, подписывайтесь на каналы, звоните друзьям, делитесь историями, отправляйте фото, файлы и голосовые сообщения — всё защищено сквозным шифрованием. Safari расходует гораздо меньше трафика, чем другие мессенджеры, поэтому летает даже на медленном интернете. Скачивание и использование бесплатны.",
     downloadTitle: "Скачать Safari для Android",
     versionLine:
-      "Версия 0.7.0 (бета) · Требуется Android 6.0 или новее · Сайт автоматически определяет ваш телефон — просто нажмите кнопку ниже, и скачается подходящая для него версия.",
+      "Версия 0.7.1 (бета) · Требуется Android 6.0 или новее · Сайт автоматически определяет ваш телефон — просто нажмите кнопку ниже, и скачается подходящая для него версия.",
     warning:
       "Скачивайте Safari только с этого официального сайта. APK-файлы с других сайтов небезопасны — не устанавливайте их.",
     featuresTitle: "Возможности",
@@ -304,7 +304,7 @@ export const translations: Record<LangCode, Strings> = {
       "Скачивание и использование бесплатны. Бета-версия для Android доступна выше; iPhone появится позже.",
     aboutTitle: "О Safari",
     languageLabel: "Язык",
-    forYourPhone: "Safari 0.7.0 — для вашего телефона",
+    forYourPhone: "Safari 0.7.1 — для вашего телефона",
     detected: "Определено для вашего телефона:",
     downloadButton: "Скачать Safari для Android",
     verify: "Проверьте загрузку (SHA-256):",
@@ -327,7 +327,7 @@ export const translations: Record<LangCode, Strings> = {
       "Conoce Safari: un mensajero rápido y privado para Android. Chatea con tus amigos en privado o en grupos grandes, sigue canales, llama a tus amigos, comparte historias y envía fotos, archivos y notas de voz — todo protegido con cifrado de extremo a extremo. Safari usa mucho menos datos que otros mensajeros, así que vuela incluso con internet lento. Descargarlo y usarlo es gratis.",
     downloadTitle: "Descargar Safari para Android",
     versionLine:
-      "Versión 0.7.0 (beta) · Android 6.0 o superior · El sitio detecta tu teléfono automáticamente: solo toca el botón de abajo y se descargará la versión adecuada para ti.",
+      "Versión 0.7.1 (beta) · Android 6.0 o superior · El sitio detecta tu teléfono automáticamente: solo toca el botón de abajo y se descargará la versión adecuada para ti.",
     warning:
       "Descarga Safari solo desde este sitio web oficial. Los APK de otros sitios no son seguros: no los instales.",
     featuresTitle: "Funciones",
@@ -347,7 +347,7 @@ export const translations: Record<LangCode, Strings> = {
       "Descargarlo y usarlo es gratis. La beta de Android está disponible arriba; el iPhone llegará después.",
     aboutTitle: "Acerca de Safari",
     languageLabel: "Idioma",
-    forYourPhone: "Safari 0.7.0 — para tu teléfono",
+    forYourPhone: "Safari 0.7.1 — para tu teléfono",
     detected: "Detectado para tu teléfono:",
     downloadButton: "Descargar Safari para Android",
     verify: "Verifica la descarga (SHA-256):",
@@ -370,7 +370,7 @@ export const translations: Record<LangCode, Strings> = {
       "Découvrez Safari, une messagerie rapide et privée pour Android. Discutez avec vos amis en privé ou en grands groupes, suivez des chaînes, appelez vos amis, partagez des stories et envoyez photos, fichiers et messages vocaux — le tout protégé par le chiffrement de bout en bout. Safari consomme beaucoup moins de données que les autres messageries, il file donc même sur une connexion lente. Téléchargement et utilisation gratuits.",
     downloadTitle: "Télécharger Safari pour Android",
     versionLine:
-      "Version 0.7.0 (bêta) · Android 6.0 ou plus récent · Le site détecte automatiquement votre téléphone — touchez simplement le bouton ci-dessous et la version adaptée se téléchargera.",
+      "Version 0.7.1 (bêta) · Android 6.0 ou plus récent · Le site détecte automatiquement votre téléphone — touchez simplement le bouton ci-dessous et la version adaptée se téléchargera.",
     warning:
       "Téléchargez Safari uniquement depuis ce site officiel. Les APK d'autres sites ne sont pas sûrs — ne les installez pas.",
     featuresTitle: "Fonctionnalités",
@@ -390,7 +390,7 @@ export const translations: Record<LangCode, Strings> = {
       "Téléchargement et utilisation gratuits. La bêta Android est disponible ci-dessus ; l'iPhone viendra plus tard.",
     aboutTitle: "À propos de Safari",
     languageLabel: "Langue",
-    forYourPhone: "Safari 0.7.0 — pour votre téléphone",
+    forYourPhone: "Safari 0.7.1 — pour votre téléphone",
     detected: "Détecté pour votre téléphone :",
     downloadButton: "Télécharger Safari pour Android",
     verify: "Vérifiez le téléchargement (SHA-256) :",
@@ -413,7 +413,7 @@ export const translations: Record<LangCode, Strings> = {
       "Lerne Safari kennen — ein schneller, privater Messenger für Android. Chatte mit Freunden privat oder in großen Gruppen, folge Kanälen, rufe deine Freunde an, teile Stories und sende Fotos, Dateien und Sprachnachrichten — alles geschützt durch Ende-zu-Ende-Verschlüsselung. Safari verbraucht viel weniger Daten als andere Messenger und fliegt deshalb auch bei langsamem Internet. Download und Nutzung sind kostenlos.",
     downloadTitle: "Safari für Android herunterladen",
     versionLine:
-      "Version 0.7.0 (Beta) · Android 6.0 oder neuer · Die Website erkennt dein Telefon automatisch — tippe einfach auf die Schaltfläche unten, und die passende Version wird heruntergeladen.",
+      "Version 0.7.1 (Beta) · Android 6.0 oder neuer · Die Website erkennt dein Telefon automatisch — tippe einfach auf die Schaltfläche unten, und die passende Version wird heruntergeladen.",
     warning:
       "Lade Safari nur von dieser offiziellen Website herunter. APKs von anderen Websites sind nicht sicher — installiere sie nicht.",
     featuresTitle: "Funktionen",
@@ -433,7 +433,7 @@ export const translations: Record<LangCode, Strings> = {
       "Download und Nutzung sind kostenlos. Die Android-Beta ist oben verfügbar; das iPhone kommt später.",
     aboutTitle: "Über Safari",
     languageLabel: "Sprache",
-    forYourPhone: "Safari 0.7.0 — für dein Telefon",
+    forYourPhone: "Safari 0.7.1 — für dein Telefon",
     detected: "Für dein Telefon erkannt:",
     downloadButton: "Safari für Android herunterladen",
     verify: "Download überprüfen (SHA-256):",
@@ -456,7 +456,7 @@ export const translations: Record<LangCode, Strings> = {
       "Safari से मिलिए — Android के लिए एक तेज़ और निजी मैसेंजर। दोस्तों से अकेले या बड़े ग्रुप में चैट करें, चैनल फॉलो करें, दोस्तों को कॉल करें, स्टोरीज़ शेयर करें और फ़ोटो, फ़ाइलें व वॉइस नोट्स भेजें — सब कुछ एंड-टू-एंड एन्क्रिप्शन से सुरक्षित। Safari दूसरे मैसेंजरों से बहुत कम डेटा इस्तेमाल करता है, इसलिए धीमे इंटरनेट पर भी तेज़ चलता है। डाउनलोड और इस्तेमाल मुफ़्त है।",
     downloadTitle: "Android के लिए Safari डाउनलोड करें",
     versionLine:
-      "संस्करण 0.7.0 (बीटा) · Android 6.0 या उससे नया · साइट आपके फ़ोन को अपने आप पहचानती है — बस नीचे वाला बटन दबाएँ और आपके फ़ोन के लिए सही संस्करण डाउनलोड हो जाएगा।",
+      "संस्करण 0.7.1 (बीटा) · Android 6.0 या उससे नया · साइट आपके फ़ोन को अपने आप पहचानती है — बस नीचे वाला बटन दबाएँ और आपके फ़ोन के लिए सही संस्करण डाउनलोड हो जाएगा।",
     warning:
       "Safari सिर्फ़ इसी आधिकारिक वेबसाइट से डाउनलोड करें। अन्य साइटों की APK सुरक्षित नहीं हैं — उन्हें इंस्टॉल न करें।",
     featuresTitle: "सुविधाएँ",
@@ -476,7 +476,7 @@ export const translations: Record<LangCode, Strings> = {
       "डाउनलोड और इस्तेमाल मुफ़्त है। Android बीटा ऊपर उपलब्ध है; iPhone बाद में आएगा।",
     aboutTitle: "Safari के बारे में",
     languageLabel: "भाषा",
-    forYourPhone: "Safari 0.7.0 — आपके फ़ोन के लिए",
+    forYourPhone: "Safari 0.7.1 — आपके फ़ोन के लिए",
     detected: "आपके फ़ोन के लिए पहचाना गया:",
     downloadButton: "Android के लिए Safari डाउनलोड करें",
     verify: "डाउनलोड सत्यापित करें (SHA-256):",
@@ -499,7 +499,7 @@ export const translations: Record<LangCode, Strings> = {
       "له Safari سره وپېژنئ — د Android لپاره یو چټک او شخصي مسینجر. له ملګرو سره یو په یو یا په لویو ډلو کې چیټ وکړئ، چینلونه تعقیب کړئ، ملګرو ته زنګ ووهئ، کیسې شریکې کړئ او انځورونه، فایلونه او غږیز یادښتونه ولېږئ — هر څه د له پایه تر پایه کوډ کولو سره خوندي دي. Safari له نورو مسینجرونو څخه ډېر کم ډاټا کاروي، نو په کم سرعت انټرنېټ کې هم چټک کار کوي. ډاونلوډ او کارول یې وړیا دي.",
     downloadTitle: "د Android لپاره Safari ډاونلوډ کړئ",
     versionLine:
-      "نسخه 0.7.0 (بیټا) · Android 6.0 یا نوی · سایټ ستاسو تلیفون په اوتومات ډول پېژني — یوازې لاندې تڼۍ کېکاږئ او ستاسو تلیفون لپاره سمه نسخه به ډاونلوډ شي.",
+      "نسخه 0.7.1 (بیټا) · Android 6.0 یا نوی · سایټ ستاسو تلیفون په اوتومات ډول پېژني — یوازې لاندې تڼۍ کېکاږئ او ستاسو تلیفون لپاره سمه نسخه به ډاونلوډ شي.",
     warning:
       "Safari یوازې له دې رسمي ویب‌سایټ څخه ډاونلوډ کړئ. له نورو سایټونو څخه APK خوندي نه دي — مه یې نصب کوئ.",
     featuresTitle: "ځانګړتیاوې",
@@ -519,7 +519,7 @@ export const translations: Record<LangCode, Strings> = {
       "ډاونلوډ او کارول وړیا دي. د Android بیټا پورته شتون لري؛ iPhone وروسته راځي.",
     aboutTitle: "د Safari په اړه",
     languageLabel: "ژبه",
-    forYourPhone: "Safari 0.7.0 — ستاسو تلیفون لپاره",
+    forYourPhone: "Safari 0.7.1 — ستاسو تلیفون لپاره",
     detected: "ستاسو تلیفون لپاره وپېژندل شو:",
     downloadButton: "د Android لپاره Safari ډاونلوډ کړئ",
     verify: "ډاونلوډ تایید کړئ (SHA-256):",
