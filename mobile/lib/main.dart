@@ -117,7 +117,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+class _HomePageState extends State<HomePage>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final _api = ApiClient();
   final _usage = DataUsageTracker();
   final _email = TextEditingController();
@@ -148,6 +149,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Map<String, dynamic>? _activeChat;
   String? _error;
   bool _registerMode = false;
+  // 3D registration page: show/hide password (eye icon).
+  bool _obscurePassword = true;
+  // Offline mode (WhatsApp-style): true while the server is
+  // unreachable; the app then shows the on-device cache.
+  bool _offline = false;
+  // Messages typed while offline, waiting to send when back online.
+  final List<Map<String, dynamic>> _outbox = [];
+  // Animated registration page: the orbs, bubbles and logo drift.
+  late final AnimationController _authAnim;
   int _tabIndex = 0; // 0 = chats, 1 = updates, 2 = communities, 3 = calls
   // WhatsApp navigation: Settings lives in the ⋮ menu, not a tab.
   bool _showSettings = false;
@@ -187,9 +197,54 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _aboutPrivacy = 'everyone';
   String _groupsPrivacy = 'everyone';
   bool _readReceipts = true;
-  // Stage 11: chat wallpaper — a solid colour picked in Settings >
-  // Chats, stored on-device. Null means the theme default.
-  int? _wallpaperColor;
+  // Stage 11 + wallpaper upgrade: beautiful professional wallpapers —
+  // solid colours and gradients — picked per chat (WhatsApp-style) or
+  // as the default for all chats (Settings). 'default' is the theme
+  // chat background. One colour = solid, two = gradient.
+  static const Map<String, List<int>> wallpapers = {
+    'default': [],
+    'beige': [0xFFECE5DD],
+    'mint': [0xFFD8F3DC],
+    'sky': [0xFFDCEFFA],
+    'rose': [0xFFF6DCE0],
+    'slate': [0xFF2A2F2B],
+    'lavender': [0xFFE6E0F5],
+    'peach': [0xFFFBE3D3],
+    'sand': [0xFFEFE6CF],
+    'ocean': [0xFFD3E9F2],
+    'forest': [0xFFD5E8D4],
+    'charcoal': [0xFF1F2C34],
+    'grad-teal': [0xFF008069, 0xFF25D366],
+    'grad-sunset': [0xFFFF9A56, 0xFFFF6B9D],
+    'grad-ocean': [0xFF4A90D9, 0xFF7B61FF],
+    'grad-forest': [0xFF43A047, 0xFF00897B],
+    'grad-lavender': [0xFF9D7BFF, 0xFFFF7EB6],
+    'grad-midnight': [0xFF1F2C34, 0xFF4A235A],
+  };
+  static const Map<String, String> wallpaperNames = {
+    'default': 'Default',
+    'beige': 'Beige',
+    'mint': 'Mint',
+    'sky': 'Sky',
+    'rose': 'Rose',
+    'slate': 'Slate',
+    'lavender': 'Lavender',
+    'peach': 'Peach',
+    'sand': 'Sand',
+    'ocean': 'Ocean',
+    'forest': 'Forest',
+    'charcoal': 'Charcoal',
+    'grad-teal': 'Teal Dawn',
+    'grad-sunset': 'Sunset',
+    'grad-ocean': 'Ocean Blue',
+    'grad-forest': 'Forest',
+    'grad-lavender': 'Lavender Dream',
+    'grad-midnight': 'Midnight',
+  };
+  // Global default wallpaper id.
+  String _wallpaperId = 'default';
+  // Per-chat overrides: chat id -> wallpaper id. Absent = global.
+  final Map<String, String> _chatWallpapers = {};
   // Downloaded media bytes, keyed by file_url (Data Saver: only after
   // the user taps Download, or when Data Saver is off).
   final Map<String, Uint8List> _downloaded = {};
@@ -221,8 +276,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _authAnim =
+        AnimationController(vsync: this, duration: const Duration(seconds: 7))
+          ..repeat();
     _remoteRenderer.initialize();
     _initPrefs();
+    // Offline mode: reopen the last session from the device cache.
+    unawaited(_restoreSession());
     // Stage 3: refresh the in-call duration label once a second
     // while a call is active (cheap: setState only during a call).
     _callTicker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -267,8 +327,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _notifyEnabled = prefs.getBool('vyro_notify_enabled_v1') ?? true;
     _notifySound = prefs.getBool('vyro_notify_sound_v1') ?? true;
     _notifyVibrate = prefs.getBool('vyro_notify_vibrate_v1') ?? true;
-    // Stage 11: chat wallpaper colour, if the user picked one.
-    _wallpaperColor = prefs.getInt('vyro_wallpaper_color');
+    // Wallpaper: id-based setting, with migration from the old
+    // Stage 11 single-colour int, plus per-chat overrides.
+    _wallpaperId = prefs.getString('vyro_wallpaper_id') ?? 'default';
+    if (!wallpapers.containsKey(_wallpaperId)) {
+      final old = prefs.getInt('vyro_wallpaper_color');
+      _wallpaperId = _wallpaperIdForArgb(old) ?? 'default';
+    }
+    final perChat = prefs.getString('vyro_chat_wallpapers');
+    if (perChat != null) {
+      try {
+        final decoded = jsonDecode(perChat) as Map<String, dynamic>;
+        for (final e in decoded.entries) {
+          if (e.value is String && wallpapers.containsKey(e.value as String)) {
+            _chatWallpapers[e.key] = e.value as String;
+          }
+        }
+      } catch (_) {}
+    }
     _drafts = MessageDrafts(prefs);
     _folderNames = _folders!.list();
     if (mounted) setState(() {});
@@ -364,71 +440,212 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  /// Stage 11: chat wallpaper — a solid colour for the chat
-  /// background, stored on-device. Null restores the theme default.
-  Future<void> _setWallpaper(int? argb) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (argb == null) {
-      await prefs.remove('vyro_wallpaper_color');
-    } else {
-      await prefs.setInt('vyro_wallpaper_color', argb);
+  /// Wallpaper id for a legacy Stage 11 ARGB colour (migration).
+  String? _wallpaperIdForArgb(int? argb) {
+    if (argb == null) return null;
+    for (final e in wallpapers.entries) {
+      if (e.value.length == 1 && e.value.first == argb) return e.key;
     }
-    setState(() => _wallpaperColor = argb);
+    return null;
   }
 
-  /// Stage 11: pick a chat wallpaper colour (WhatsApp-style solid
-  /// colours; the default is the theme chat background).
-  Future<void> _showWallpaperPicker() async {
-    // -1 is the "Default" sentinel: showDialog returns null when
-    // the dialog is dismissed, so Default needs its own value.
-    const options = <String, int>{
-      'Default': -1,
-      'Beige': 0xFFECE5DD,
-      'Mint': 0xFFD8F3DC,
-      'Sky': 0xFFDCEFFA,
-      'Rose': 0xFFF6DCE0,
-      'Slate': 0xFF2A2F2B,
-    };
-    if (!mounted) return;
-    final picked = await showDialog<int>(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('Chat wallpaper'),
-        children: [
-          for (final entry in options.entries)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(context, entry.value),
-              child: Row(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: entry.value == -1
-                          ? (Theme.of(context).brightness == Brightness.dark
-                              ? WaColors.darkChatBackground
-                              : WaColors.lightChatBackground)
-                          : Color(entry.value),
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(entry.key),
-                  const Spacer(),
-                  if (_wallpaperColor ==
-                      (entry.value == -1 ? null : entry.value))
-                    const Icon(Icons.check, size: 18),
-                ],
-              ),
-            ),
+  /// The wallpaper id in effect for a chat: its own choice, else the
+  /// global default. 'default' means the theme chat background.
+  String _wallpaperForChat(String? chatId) {
+    if (chatId != null && _chatWallpapers.containsKey(chatId)) {
+      return _chatWallpapers[chatId]!;
+    }
+    return _wallpaperId;
+  }
+
+  /// Box decoration for a wallpaper id (solid colour or gradient).
+  BoxDecoration _wallpaperDecoration(String id, bool dark) {
+    final colors = wallpapers[id];
+    if (colors == null || colors.isEmpty) {
+      return BoxDecoration(
+          color: dark
+              ? WaColors.darkChatBackground
+              : WaColors.lightChatBackground);
+    }
+    if (colors.length == 1) {
+      return BoxDecoration(color: Color(colors.first));
+    }
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: colors.map((c) => Color(c)).toList(),
+      ),
+    );
+  }
+
+  /// Small preview tile for a wallpaper (solid or gradient).
+  Widget _wallpaperTile(String id, bool dark, {double size = 56}) {
+    final colors = wallpapers[id];
+    final solid =
+        colors != null && colors.length == 1 ? Color(colors.first) : null;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: solid ??
+            (dark ? WaColors.darkChatBackground : WaColors.lightChatBackground),
+        gradient: colors != null && colors.length > 1
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: colors.map((c) => Color(c)).toList())
+            : null,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 3)),
         ],
       ),
     );
-    // Dismissed: picked is null, leave the wallpaper alone.
-    if (picked == null) return;
-    final chosen = picked == -1 ? null : picked;
-    if (chosen != _wallpaperColor) await _setWallpaper(chosen);
+  }
+
+  /// Set the global default wallpaper (Settings) or one chat's own.
+  Future<void> _setWallpaper(String id, {String? chatId}) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (chatId == null) {
+      await prefs.setString('vyro_wallpaper_id', id);
+      setState(() => _wallpaperId = id);
+    } else {
+      if (id == 'default') {
+        _chatWallpapers.remove(chatId);
+      } else {
+        _chatWallpapers[chatId] = id;
+      }
+      await prefs.setString(
+          'vyro_chat_wallpapers', jsonEncode(_chatWallpapers));
+      setState(() {});
+    }
+  }
+
+  /// Beautiful wallpaper picker: a grid of colours and gradients.
+  /// chatId == null edits the global default; otherwise this chat
+  /// only (Default there means "use my global wallpaper").
+  Future<void> _showWallpaperPicker({String? chatId}) async {
+    if (!mounted) return;
+    final current = chatId == null ? _wallpaperId : _wallpaperForChat(chatId);
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        Widget section(String title, List<String> ids) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  child: Text(title,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w700)),
+                ),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    childAspectRatio: 1.35,
+                  ),
+                  itemCount: ids.length,
+                  itemBuilder: (context, i) {
+                    final id = ids[i];
+                    final selected = id == current;
+                    return GestureDetector(
+                      onTap: () => Navigator.pop(context, id),
+                      child: Column(
+                        children: [
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              _wallpaperTile(id, dark),
+                              if (selected)
+                                Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: const BoxDecoration(
+                                      color: Color(0x80000000),
+                                      shape: BoxShape.circle),
+                                  child: const Icon(Icons.check,
+                                      color: Colors.white, size: 18),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(wallpaperNames[id] ?? id,
+                              style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                chatId == null ? 'Chat wallpaper' : 'Wallpaper for this chat',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              if (chatId != null)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                      'Only this chat uses it. Choose Default to use your global wallpaper.',
+                      style: TextStyle(fontSize: 13, color: Colors.grey)),
+                ),
+              section('Colours', const [
+                'default',
+                'beige',
+                'mint',
+                'sky',
+                'rose',
+                'slate',
+                'lavender',
+                'peach',
+                'sand',
+                'ocean',
+                'forest',
+                'charcoal',
+              ]),
+              section('Gradients', const [
+                'grad-teal',
+                'grad-sunset',
+                'grad-ocean',
+                'grad-forest',
+                'grad-lavender',
+                'grad-midnight',
+              ]),
+            ],
+          ),
+        );
+      },
+    );
+    // Dismissed, or the same as now: leave the wallpaper alone.
+    if (picked == null || picked == current) return;
+    await _setWallpaper(picked, chatId: chatId);
   }
 
   /// Stage 11: blocked contacts — the list from the server, with
@@ -548,6 +765,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     await _ws?.sink.close();
     _api.clearToken();
+    // Offline mode: forget the saved session and cache too, so the
+    // next person on this phone starts clean.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('vyro_session_token');
+    await prefs.remove('vyro_session_user');
+    await prefs.remove('vyro_cached_chats');
+    await prefs.remove('vyro_outbox');
+    for (final k in prefs
+        .getKeys()
+        .where((k) => k.startsWith('vyro_cached_msgs_'))
+        .toList()) {
+      await prefs.remove(k);
+    }
     if (!mounted) return;
     setState(() {
       _user = null;
@@ -581,6 +811,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _authAnim.dispose();
     _ws?.sink.close();
     _call?.dispose();
     _remoteRenderer.dispose();
@@ -624,9 +855,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         setState(() {
           _codeEmail = _email.text.trim();
           _codePurpose = _registerMode ? 'register' : 'login';
-          _assignedUsername = _registerMode
-              ? (out['username'] as String? ?? '')
-              : '';
+          _assignedUsername =
+              _registerMode ? (out['username'] as String? ?? '') : '';
           _codeStep = true;
         });
         _startResendTimer();
@@ -686,7 +916,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     });
   }
 
-  Future<void> _finishLogin(Map<String, dynamic> u) async {
+  Future<void> _finishLogin(Map<String, dynamic> u,
+      {bool persist = true}) async {
+    // Offline mode: remember the session on the device, so the app
+    // opens without internet like WhatsApp.
+    if (persist) {
+      final prefs = await SharedPreferences.getInstance();
+      final token = _api.token;
+      if (token != null) {
+        await prefs.setString('vyro_session_token', token);
+      }
+      await prefs.setString('vyro_session_user', jsonEncode(u));
+    }
     setState(() => _user = u);
     // E2EE setup: generate/load the device identity and publish
     // public keys. Private keys never leave the device.
@@ -695,8 +936,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       await _e2ee!.ensureSetup(u['id'] as String);
     } catch (e) {
-      setState(() => _error = 'E2EE setup failed (chats still work '
-          'unencrypted): $e');
+      // Offline: no error — the chats still open from the cache.
+      if (!_isNetworkError(e)) {
+        setState(() => _error = 'E2EE setup failed (chats still work '
+            'unencrypted): $e');
+      }
     }
     _call = CallController(
       sendSignal: (chatId, type, toUserId, payload) {
@@ -847,8 +1091,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         final payload = ev['payload'] as Map<String, dynamic>;
         final peerId = ev['user_id'] as String? ?? '';
         final call = payload['group'] == true
-            ? _call?.handleGroupOffer(
-                ev['chat_id'] as String, peerId, payload)
+            ? _call?.handleGroupOffer(ev['chat_id'] as String, peerId, payload)
             : _call?.handleOffer(ev['chat_id'] as String, peerId, payload);
         if (call != null) setState(() => _incomingCall = call);
       } else if (type == 'call-answer' && ev['payload'] != null) {
@@ -896,15 +1139,197 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           );
         }
       }
+    }, onError: (_) {
+      // Offline: the socket died. The cached chats stay on screen;
+      // sending queues in the outbox until the internet is back.
+      if (mounted) setState(() => _offline = true);
+    }, onDone: () {
+      if (mounted) setState(() => _offline = true);
     });
+  }
+
+  // ── Offline mode (WhatsApp-style): the app opens without
+  // internet and shows the on-device cache. ─────────────────────
+
+  /// True when an error means "no internet" rather than a real
+  /// server problem (wrong password, expired code, ...).
+  bool _isNetworkError(Object e) {
+    final s = e.toString();
+    return s.contains('SocketException') ||
+        s.contains('Failed host lookup') ||
+        s.contains('Connection refused') ||
+        s.contains('Network is unreachable') ||
+        s.contains('Connection closed') ||
+        s.contains('timed out') ||
+        s.contains('HttpException') ||
+        s.contains('ClientException');
+  }
+
+  /// Slim amber banner shown while offline.
+  Widget _offlineBanner() {
+    if (!_offline) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      color: Colors.amber.shade100,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: const Row(
+        children: [
+          Icon(Icons.wifi_off, size: 16),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "You're offline — showing saved chats. Messages will send when you're back online.",
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveCachedChats() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('vyro_cached_chats', jsonEncode(_chats));
+    } catch (_) {}
+  }
+
+  Future<void> _loadCachedChats() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('vyro_cached_chats');
+      if (raw == null) return;
+      final decoded = jsonDecode(raw) as List;
+      if (mounted) {
+        setState(() => _chats = List<dynamic>.from(decoded));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveCachedMessages(String chatId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final recent = _messages.length > 100
+          ? _messages.sublist(_messages.length - 100)
+          : _messages;
+      await prefs.setString('vyro_cached_msgs_$chatId', jsonEncode(recent));
+    } catch (_) {}
+  }
+
+  Future<List<dynamic>> _loadCachedMessages(String chatId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('vyro_cached_msgs_$chatId');
+      if (raw == null) return [];
+      return List<dynamic>.from(jsonDecode(raw) as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  Future<void> _loadOutbox() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('vyro_outbox');
+      if (raw != null) {
+        final decoded = jsonDecode(raw) as List;
+        _outbox
+          ..clear()
+          ..addAll(decoded.map((e) => Map<String, dynamic>.from(e as Map)));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveOutbox() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('vyro_outbox', jsonEncode(_outbox));
+    } catch (_) {}
+  }
+
+  /// Messages typed while offline for one chat, as chat bubbles
+  /// with a clock (pending) instead of ticks.
+  List<Map<String, dynamic>> _queuedMessagesFor(String chatId) {
+    return _outbox
+        .where((o) => o['chat_id'] == chatId)
+        .map((o) => <String, dynamic>{
+              'id': o['local_id'],
+              'chat_id': chatId,
+              'sender_id': _user?['id'],
+              'content': o['content'],
+              'kind': 'text',
+              'pending': true,
+              'created_at': o['created_at'],
+            })
+        .toList();
+  }
+
+  /// Send the messages that were queued while offline, oldest first.
+  /// Stops at the first failure (still offline) and keeps the rest.
+  Future<void> _flushOutbox() async {
+    if (_outbox.isEmpty || _offline) return;
+    final pending = List<Map<String, dynamic>>.from(_outbox);
+    for (final item in pending) {
+      try {
+        final msg = await _api.sendMessage(
+          item['chat_id'] as String,
+          item['content'] as String,
+          replyToId: item['reply_to'] as String?,
+        );
+        _outbox.remove(item);
+        await _saveOutbox();
+        if (mounted &&
+            _activeChat != null &&
+            _activeChat!['id'] == item['chat_id']) {
+          setState(() {
+            _messages = _messages.map((m) {
+              final mm = Map<String, dynamic>.from(m as Map);
+              return mm['id'] == item['local_id'] ? msg : mm;
+            }).toList();
+          });
+        }
+      } catch (_) {
+        break;
+      }
+    }
+  }
+
+  /// Reopen the last session without internet, like WhatsApp: the
+  /// saved token signs the app in and the cached chats show at once.
+  Future<void> _restoreSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('vyro_session_token');
+    final rawUser = prefs.getString('vyro_session_user');
+    if (token == null || rawUser == null) return;
+    try {
+      final u = jsonDecode(rawUser) as Map<String, dynamic>;
+      _api.token = token;
+      await _loadCachedChats();
+      await _loadOutbox();
+      await _finishLogin(u, persist: false);
+    } catch (_) {
+      // Corrupt or expired session: fall through to the login page.
+      _api.clearToken();
+    }
   }
 
   Future<void> _refreshChats() async {
     try {
       final chats = await _api.listChats();
-      setState(() => _chats = chats);
+      setState(() {
+        _chats = chats;
+        _offline = false;
+      });
+      await _saveCachedChats();
+      await _flushOutbox();
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (_isNetworkError(e)) {
+        // Offline: keep the cached chats on screen, no scary error.
+        if (mounted) setState(() => _offline = true);
+        if (_chats.isEmpty) await _loadCachedChats();
+      } else {
+        setState(() => _error = e.toString());
+      }
     }
     // Best-effort user directory for DM titles (never blocks the list).
     try {
@@ -938,8 +1363,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final members =
           (chat['member_ids'] as List?)?.map((m) => '$m').toList() ??
               const <String>[];
-      final peerId =
-          members.firstWhere((m) => m != me, orElse: () => '');
+      final peerId = members.firstWhere((m) => m != me, orElse: () => '');
       final peer = _usersById[peerId];
       if (peer != null) {
         final name = (peer['display_name'] as String?)?.trim();
@@ -1003,17 +1427,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       // v0.7 drafts: restore the unsent text of this chat, if any.
       _draft.text = _drafts?.draftFor(chatId) ?? '';
     });
-    final msgs = await _api.listMessages(chat['id'] as String);
-    setState(() => _messages = msgs);
-    for (final m in msgs) {
-      _maybeDecrypt(m as Map<String, dynamic>);
+    // Offline mode: show the saved messages at once, then refresh.
+    final cached = await _loadCachedMessages(chatId);
+    if (cached.isNotEmpty && mounted) {
+      setState(() => _messages = cached);
+      for (final m in cached) {
+        _maybeDecrypt(m as Map<String, dynamic>);
+      }
     }
-    final fromOthers =
-        msgs.where((m) => (m as Map)['sender_id'] != _user!['id']).toList();
-    if (fromOthers.isNotEmpty) {
-      try {
-        await _api.markRead((fromOthers.last as Map)['id'] as String);
-      } catch (_) {}
+    // Messages typed while offline, still waiting to send.
+    final queued = _queuedMessagesFor(chatId);
+    if (queued.isNotEmpty && mounted) {
+      setState(() => _messages = [..._messages, ...queued]);
+    }
+    try {
+      final msgs = await _api.listMessages(chat['id'] as String);
+      if (!mounted) return;
+      setState(() {
+        _messages = [...msgs, ...queued];
+        _offline = false;
+      });
+      await _saveCachedMessages(chatId);
+      for (final m in msgs) {
+        _maybeDecrypt(m as Map<String, dynamic>);
+      }
+      final fromOthers =
+          msgs.where((m) => (m as Map)['sender_id'] != _user!['id']).toList();
+      if (fromOthers.isNotEmpty) {
+        try {
+          await _api.markRead((fromOthers.last as Map)['id'] as String);
+        } catch (_) {}
+      }
+    } catch (e) {
+      // Offline: the saved messages above stay on screen.
+      if (_isNetworkError(e) && mounted) {
+        setState(() => _offline = true);
+      }
     }
   }
 
@@ -1022,7 +1471,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     try {
       final msgs = await _api.listMessages(_activeChat!['id'] as String);
       if (mounted) {
-        setState(() => _messages = msgs);
+        final queued = _queuedMessagesFor(_activeChat!['id'] as String);
+        setState(() {
+          _messages = [...msgs, ...queued];
+          _offline = false;
+        });
+        await _saveCachedMessages(_activeChat!['id'] as String);
         for (final m in msgs) {
           _maybeDecrypt(m as Map<String, dynamic>);
         }
@@ -1101,6 +1555,38 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
       setState(() => _messages = [..._messages, msg]);
     } catch (e) {
+      // Offline: queue the message like WhatsApp — it goes out when
+      // the internet is back. (Plain chats only: E2EE sends need the
+      // server for keys, so those still report the error.)
+      final chatId = _activeChat?['id'] as String?;
+      if (_isNetworkError(e) &&
+          editingId == null &&
+          chatId != null &&
+          !_e2eeChats.contains(chatId)) {
+        final localId = 'pending-${DateTime.now().millisecondsSinceEpoch}';
+        final pending = <String, dynamic>{
+          'id': localId,
+          'chat_id': chatId,
+          'sender_id': _user?['id'],
+          'content': content,
+          'kind': 'text',
+          'pending': true,
+          'created_at': DateTime.now().toIso8601String(),
+        };
+        _outbox.add({
+          'local_id': localId,
+          'chat_id': chatId,
+          'content': content,
+          'reply_to': replyTo == null ? null : replyTo['id'] as String,
+          'created_at': pending['created_at'],
+        });
+        await _saveOutbox();
+        setState(() {
+          _offline = true;
+          _messages = [..._messages, pending];
+        });
+        return;
+      }
       setState(() => _error = e.toString());
     }
   }
@@ -1225,11 +1711,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 if (type == 'channel')
                   SwitchListTile(
                     title: const Text('Public channel'),
-                    subtitle: const Text(
-                        'Anyone can find and follow it'),
+                    subtitle: const Text('Anyone can find and follow it'),
                     value: channelPublic,
-                    onChanged: (v) =>
-                        setDialogState(() => channelPublic = v),
+                    onChanged: (v) => setDialogState(() => channelPublic = v),
                     contentPadding: EdgeInsets.zero,
                   ),
                 TextField(
@@ -1336,8 +1820,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await _refreshChats();
       if (!mounted) return;
       final chatId = res['chat_id'] as String?;
-      final chat = _chats.firstWhere(
-          (c) => (c as Map)['id'] == chatId,
+      final chat = _chats.firstWhere((c) => (c as Map)['id'] == chatId,
           orElse: () => null);
       if (chat != null) {
         await _openChat(chat as Map<String, dynamic>);
@@ -1352,8 +1835,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _editChannel() async {
     if (_activeChat == null) return;
     final chatId = _activeChat!['id'] as String;
-    final titleCtrl = TextEditingController(
-        text: (_activeChat!['title'] as String?) ?? '');
+    final titleCtrl =
+        TextEditingController(text: (_activeChat!['title'] as String?) ?? '');
     bool isPublic = _activeChat!['is_public'] == true;
     final ok = await showDialog<bool>(
       context: context,
@@ -1414,11 +1897,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       }
       final activeInvites =
           invites.where((i) => (i as Map)['revoked'] != true).toList();
-      final activeInvite =
-          activeInvites.isEmpty ? null : activeInvites.first as Map<String, dynamic>;
-      final myRole = members
-          .map((m) => m as Map<String, dynamic>)
-          .firstWhere((m) => m['user_id'] == _user!['id'],
+      final activeInvite = activeInvites.isEmpty
+          ? null
+          : activeInvites.first as Map<String, dynamic>;
+      final myRole = members.map((m) => m as Map<String, dynamic>).firstWhere(
+              (m) => m['user_id'] == _user!['id'],
               orElse: () => <String, dynamic>{})['role'] as String? ??
           '';
       final canManageInvite = myRole == 'owner' || myRole == 'admin';
@@ -1760,8 +2243,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 controller: textCtrl,
                 maxLength: 700,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                    labelText: 'Write your status…'),
+                decoration:
+                    const InputDecoration(labelText: 'Write your status…'),
               ),
               const SizedBox(height: 8),
               Wrap(
@@ -1777,9 +2260,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           color: _colorFromHex(c),
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: color == c
-                                ? Colors.white
-                                : Colors.transparent,
+                            color:
+                                color == c ? Colors.white : Colors.transparent,
                             width: 3,
                           ),
                         ),
@@ -1841,13 +2323,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   if (bytes.isEmpty) {
                     throw Exception('Recording is empty');
                   }
-                  final fileName =
-                      path.split('/').last.split('?').first;
-                  final up = await _api.uploadFile(bytes, fileName,
-                      mime ?? 'audio/ogg',
+                  final fileName = path.split('/').last.split('?').first;
+                  final up = await _api.uploadFile(
+                      bytes, fileName, mime ?? 'audio/ogg',
                       category: UsageCategory.voice);
-                  await _api.createStory(up['url'] as String,
-                      kind: 'audio');
+                  await _api.createStory(up['url'] as String, kind: 'audio');
                   final stories = await _api.listStories();
                   setState(() => _stories = stories);
                   if (context.mounted) Navigator.pop(context, true);
@@ -1971,8 +2451,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final mine = m['sender_id'] == _user!['id'];
     final content =
         _decrypted[m['id'] as String] ?? (m['content'] as String? ?? '');
-    final isPinned =
-        (_activeChat?['pinned_message'] as Map?)?['id'] == m['id'];
+    final isPinned = (_activeChat?['pinned_message'] as Map?)?['id'] == m['id'];
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -1997,8 +2476,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             // Stage 1: pin / unpin this message in the chat.
             ListTile(
-              leading: Icon(
-                  isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+              leading:
+                  Icon(isPinned ? Icons.push_pin : Icons.push_pin_outlined),
               title: Text(isPinned ? 'Unpin' : 'Pin'),
               onTap: () async {
                 Navigator.pop(context);
@@ -2046,8 +2525,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ],
             // Stage 4: delete the whole poll (creator or admin/owner).
             // The server deletes the poll and its chat message.
-            if ((m['kind'] as String? ?? 'text') == 'poll' &&
-                _canDeletePoll(m))
+            if ((m['kind'] as String? ?? 'text') == 'poll' && _canDeletePoll(m))
               ListTile(
                 leading: const Icon(Icons.bar_chart_outlined),
                 title: const Text('Delete poll'),
@@ -2058,8 +2536,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   try {
                     await _api.deletePoll(pollId);
                     await _refreshChats();
-                    setState(() => _messages.removeWhere(
-                        (x) => (x as Map)['id'] == m['id']));
+                    setState(() => _messages
+                        .removeWhere((x) => (x as Map)['id'] == m['id']));
                   } catch (e) {
                     setState(() => _error = e.toString());
                   }
@@ -2102,8 +2580,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               Navigator.pop(context);
               try {
                 await _api.deleteMessageForMe(m['id'] as String);
-                setState(() => _messages
-                    .removeWhere((x) => (x as Map)['id'] == m['id']));
+                setState(() =>
+                    _messages.removeWhere((x) => (x as Map)['id'] == m['id']));
               } catch (e) {
                 setState(() => _error = e.toString());
               }
@@ -2261,15 +2739,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 obscureText: true,
                 maxLength: 8,
                 autofocus: true,
-                decoration: const InputDecoration(labelText: 'New PIN (4-8 digits)'),
+                decoration:
+                    const InputDecoration(labelText: 'New PIN (4-8 digits)'),
               ),
               TextField(
                 controller: second,
                 keyboardType: TextInputType.number,
                 obscureText: true,
                 maxLength: 8,
-                decoration: InputDecoration(
-                    labelText: 'Repeat PIN', errorText: error),
+                decoration:
+                    InputDecoration(labelText: 'Repeat PIN', errorText: error),
               ),
             ],
           ),
@@ -2369,8 +2848,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 Expanded(
                   child: TextField(
                     controller: input,
-                    decoration:
-                        const InputDecoration(hintText: 'Ask how to use Safari…'),
+                    decoration: const InputDecoration(
+                        hintText: 'Ask how to use Safari…'),
                     onSubmitted: (_) {
                       final r = assistantReply(input.text);
                       setSheetState(() => answer = r.text);
@@ -2580,6 +3059,325 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // ---------------------------------------------------------- UI
 
+  // ── 3D registration screens (approved mockup): deep teal→emerald
+  // gradient, floating glass spheres and chat bubbles, a glossy logo
+  // tile, and a frosted glass card. English is the default language;
+  // the pill on the page switches to فارسی.
+
+  /// The 3D backdrop shared by the login, register and code screens.
+  /// Animated: the glass spheres and chat bubbles drift slowly, so
+  /// the page is always moving.
+  Widget _authBackdrop({required Widget child}) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF013B34),
+            Color(0xFF008069),
+            Color(0xFF00A884),
+            Color(0xFF25D366),
+          ],
+          stops: [0.0, 0.45, 0.75, 1.0],
+        ),
+      ),
+      child: AnimatedBuilder(
+        animation: _authAnim,
+        builder: (context, _) {
+          final t = _authAnim.value * 6.28318;
+          return Stack(
+            children: [
+              // Floating glass spheres — depth, near and far.
+              Positioned(
+                  top: 64 + sin(t) * 14,
+                  left: 24 + cos(t * 0.7) * 8,
+                  child: _authOrb(64, 0.20)),
+              Positioned(
+                  top: 120 + sin(t + 1.3) * 10,
+                  right: 28 + cos(t * 0.8 + 1.0) * 8,
+                  child: _authOrb(40, 0.25)),
+              Positioned(
+                  top: 250 + sin(t + 2.1) * 8,
+                  left: 8 + cos(t * 0.6 + 2.0) * 6,
+                  child: _authOrb(24, 0.18)),
+              Positioned(
+                  bottom: 64 + sin(t + 0.8) * 12,
+                  right: 36 + cos(t * 0.7 + 0.5) * 8,
+                  child: _authOrb(52, 0.20)),
+              Positioned(
+                  bottom: 190 + sin(t + 2.8) * 9,
+                  left: 30 + cos(t * 0.9 + 1.7) * 6,
+                  child: _authOrb(30, 0.15)),
+              // Big soft chat bubbles drifting behind the card.
+              Positioned(
+                  bottom: 110 + sin(t + 1.9) * 10,
+                  left: -18 + cos(t * 0.5) * 6,
+                  child: Icon(Icons.chat_bubble,
+                      size: 120, color: Colors.white.withOpacity(0.10))),
+              Positioned(
+                  top: 330 + sin(t + 0.4) * 12,
+                  right: -24 + cos(t * 0.6 + 0.9) * 6,
+                  child: Icon(Icons.chat_bubble,
+                      size: 96, color: Colors.white.withOpacity(0.08))),
+              Positioned.fill(child: child),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// One floating glass sphere for the 3D backdrop.
+  Widget _authOrb(double size, double opacity) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(opacity),
+        border: Border.all(color: Colors.white.withOpacity(0.35), width: 1.5),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x30000000), blurRadius: 20, offset: Offset(0, 8)),
+        ],
+      ),
+    );
+  }
+
+  /// Frosted glass card holding the registration fields.
+  Widget _authGlassCard({required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withOpacity(0.8)),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x40000000), blurRadius: 28, offset: Offset(0, 14)),
+          BoxShadow(
+              color: Color(0x20000000), blurRadius: 6, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
+
+  /// One big soft 3D input field with a label above it.
+  Widget _authField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    bool obscureText = false,
+    Widget? suffix,
+    void Function(String)? onSubmitted,
+    int? maxLength,
+    TextAlign textAlign = TextAlign.start,
+    TextStyle? style,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1F2C34))),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4)),
+              BoxShadow(
+                  color: Color(0x0A000000),
+                  blurRadius: 2,
+                  offset: Offset(0, 1)),
+            ],
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            obscureText: obscureText,
+            maxLength: maxLength,
+            textAlign: textAlign,
+            style: style ?? const TextStyle(fontSize: 16),
+            onSubmitted: onSubmitted,
+            decoration: InputDecoration(
+              prefixIcon: Icon(icon, color: const Color(0xFF008069)),
+              suffixIcon: suffix,
+              hintText: label,
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              counterText: '',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Big gradient-green 3D button (Create account / Log in / Verify).
+  Widget _authButton({required String label, required VoidCallback onPressed}) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [Color(0xFF25D366), Color(0xFF00A884)]),
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x5500A884), blurRadius: 18, offset: Offset(0, 8)),
+          BoxShadow(
+              color: Color(0x33000000), blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Colors.white)),
+      ),
+    );
+  }
+
+  /// Language picker pill (English default, فارسی second).
+  Widget _authLangPill(bool isFa) {
+    return PopupMenuButton<String>(
+      onSelected: (code) {
+        if ((code == 'fa') != isFa) widget.onToggleLang();
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'en', child: Text('English')),
+        PopupMenuItem(value: 'fa', child: Text('فارسی')),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.20),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.language, size: 18, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(isFa ? 'فارسی' : 'English',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 2),
+            const Icon(Icons.keyboard_arrow_down,
+                size: 18, color: Colors.white),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Glossy glass logo tile + Safari name + slogan.
+  /// The tile floats gently up and down.
+  Widget _authLogoHeader({required bool isFa}) {
+    return Column(
+      children: [
+        AnimatedBuilder(
+          animation: _authAnim,
+          builder: (context, child) => Transform.translate(
+            offset: Offset(0, sin(_authAnim.value * 6.28318 + 1.0) * 7),
+            child: child,
+          ),
+          child: Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(32),
+              color: Colors.white.withOpacity(0.20),
+              border:
+                  Border.all(color: Colors.white.withOpacity(0.7), width: 2),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x40000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 12)),
+                BoxShadow(
+                    color: Color(0x33FFFFFF),
+                    blurRadius: 2,
+                    offset: Offset(0, -1)),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: Image.asset(
+                'assets/safari-logo.png',
+                width: 112,
+                height: 112,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        const Text(
+          'Safari',
+          style: TextStyle(
+            fontSize: 42,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+            letterSpacing: 5,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isFa ? 'فراتر از مرزها وصل شو' : 'Connect Beyond Limits',
+          style: TextStyle(
+            fontSize: 15,
+            color: Colors.white.withOpacity(0.92),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Soft red error box for auth failures.
+  Widget _authError(String message) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDECEA),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFF5C6C2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFB3261E), size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message,
+                style: const TextStyle(color: Color(0xFFB3261E), fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isFa = Localizations.localeOf(context).languageCode == 'fa';
@@ -2589,246 +3387,170 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     // resend after a 60-second cooldown. No token until verified.
     if (_user == null && _codeStep) {
       return Scaffold(
-        body: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 64, 24, 36),
-                decoration: const BoxDecoration(
-                  color: WaColors.lightHeader,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(36),
-                    bottomRight: Radius.circular(36),
+        body: _authBackdrop(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 56, 24, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: _authLangPill(isFa)),
+                const SizedBox(height: 28),
+                const Icon(Icons.mark_email_read_outlined,
+                    size: 64, color: Colors.white),
+                const SizedBox(height: 12),
+                const Text(
+                  'Check your email',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
                   ),
                 ),
-                child: const Column(
-                  children: [
-                    Icon(Icons.mark_email_read_outlined,
-                        size: 56, color: Colors.white),
-                    SizedBox(height: 12),
+                const SizedBox(height: 24),
+                _authGlassCard(children: [
+                  Text(
+                    'We sent a 6-digit verification code to $_codeEmail. '
+                    'It expires in 10 minutes. Never share it with anyone.',
+                    style:
+                        const TextStyle(fontSize: 14, color: Color(0xFF1F2C34)),
+                  ),
+                  if (_assignedUsername.isNotEmpty) ...[
+                    const SizedBox(height: 12),
                     Text(
-                      'Check your email',
-                      style: TextStyle(
+                      'Your username: @$_assignedUsername',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  _authField(
+                    controller: _codeCtrl,
+                    label: '6-digit code',
+                    icon: Icons.pin_outlined,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
                         fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'We sent a 6-digit verification code to $_codeEmail. '
-                      'It expires in 10 minutes. Never share it with anyone.',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    if (_assignedUsername.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        'Your username: @$_assignedUsername',
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _codeCtrl,
-                      decoration: const InputDecoration(
-                        labelText: '6-digit code',
-                        prefixIcon: Icon(Icons.pin_outlined),
-                        hintText: '••••••',
-                      ),
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 24, letterSpacing: 8),
-                      onSubmitted: (_) => _verifyCode(),
-                    ),
-                    const SizedBox(height: 8),
-                    FilledButton(
-                      onPressed: _verifyCode,
-                      child: const Text('Verify and continue'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _resendIn > 0 ? null : _resendCode,
-                      child: Text(_resendIn > 0
-                          ? 'Resend code in ${_resendIn}s'
-                          : 'Resend code'),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() {
-                        _codeStep = false;
-                        _resendTimer?.cancel();
-                      }),
-                      child: const Text('Back to login'),
-                    ),
-                    if (_error != null)
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                  ],
-                ),
-              ),
-            ],
+                        letterSpacing: 10,
+                        fontWeight: FontWeight.w700),
+                    onSubmitted: (_) => _verifyCode(),
+                  ),
+                  const SizedBox(height: 20),
+                  _authButton(
+                      label: 'Verify and continue', onPressed: _verifyCode),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: _resendIn > 0 ? null : _resendCode,
+                    child: Text(_resendIn > 0
+                        ? 'Resend code in ${_resendIn}s'
+                        : 'Resend code'),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() {
+                      _codeStep = false;
+                      _resendTimer?.cancel();
+                    }),
+                    child: const Text('Back to login'),
+                  ),
+                  if (_error != null) _authError(_error!),
+                ]),
+              ],
+            ),
           ),
         ),
       );
     }
     if (_user == null) {
-      final dark = Theme.of(context).brightness == Brightness.dark;
       return Scaffold(
-        body: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Welcome hero: WhatsApp-style solid teal, swift logo,
-              // Safari name, slogan.
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 64, 24, 36),
-                decoration: BoxDecoration(
-                  color: dark
-                      ? WaColors.darkHeader
-                      : WaColors.lightHeader,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(36),
-                    bottomRight: Radius.circular(36),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                            color: Colors.white.withOpacity(0.6), width: 2),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x33000000),
-                            blurRadius: 16,
-                            offset: Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset(
-                          'assets/safari-logo.png',
-                          width: 88,
-                          height: 88,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Safari',
-                      style: TextStyle(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: 4,
-                      ),
+        body: _authBackdrop(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 56, 24, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: _authLangPill(isFa)),
+                const SizedBox(height: 20),
+                _authLogoHeader(isFa: isFa),
+                const SizedBox(height: 28),
+                _authGlassCard(children: [
+                  if (_registerMode) ...[
+                    _authField(
+                      controller: _displayName,
+                      label: 'Your name',
+                      icon: Icons.person_outline,
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      isFa ? 'فراتر از مرزها وصل شو' : 'Connect Beyond Limits',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.white.withOpacity(0.9),
-                        fontWeight: FontWeight.w500,
-                      ),
+                    const Text(
+                      'Your username is chosen automatically from your name.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
                     ),
+                    const SizedBox(height: 14),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Official-download warning, styled as an info card.
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: Colors.amber.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.amber.shade200),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.verified_user_outlined,
-                              color: Colors.amber.shade800),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'Download Safari only from the official Safari '
-                              'website. APKs from other sites are not safe '
-                              '— do not install them.',
-                              style: TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
+                  _authField(
+                    controller: _email,
+                    label: 'Email',
+                    icon: Icons.mail_outline,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 14),
+                  _authField(
+                    controller: _password,
+                    label: 'Password',
+                    icon: Icons.lock_outline,
+                    obscureText: _obscurePassword,
+                    suffix: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
-                    const SizedBox(height: 24),
-                    TextField(
-                        controller: _email,
-                        decoration: const InputDecoration(
-                            labelText: 'Email',
-                            prefixIcon: Icon(Icons.mail_outline)),
-                        keyboardType: TextInputType.emailAddress),
-                    const SizedBox(height: 12),
-                    if (_registerMode) ...[
-                      TextField(
-                          controller: _displayName,
-                          decoration: const InputDecoration(
-                              labelText: 'Your name',
-                              prefixIcon: Icon(Icons.person_outline))),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Your username is chosen automatically from your name.',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+                  _authButton(
+                    label: _registerMode ? 'Create account' : 'Log in',
+                    onPressed: _auth,
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                      onPressed: () =>
+                          setState(() => _registerMode = !_registerMode),
+                      child: Text(_registerMode
+                          ? 'Already have an account? Log in'
+                          : 'New to Safari? Create an account')),
+                  if (_error != null) _authError(_error!),
+                ]),
+                const SizedBox(height: 16),
+                // Official-download note, restyled small on the 3D page.
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.16),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.white.withOpacity(0.35)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.verified_user_outlined, color: Colors.white),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Download Safari only from the official Safari '
+                          'website. APKs from other sites are not safe.',
+                          style: TextStyle(fontSize: 12, color: Colors.white),
+                        ),
                       ),
-                      const SizedBox(height: 12),
                     ],
-                    TextField(
-                        controller: _password,
-                        decoration: const InputDecoration(
-                            labelText: 'Password',
-                            prefixIcon: Icon(Icons.lock_outline)),
-                        obscureText: true),
-                    const SizedBox(height: 20),
-                    FilledButton(
-                      onPressed: _auth,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child:
-                          Text(_registerMode ? 'Create account' : 'Log in'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                        onPressed: () =>
-                            setState(() => _registerMode = !_registerMode),
-                        child: Text(_registerMode
-                            ? 'Already have an account? Log in'
-                            : 'New to Safari? Create an account')),
-                    TextButton(
-                        onPressed: widget.onToggleLang,
-                        child: const Text('فارسی / English')),
-                    if (_error != null)
-                      Text(_error!, style: const TextStyle(color: Colors.red)),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -2931,8 +3653,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           itemBuilder: (context) => const [
             PopupMenuItem(value: 'new_group', child: Text('New group')),
             PopupMenuItem(value: 'settings', child: Text('Settings')),
-            PopupMenuItem(
-                value: 'assistant', child: Text('Safari assistant')),
+            PopupMenuItem(value: 'assistant', child: Text('Safari assistant')),
             PopupMenuItem(value: 'theme', child: Text('Dark mode')),
             PopupMenuItem(value: 'lang', child: Text('فارسی / English')),
           ],
@@ -3062,6 +3783,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               case 'export':
                 await _exportChat(chat);
                 break;
+              case 'wallpaper':
+                await _showWallpaperPicker(chatId: chat['id'] as String);
+                break;
               case 'block':
                 final peerId = _peerId(chat);
                 if (peerId.isEmpty) break;
@@ -3086,13 +3810,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           itemBuilder: (context) => [
             PopupMenuItem(
               value: 'members',
-              child:
-                  Text(type == 'dm' ? 'View contact' : 'Members & admins'),
+              child: Text(type == 'dm' ? 'View contact' : 'Members & admins'),
             ),
             PopupMenuItem(
               value: 'pin',
-              child: Text(
-                  chat['pinned'] == true ? 'Unpin chat' : 'Pin chat'),
+              child: Text(chat['pinned'] == true ? 'Unpin chat' : 'Pin chat'),
             ),
             PopupMenuItem(
               value: 'mute',
@@ -3100,8 +3822,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ? 'Unmute notifications'
                   : 'Mute notifications'),
             ),
-            const PopupMenuItem(
-                value: 'archive', child: Text('Archive chat')),
+            const PopupMenuItem(value: 'archive', child: Text('Archive chat')),
             const PopupMenuItem(
                 value: 'scheduled', child: Text('Scheduled messages')),
             PopupMenuItem(
@@ -3116,6 +3837,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
             const PopupMenuItem(value: 'search', child: Text('Search')),
             const PopupMenuItem(value: 'export', child: Text('Export chat')),
+            const PopupMenuItem(value: 'wallpaper', child: Text('Wallpaper')),
             if (type == 'dm')
               PopupMenuItem(
                 value: 'block',
@@ -3214,11 +3936,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _chats.where((c) => (c as Map)['archived'] == true).toList();
     final shown = _showArchived
         ? archived
-        : _visibleChats
-            .where((c) => (c as Map)['archived'] != true)
-            .toList();
+        : _visibleChats.where((c) => (c as Map)['archived'] != true).toList();
     return Column(
       children: [
+        _offlineBanner(),
         if (_showArchived)
           ListTile(
             leading: const Icon(Icons.arrow_back),
@@ -3261,9 +3982,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final muted = c['muted'] == true;
     final locked = _chatLock?.isLocked(c['id'] as String) == true;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final secondary = dark
-        ? WaColors.darkTextSecondary
-        : WaColors.lightTextSecondary;
+    final secondary =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
     final green = dark ? WaColors.accentDark : WaColors.accent;
     return ListTile(
       leading: WaAvatar(label: title, radius: 26),
@@ -3276,8 +3996,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 16,
-                fontWeight:
-                    unread > 0 ? FontWeight.w600 : FontWeight.w500,
+                fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ),
@@ -3289,8 +4008,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           if (muted)
             Padding(
               padding: const EdgeInsets.only(right: 4),
-              child:
-                  Icon(Icons.notifications_off, size: 15, color: secondary),
+              child: Icon(Icons.notifications_off, size: 15, color: secondary),
             ),
           if (timeLabel.isNotEmpty)
             Text(
@@ -3298,8 +4016,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               style: TextStyle(
                 fontSize: 12,
                 color: unread > 0 ? green : secondary,
-                fontWeight:
-                    unread > 0 ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
         ],
@@ -3327,10 +4044,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           if (unread > 0) ...[
             const SizedBox(width: 6),
             Container(
-              constraints:
-                  const BoxConstraints(minWidth: 20, minHeight: 20),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: muted ? secondary : WaColors.unreadBadge,
                 borderRadius: BorderRadius.circular(10),
@@ -3461,9 +4176,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: dark
-                ? WaColors.darkTextSecondary
-                : WaColors.lightTextSecondary,
+            color:
+                dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary,
           ),
         ),
       ),
@@ -3538,9 +4252,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? null
                 : const Icon(Icons.visibility_outlined),
             onTap: () => _viewStory(st),
-            onLongPress: st['user_id'] == _user?['id']
-                ? () => _deleteStory(st)
-                : null,
+            onLongPress:
+                st['user_id'] == _user?['id'] ? () => _deleteStory(st) : null,
           ),
         if (sponsored.isNotEmpty) ...[
           _sectionHeader('Sponsored'),
@@ -3550,8 +4263,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               title: Text(s.title),
               subtitle: Text(s.advertiserName),
               trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: Colors.amber.shade100,
                   borderRadius: BorderRadius.circular(10),
@@ -3572,8 +4284,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ListTile(
           leading: const CircleAvatar(child: Icon(Icons.campaign_outlined)),
           title: const Text('Promote your business'),
-          subtitle: const Text(
-              'Put your business in Stories as a sponsored story.'),
+          subtitle:
+              const Text('Put your business in Stories as a sponsored story.'),
           trailing: const Icon(Icons.chevron_right),
           onTap: _showPromoteSheet,
         ),
@@ -3701,8 +4413,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       onTap: joined
                           ? () async {
                               Navigator.pop(context);
-                              final chat = _chats.firstWhere(
-                                  (c) => (c as Map)['id'] == id);
+                              final chat = _chats
+                                  .firstWhere((c) => (c as Map)['id'] == id);
                               await _openChat(chat as Map<String, dynamic>);
                             }
                           : null,
@@ -3725,9 +4437,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (raw == null) return '';
     DateTime t;
     try {
-      t = DateTime.parse(raw)
-          .subtract(const Duration(hours: 24))
-          .toLocal();
+      t = DateTime.parse(raw).subtract(const Duration(hours: 24)).toLocal();
     } catch (_) {
       return '';
     }
@@ -3771,8 +4481,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         if (_communities.isEmpty)
           const ListTile(
             title: Text('No communities yet'),
-            subtitle: Text(
-                'Create a community to bring related groups together.'),
+            subtitle:
+                Text('Create a community to bring related groups together.'),
           ),
         for (final c in _communities)
           ListTile(
@@ -3852,8 +4562,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final announcementId = c['announcement_chat_id'] as String?;
     final announcement = announcementId == null
         ? null
-        : _chats.cast<Map?>().firstWhere(
-            (ch) => ch?['id'] == announcementId,
+        : _chats.cast<Map?>().firstWhere((ch) => ch?['id'] == announcementId,
             orElse: () => null);
     await showModalBottomSheet(
       context: context,
@@ -3879,7 +4588,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.campaign_outlined),
-                title: Text((announcement['title'] as String?) ?? 'Announcements'),
+                title:
+                    Text((announcement['title'] as String?) ?? 'Announcements'),
                 subtitle: const Text('Announcement group · admins only'),
                 onTap: () async {
                   Navigator.pop(context);
@@ -4008,8 +4718,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final id = community['id'] as String;
     final announcementId = community['announcement_chat_id'] as String?;
     final existing = _chats
-        .where((ch) =>
-            ch['type'] == 'group' && ch['id'] != announcementId)
+        .where((ch) => ch['type'] == 'group' && ch['id'] != announcementId)
         .toList();
     final titleCtrl = TextEditingController();
     final ok = await showDialog<bool>(
@@ -4046,8 +4755,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 const Divider(),
                 TextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(
-                      labelText: 'Or create a new group'),
+                  decoration:
+                      const InputDecoration(labelText: 'Or create a new group'),
                   maxLength: 100,
                 ),
               ],
@@ -4183,8 +4892,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 if (v == 'remove') {
                                   await _api.removeCommunityMember(id, uid);
                                 } else {
-                                  await _api.setCommunityMemberRole(
-                                      id, uid, v);
+                                  await _api.setCommunityMemberRole(id, uid, v);
                                 }
                                 await _refreshCommunities();
                               } catch (e) {
@@ -4195,8 +4903,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               PopupMenuItem(
                                   value: 'admin', child: Text('Make admin')),
                               PopupMenuItem(
-                                  value: 'member',
-                                  child: Text('Make member')),
+                                  value: 'member', child: Text('Make member')),
                               PopupMenuItem(
                                   value: 'remove', child: Text('Remove')),
                             ],
@@ -4216,8 +4923,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// (admins and the owner).
   Future<void> _editCommunity(Map<String, dynamic> community) async {
     final id = community['id'] as String;
-    final nameCtrl = TextEditingController(
-        text: (community['name'] as String?) ?? '');
+    final nameCtrl =
+        TextEditingController(text: (community['name'] as String?) ?? '');
     final descCtrl = TextEditingController(
         text: (community['description'] as String?) ?? '');
     final ok = await showDialog<bool>(
@@ -4282,8 +4989,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               CheckboxListTile(
                 title: const Text('Also block this user'),
                 value: alsoBlock,
-                onChanged: (v) =>
-                    setDialogState(() => alsoBlock = v == true),
+                onChanged: (v) => setDialogState(() => alsoBlock = v == true),
               ),
             ],
           ),
@@ -4314,8 +5020,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// The photo is uploaded like any other image; the server only
   /// accepts /uploads/ avatar URLs.
   Future<void> _editProfile() async {
-    final nameCtrl = TextEditingController(
-        text: (_user?['display_name'] as String?) ?? '');
+    final nameCtrl =
+        TextEditingController(text: (_user?['display_name'] as String?) ?? '');
     final bioCtrl =
         TextEditingController(text: (_user?['bio'] as String?) ?? '');
     var avatarUrl = _user?['avatar_url'] as String?;
@@ -4342,8 +5048,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         compressed,
                         'avatar-${DateTime.now().millisecondsSinceEpoch}.jpg',
                         'image/jpeg');
-                    setDialogState(
-                        () => avatarUrl = up['url'] as String?);
+                    setDialogState(() => avatarUrl = up['url'] as String?);
                   } catch (e) {
                     setState(() => _error = e.toString());
                   }
@@ -4424,12 +5129,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       : (d['device_id'] as String? ?? 'Device');
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                        (d['platform'] as String?) == 'android'
-                            ? Icons.phone_android
-                            : (d['platform'] as String?) == 'ios'
-                                ? Icons.phone_iphone
-                                : Icons.computer_outlined),
+                    leading: Icon((d['platform'] as String?) == 'android'
+                        ? Icons.phone_android
+                        : (d['platform'] as String?) == 'ios'
+                            ? Icons.phone_iphone
+                            : Icons.computer_outlined),
                     title: Text(name),
                     subtitle: Text(
                         '${d['platform'] ?? ''}${isThis ? ' · This device' : ''}'),
@@ -4441,8 +5145,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             onPressed: () async {
                               Navigator.pop(context);
                               try {
-                                await _api.removeDevice(
-                                    d['device_id'] as String);
+                                await _api
+                                    .removeDevice(d['device_id'] as String);
                               } catch (e) {
                                 setState(() => _error = e.toString());
                               }
@@ -4502,8 +5206,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
               const SizedBox(height: 16),
               FilledButton(
-                  onPressed: _unlockWithPin,
-                  child: const Text('Unlock')),
+                  onPressed: _unlockWithPin, child: const Text('Unlock')),
               if (_appLock?.biometric == true) ...[
                 const SizedBox(height: 12),
                 IconButton(
@@ -4548,8 +5251,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (lock == null) return;
     var canBiometric = false;
     try {
-      canBiometric =
-          await LocalAuthentication().canCheckBiometrics;
+      canBiometric = await LocalAuthentication().canCheckBiometrics;
     } catch (_) {}
     final pinCtrl = TextEditingController();
     final confirmCtrl = TextEditingController();
@@ -4574,8 +5276,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               if (canBiometric)
                 SwitchListTile(
                   title: const Text('Fingerprint'),
-                  subtitle:
-                      const Text('Also unlock with your fingerprint.'),
+                  subtitle: const Text('Also unlock with your fingerprint.'),
                   value: biometric,
                   onChanged: (v) => setDialogState(() => biometric = v),
                 ),
@@ -4592,8 +5293,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 keyboardType: TextInputType.number,
                 obscureText: true,
                 maxLength: 8,
-                decoration:
-                    const InputDecoration(labelText: 'Confirm PIN'),
+                decoration: const InputDecoration(labelText: 'Confirm PIN'),
               ),
             ],
           ),
@@ -4666,13 +5366,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final when = (map['created_at'] as String?) ?? '';
       final sender = (map['sender_id'] == _user?['id'])
           ? 'You'
-          : (_usersById[map['sender_id'] as String? ?? '']
-                      ?['display_name'] as String?) ??
-                  'Someone';
+          : (_usersById[map['sender_id'] as String? ?? '']?['display_name']
+                  as String?) ??
+              'Someone';
       final kind = map['kind'] as String? ?? 'text';
-      final body = kind == 'text'
-          ? (map['content'] as String? ?? '')
-          : '[$kind]';
+      final body =
+          kind == 'text' ? (map['content'] as String? ?? '') : '[$kind]';
       lines.add('[$when] $sender: $body');
     }
     try {
@@ -4680,11 +5379,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final file = File(
           '${dir.path}/safari-chat-${DateTime.now().millisecondsSinceEpoch}.txt');
       await file.writeAsString(lines.join('\n'));
-      final shared = await ShareFile.shareFile(file.path,
-          text: 'Safari chat export');
+      final shared =
+          await ShareFile.shareFile(file.path, text: 'Safari chat export');
       if (!shared) {
-        setState(() =>
-            _error = 'Sharing is not available here — the export is saved at ${file.path}');
+        setState(() => _error =
+            'Sharing is not available here — the export is saved at ${file.path}');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -4703,8 +5402,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         content: TextField(
           controller: emailCtrl,
           keyboardType: TextInputType.emailAddress,
-          decoration:
-              const InputDecoration(labelText: 'New email address'),
+          decoration: const InputDecoration(labelText: 'New email address'),
         ),
         actions: [
           TextButton(
@@ -4807,11 +5505,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ListTile(
                 title: Text(_chatTitleFromMap(row)),
                 subtitle: Text('${row['message_count']} messages'),
-                trailing: Text(
-                    mb((row['bytes'] as num?) ?? 0)),
+                trailing: Text(mb((row['bytes'] as num?) ?? 0)),
               ),
-            if (rows.isEmpty)
-              const ListTile(title: Text('No chats yet.')),
+            if (rows.isEmpty) const ListTile(title: Text('No chats yet.')),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.delete_outline),
@@ -4853,8 +5549,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         mainAxisSize: MainAxisSize.min,
         children: [
           const ListTile(
-            title: Text('Backup',
-                style: TextStyle(fontWeight: FontWeight.bold)),
+            title:
+                Text('Backup', style: TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('Your chats are saved on Safari\'s server — '
                 'signing in on any device restores them. Keep an extra '
                 'copy of your own, or re-download everything now.'),
@@ -4941,16 +5637,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       children: [
         for (final c in _calls)
           ListTile(
-            leading: WaAvatar(
-                label: (c['peer_name'] as String?) ?? '?', radius: 26),
+            leading:
+                WaAvatar(label: (c['peer_name'] as String?) ?? '?', radius: 26),
             title: Text((c['peer_name'] as String?) ?? ''),
             subtitle: Text(_callSubtitle(c),
                 style: TextStyle(
                     color: c['status'] == 'missed' ? Colors.red : null)),
             trailing: IconButton(
-              icon: Icon(c['call_type'] == 'video'
-                  ? Icons.videocam
-                  : Icons.call),
+              icon:
+                  Icon(c['call_type'] == 'video' ? Icons.videocam : Icons.call),
               color: WaColors.accent,
               onPressed: () => _callBack(c),
             ),
@@ -5031,9 +5726,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// v0.7: chats visible under the active folder filter.
   List<dynamic> get _visibleChats {
     if (_folderFilter.isEmpty) return _chats;
-    return _chats
-        .where((c) => (c as Map)['folder'] == _folderFilter)
-        .toList();
+    return _chats.where((c) => (c as Map)['folder'] == _folderFilter).toList();
   }
 
   /// WhatsApp-style filter chips ("All", "Unread", "Groups" in
@@ -5043,7 +5736,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final selectedBg = dark ? const Color(0xFF1A3A34) : const Color(0xFFD8F3DC);
     final selectedFg = dark ? WaColors.accentDark : WaColors.lightHeader;
-    final unselectedBg = dark ? WaColors.darkInputBackground : const Color(0xFFF0F2F5);
+    final unselectedBg =
+        dark ? WaColors.darkInputBackground : const Color(0xFFF0F2F5);
     final unselectedFg = dark ? WaColors.darkText : WaColors.lightText;
     Widget chip(String label, bool selected, VoidCallback onTap,
         {VoidCallback? onLongPress}) {
@@ -5079,9 +5773,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               () => setState(() => _folderFilter = '')),
           const SizedBox(width: 6),
           for (final f in _folderNames) ...[
-            chip(f, _folderFilter == f,
-                () => setState(
-                    () => _folderFilter = _folderFilter == f ? '' : f),
+            chip(
+                f,
+                _folderFilter == f,
+                () =>
+                    setState(() => _folderFilter = _folderFilter == f ? '' : f),
                 onLongPress: () => _manageFolder(f)),
             const SizedBox(width: 6),
           ],
@@ -5089,9 +5785,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             label: const Text('+ Folder'),
             backgroundColor: unselectedBg,
             labelStyle: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: unselectedFg),
+                fontSize: 13, fontWeight: FontWeight.w600, color: unselectedFg),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),
               side: BorderSide.none,
@@ -5258,8 +5952,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               },
             ),
             ListTile(
-              leading: Icon(
-                  locked ? Icons.lock_open_outlined : Icons.lock_outlined),
+              leading:
+                  Icon(locked ? Icons.lock_open_outlined : Icons.lock_outlined),
               title: Text(locked ? 'Unlock chat' : 'Lock chat'),
               subtitle: hasPin
                   ? null
@@ -5342,8 +6036,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ListTile(
                 leading: const Icon(Icons.folder_outlined),
                 title: Text(f),
-                trailing:
-                    current == f ? const Icon(Icons.check) : null,
+                trailing: current == f ? const Icon(Icons.check) : null,
                 onTap: () async {
                   Navigator.pop(context);
                   await _api.setFolder(chatId, f);
@@ -5517,7 +6210,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         privacyRow(
           'Groups',
           'Who can add you to groups. "Nobody" blocks adds — '
-          'invite links still work, since joining is your choice.',
+              'invite links still work, since joining is your choice.',
           _groupsPrivacy,
           (v) => _setPrivacyField('groups', v),
         ),
@@ -5531,8 +6224,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           onTap: _showBlockedContacts,
         ),
         ListTile(
-          leading: const Icon(Icons.delete_forever_outlined,
-              color: Colors.red),
+          leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
           title: const Text('Delete my account',
               style: TextStyle(color: Colors.red)),
           subtitle: const Text('Permanently delete your account, messages, '
@@ -5542,7 +6234,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         header('Notifications'),
         SwitchListTile(
           title: const Text('Notifications'),
-          subtitle: const Text('Show message notifications while the app is open.'),
+          subtitle:
+              const Text('Show message notifications while the app is open.'),
           value: _notifyEnabled,
           onChanged: (v) => _setNotifyPref('enabled', v),
         ),
@@ -5569,20 +6262,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ListTile(
           leading: const Icon(Icons.wallpaper_outlined),
           title: const Text('Chat wallpaper'),
-          subtitle: Text(_wallpaperColor == null
-              ? 'Default'
-              : 'Custom colour'),
-          trailing: _wallpaperColor == null
-              ? const Icon(Icons.chevron_right)
-              : Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: Color(_wallpaperColor!),
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
+          subtitle: Text(wallpaperNames[_wallpaperId] ?? 'Default'),
+          trailing: _wallpaperTile(
+              _wallpaperId, Theme.of(context).brightness == Brightness.dark,
+              size: 28),
           onTap: _showWallpaperPicker,
         ),
         ListTile(
@@ -5639,8 +6322,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ListTile(
           leading: const Icon(Icons.storage_outlined),
           title: const Text('Storage'),
-          subtitle:
-              const Text('Messages and media per chat, on the server'),
+          subtitle: const Text('Messages and media per chat, on the server'),
           onTap: _showStoragePage,
         ),
         ListTile(
@@ -5878,14 +6560,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             final text = replyCtrl.text.trim();
                             if (text.isEmpty) return;
                             try {
-                              await _api.replyToStory(
-                                  st['id'] as String, text);
+                              await _api.replyToStory(st['id'] as String, text);
                               replyCtrl.clear();
                               await _refreshChats();
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('Reply sent')),
+                                  const SnackBar(content: Text('Reply sent')),
                                 );
                               }
                             } catch (e) {
@@ -5913,8 +6593,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Navigator.pop(context);
                     _deleteStory(st);
                   },
-                  child: const Text('Delete',
-                      style: TextStyle(color: Colors.red)),
+                  child:
+                      const Text('Delete', style: TextStyle(color: Colors.red)),
                 ),
               ],
               TextButton(
@@ -5973,8 +6653,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 if (replies.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   const Text('Replies',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   for (final r in replies)
                     ListTile(
                       leading: WaAvatar(
@@ -5987,8 +6667,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 if (reactions.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   const Text('Reactions',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   for (final r in reactions)
                     ListTile(
                       leading: Text((r['emoji'] as String?) ?? '',
@@ -6070,8 +6750,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text(s.title),
             const SizedBox(height: 8),
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: Colors.amber.shade100,
                 borderRadius: BorderRadius.circular(10),
@@ -6268,8 +6947,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 children: users.where((u) {
                                   final m = u as Map<String, dynamic>;
                                   if (m['id'] == _user?['id']) return false;
-                                  final q =
-                                      queryCtrl.text.trim().toLowerCase();
+                                  final q = queryCtrl.text.trim().toLowerCase();
                                   if (q.isEmpty) return true;
                                   final name =
                                       ((m['display_name'] as String?) ?? '')
@@ -6283,10 +6961,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   final m = u as Map<String, dynamic>;
                                   return ListTile(
                                     leading: WaAvatar(
-                                        label: (m['display_name']
-                                                    as String?) ??
-                                                (m['username'] as String?) ??
-                                                '?',
+                                        label: (m['display_name'] as String?) ??
+                                            (m['username'] as String?) ??
+                                            '?',
                                         radius: 20),
                                     title: Text(
                                         (m['display_name'] as String?) ??
@@ -6294,8 +6971,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                             ''),
                                     subtitle: Text(
                                         '@${m['username'] as String? ?? ''}'),
-                                    onTap: () =>
-                                        Navigator.pop(context, m),
+                                    onTap: () => Navigator.pop(context, m),
                                   );
                                 }).toList(),
                               ),
@@ -6392,8 +7068,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     subtitle: Text('@${u['username'] as String? ?? ''}'),
                     onTap: () async {
                       Navigator.pop(context);
-                      final chat =
-                          await _api.createDm(u['id'] as String);
+                      final chat = await _api.createDm(u['id'] as String);
                       await _refreshChats();
                       await _openChat(chat);
                     },
@@ -6437,8 +7112,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         .where((u) {
           if (u['id'] == _user?['id']) return false;
           final name = ((u['display_name'] as String?) ?? '').toLowerCase();
-          final username =
-              ((u['username'] as String?) ?? '').toLowerCase();
+          final username = ((u['username'] as String?) ?? '').toLowerCase();
           return name.contains(q) || username.contains(q);
         })
         .take(8)
@@ -6627,6 +7301,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
     setState(() => _incomingCall = null);
   }
+
   String _callDurationLabel() {
     final s = _call?.durationSeconds ?? 0;
     final m = s ~/ 60;
@@ -6663,9 +7338,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         }
         _callInitiatedByMe = true;
         await _call!.startCall(
-            chatId: _activeChat!['id'] as String,
-            peerId: peerId,
-            video: video);
+            chatId: _activeChat!['id'] as String, peerId: peerId, video: video);
       }
       if (mounted) setState(() {});
     } catch (e) {
@@ -6756,9 +7429,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: dark
-                                ? WaColors.accentDark
-                                : WaColors.accent)),
+                            color:
+                                dark ? WaColors.accentDark : WaColors.accent)),
                   Text(text,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -6778,8 +7450,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   final fresh = _chats.firstWhere(
                       (c) => (c as Map)['id'] == _activeChat!['id'],
                       orElse: () => _activeChat!);
-                  setState(
-                      () => _activeChat = fresh as Map<String, dynamic>);
+                  setState(() => _activeChat = fresh as Map<String, dynamic>);
                 } catch (e) {
                   setState(() => _error = e.toString());
                 }
@@ -6798,14 +7469,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _buildChatBody() {
     final callState = _call?.state ?? CallState.idle;
     final dark = Theme.of(context).brightness == Brightness.dark;
-    final chatBg = _wallpaperColor != null
-        ? Color(_wallpaperColor!)
-        : (dark ? WaColors.darkChatBackground : WaColors.lightChatBackground);
+    final chatBg = _wallpaperDecoration(
+        _wallpaperForChat(_activeChat!['id'] as String?), dark);
     final isE2ee = _e2eeChats.contains(_activeChat!['id']);
     return Container(
-      color: chatBg,
+      decoration: chatBg,
       child: Column(
         children: [
+          _offlineBanner(),
           if (_incomingCall != null) _incomingCallBanner(),
           if (callState == CallState.inCall || callState == CallState.outgoing)
             Container(
@@ -6823,8 +7494,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ),
                 // Stage 3: in-call controls — mic, camera, switch.
                 IconButton(
-                  icon: Icon(
-                      _call?.micMuted == true ? Icons.mic_off : Icons.mic),
+                  icon:
+                      Icon(_call?.micMuted == true ? Icons.mic_off : Icons.mic),
                   tooltip: _call?.micMuted == true ? 'Unmute' : 'Mute',
                   onPressed: () {
                     _call?.toggleMute();
@@ -6836,9 +7507,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   icon: Icon(_call?.speakerOn == true
                       ? Icons.volume_up
                       : Icons.volume_down),
-                  tooltip: _call?.speakerOn == true
-                      ? 'Speaker off'
-                      : 'Speaker on',
+                  tooltip:
+                      _call?.speakerOn == true ? 'Speaker off' : 'Speaker on',
                   onPressed: () async {
                     await _call?.toggleSpeaker();
                     setState(() {});
@@ -6906,17 +7576,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: dark
-                    ? const Color(0xFF2A2F2B)
-                    : const Color(0xFFFFF8C6),
+                color: dark ? const Color(0xFF2A2F2B) : const Color(0xFFFFF8C6),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.lock,
-                      size: 15,
-                      color: dark ? Colors.white70 : Colors.black54),
+                      size: 15, color: dark ? Colors.white70 : Colors.black54),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -7011,7 +7678,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   'member')
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              color: chatBg,
+              color: Colors.transparent,
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -7025,7 +7692,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           else
             Container(
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
-              color: chatBg,
+              color: Colors.transparent,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -7054,62 +7721,61 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
                                 focusedBorder: InputBorder.none,
-                              filled: false,
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
-                            ),
-                            onChanged: (_) => _sendTyping(),
-                            onSubmitted: (_) => _send(),
-                          ),
-                        ),
-                        if (_ttlSeconds > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Chip(
-                              label: Text(
-                                  '⏱ ${_ttlSeconds >= 86400 ? '1d' : _ttlSeconds >= 3600 ? '1h' : '1m'}'),
-                              visualDensity: VisualDensity.compact,
-                              onDeleted: () => setState(() => _ttlSeconds = 0),
+                                filled: false,
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
+                              ),
+                              onChanged: (_) => _sendTyping(),
+                              onSubmitted: (_) => _send(),
                             ),
                           ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.attach_file,
-                            color: dark
-                                ? WaColors.darkIcon
-                                : WaColors.lightIcon,
+                          if (_ttlSeconds > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Chip(
+                                label: Text(
+                                    '⏱ ${_ttlSeconds >= 86400 ? '1d' : _ttlSeconds >= 3600 ? '1h' : '1m'}'),
+                                visualDensity: VisualDensity.compact,
+                                onDeleted: () =>
+                                    setState(() => _ttlSeconds = 0),
+                              ),
+                            ),
+                          IconButton(
+                            icon: Icon(
+                              Icons.attach_file,
+                              color:
+                                  dark ? WaColors.darkIcon : WaColors.lightIcon,
+                            ),
+                            tooltip:
+                                'Attach: photo, location, schedule, disappearing',
+                            onPressed: _showAttachSheet,
                           ),
-                          tooltip:
-                              'Attach: photo, location, schedule, disappearing',
-                          onPressed: _showAttachSheet,
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.camera_alt_outlined,
-                            color: dark
-                                ? WaColors.darkIcon
-                                : WaColors.lightIcon,
+                          IconButton(
+                            icon: Icon(
+                              Icons.camera_alt_outlined,
+                              color:
+                                  dark ? WaColors.darkIcon : WaColors.lightIcon,
+                            ),
+                            tooltip: 'Send photo',
+                            onPressed: _sendPhoto,
                           ),
-                          tooltip: 'Send photo',
-                          onPressed: _sendPhoto,
-                        ),
-                        const SizedBox(width: 4),
-                      ],
+                          const SizedBox(width: 4),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                if (_draftEmpty)
-                  VoiceRecordButton(
-                    api: _api,
-                    chatId: _activeChat!['id'] as String,
-                    onSent: _refreshMessages,
-                  )
-                else
-                  _WaSendButton(onPressed: _send),
-              ],
+                  const SizedBox(width: 6),
+                  if (_draftEmpty)
+                    VoiceRecordButton(
+                      api: _api,
+                      chatId: _activeChat!['id'] as String,
+                      onSent: _refreshMessages,
+                    )
+                  else
+                    _WaSendButton(onPressed: _send),
+                ],
+              ),
             ),
-          ),
           if (_error != null)
             Text(_error!, style: const TextStyle(color: Colors.red)),
         ],
@@ -7158,8 +7824,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ];
           label = weekdays[t.weekday - 1];
         } else {
-          label =
-              '${t.day}/${t.month}/${t.year}';
+          label = '${t.day}/${t.month}/${t.year}';
         }
       } catch (_) {}
     }
@@ -7168,12 +7833,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Center(
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: dark
-                ? WaColors.darkBubbleIn
-                : const Color(0xFFFCF8F0),
+            color: dark ? WaColors.darkBubbleIn : const Color(0xFFFCF8F0),
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
@@ -7275,15 +7937,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 itemCount: others.length,
                 itemBuilder: (context, i) {
                   final u = others[i];
-                  final name =
-                      (u['display_name'] as String?)?.trim() ?? '';
+                  final name = (u['display_name'] as String?)?.trim() ?? '';
                   final username = (u['username'] as String?) ?? '';
                   final label = name.isNotEmpty ? name : '@$username';
                   return ListTile(
                     leading: WaAvatar(label: label, radius: 22),
                     title: Text(label),
-                    subtitle:
-                        username.isNotEmpty ? Text('@$username') : null,
+                    subtitle: username.isNotEmpty ? Text('@$username') : null,
                     onTap: () async {
                       Navigator.pop(context);
                       try {
@@ -7405,9 +8065,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           margin: const EdgeInsets.symmetric(vertical: 6),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
-            color: dark
-                ? WaColors.darkChatBackground
-                : const Color(0xFFF0F2F5),
+            color: dark ? WaColors.darkChatBackground : const Color(0xFFF0F2F5),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
@@ -7452,14 +8110,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final textColor = dark ? WaColors.darkText : WaColors.lightText;
     final metaColor =
         dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
-    final tickColor = status == 'read'
-        ? WaColors.readBlue
-        : metaColor;
+    final tickColor = status == 'read' ? WaColors.readBlue : metaColor;
     final ticks = !mine
         ? ''
-        : status == 'read' || status == 'delivered'
-            ? ' ✓✓'
-            : ' ✓';
+        : m['pending'] == true
+            ? ' 🕐'
+            : status == 'read' || status == 'delivered'
+                ? ' ✓✓'
+                : ' ✓';
     // Subtle entrance: fade + rise, so new messages feel alive.
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
@@ -7496,8 +8154,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ],
             ),
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -7509,8 +8166,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         Icon(Icons.lock, size: 12, color: metaColor),
                         const SizedBox(width: 2),
                         Text('E2EE',
-                            style:
-                                TextStyle(fontSize: 11, color: metaColor)),
+                            style: TextStyle(fontSize: 11, color: metaColor)),
                       ],
                     ),
                   if (fwdLabel != null)
@@ -7593,8 +8249,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             padding: const EdgeInsets.only(right: 6),
                             child: Text(
                               '👁 ${m['view_count']}',
-                              style:
-                                  TextStyle(fontSize: 11, color: metaColor),
+                              style: TextStyle(fontSize: 11, color: metaColor),
                             ),
                           ),
                         Text(
@@ -7663,8 +8318,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final chat = _activeChat;
     if (chat == null) return;
     final question = TextEditingController();
-    final optionControllers =
-        List.generate(2, (_) => TextEditingController());
+    final optionControllers = List.generate(2, (_) => TextEditingController());
     bool allowMultiple = false;
     showDialog(
       context: context,
@@ -7722,8 +8376,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 SwitchListTile(
                   title: const Text('Allow multiple answers'),
                   value: allowMultiple,
-                  onChanged: (v) =>
-                      setDialogState(() => allowMultiple = v),
+                  onChanged: (v) => setDialogState(() => allowMultiple = v),
                   contentPadding: EdgeInsets.zero,
                 ),
               ],
@@ -7766,7 +8419,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   /// and percentage bars; tap to vote (or change / clear the vote).
   Widget _pollBubble(Map<String, dynamic> m, String content) {
     final pollId = _parsePollId(content);
-    final fallbackQuestion = _pollPreviewText(content).replaceFirst('📊 Poll: ', '');
+    final fallbackQuestion =
+        _pollPreviewText(content).replaceFirst('📊 Poll: ', '');
     if (pollId == null) {
       return const Text('📊 Poll');
     }
@@ -7800,15 +8454,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(question,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(question, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ...options.asMap().entries.map((e) {
               final i = e.key;
               final label = e.value.toString();
-              final count = i < votes.length
-                  ? (votes[i] as num).toInt()
-                  : 0;
+              final count = i < votes.length ? (votes[i] as num).toInt() : 0;
               final pct = total == 0 ? 0.0 : count / total;
               final mine = myVotes.contains(i);
               return InkWell(
@@ -7974,8 +8625,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     Text(label,
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                     if (username.isNotEmpty)
-                      Text('@$username',
-                          style: const TextStyle(fontSize: 12)),
+                      Text('@$username', style: const TextStyle(fontSize: 12)),
                     const Text('Tap to message',
                         style: TextStyle(fontSize: 11)),
                   ],
@@ -8143,7 +8793,6 @@ class _VideoPlayerState extends State<_VideoPlayer> {
     );
   }
 }
-
 
 /// WhatsApp green circular send button.
 class _WaSendButton extends StatelessWidget {

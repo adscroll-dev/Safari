@@ -18,8 +18,7 @@ class ApiClient {
     //   flutter build apk --dart-define=VYRO_API_URL=https://vyro-api-xxxx.onrender.com
     // Empty (dev default) keeps the emulator/localhost behaviour, so the
     // web build screenshotted against localhost:8080 is unaffected.
-    const override =
-        String.fromEnvironment('VYRO_API_URL', defaultValue: '');
+    const override = String.fromEnvironment('VYRO_API_URL', defaultValue: '');
     if (override.isNotEmpty) return override;
     if (defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:8080';
@@ -28,7 +27,7 @@ class ApiClient {
   }
 
   final String baseUrl;
-  String? _token;
+  String? token;
 
   /// Optional usage tracker (Data Saver meter). When set, every
   /// request's real byte counts are recorded per category.
@@ -39,7 +38,7 @@ class ApiClient {
 
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
-        if (_token != null) 'Authorization': 'Bearer $_token',
+        if (token != null) 'Authorization': 'Bearer $token',
       };
 
   Future<Map<String, dynamic>> _req(String method, String path,
@@ -88,14 +87,14 @@ class ApiClient {
       'password': password,
       'display_name': displayName,
     });
-    if (out['token'] != null) _token = out['token'] as String;
+    if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
     final out = await _req(
         'POST', '/api/auth/login', {'email': email, 'password': password});
-    if (out['token'] != null) _token = out['token'] as String;
+    if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
@@ -103,14 +102,14 @@ class ApiClient {
   Future<Map<String, dynamic>> verifyRegister(String email, String code) async {
     final out = await _req(
         'POST', '/api/auth/verify-register', {'email': email, 'code': code});
-    if (out['token'] != null) _token = out['token'] as String;
+    if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
   Future<Map<String, dynamic>> verifyLogin(String email, String code) async {
     final out = await _req(
         'POST', '/api/auth/verify-login', {'email': email, 'code': code});
-    if (out['token'] != null) _token = out['token'] as String;
+    if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
@@ -125,7 +124,10 @@ class ApiClient {
   /// v0.4: [ttlSeconds] sends a disappearing message (60..604800).
   /// v0.7: [forwardedFrom]/[forwardedFromId] mark a forwarded message.
   Future<Map<String, dynamic>> sendMessage(String chatId, String content,
-          {int? ttlSeconds, String? replyToId, String? forwardedFrom, String? forwardedFromId}) =>
+          {int? ttlSeconds,
+          String? replyToId,
+          String? forwardedFrom,
+          String? forwardedFromId}) =>
       _req('POST', '/api/chats/$chatId/messages', {
         'content': content,
         if (ttlSeconds != null) 'ttl_seconds': ttlSeconds,
@@ -148,9 +150,10 @@ class ApiClient {
     final fromName = (original['forwarded_from'] as String?)?.isNotEmpty == true
         ? original['forwarded_from'] as String
         : await _displayName(original['sender_id'] as String? ?? '');
-    final fromId = (original['forwarded_from_id'] as String?)?.isNotEmpty == true
-        ? original['forwarded_from_id'] as String
-        : (original['sender_id'] as String? ?? '');
+    final fromId =
+        (original['forwarded_from_id'] as String?)?.isNotEmpty == true
+            ? original['forwarded_from_id'] as String
+            : (original['sender_id'] as String? ?? '');
     return _req('POST', '/api/chats/$targetChatId/messages', {
       'content': original['content'] as String? ?? '',
       'kind': kind,
@@ -246,7 +249,8 @@ class ApiClient {
   Future<List<dynamic>> listCommunities() => _getList('/api/communities');
   Future<Map<String, dynamic>> createCommunity(String name,
           {String description = ''}) =>
-      _req('POST', '/api/communities', {'name': name, 'description': description});
+      _req('POST', '/api/communities',
+          {'name': name, 'description': description});
   Future<Map<String, dynamic>> getCommunity(String id) =>
       _req('GET', '/api/communities/$id');
   Future<Map<String, dynamic>> updateCommunity(String id,
@@ -275,8 +279,8 @@ class ApiClient {
       _req('DELETE', '/api/communities/$id/subgroups/$chatId');
 
   // Stage 5 — Channels (WhatsApp parity).
-  Future<List<dynamic>> searchChannels(String q) => _getList(
-      '/api/channels/search?q=${Uri.encodeQueryComponent(q)}');
+  Future<List<dynamic>> searchChannels(String q) =>
+      _getList('/api/channels/search?q=${Uri.encodeQueryComponent(q)}');
   Future<Map<String, dynamic>> followChannel(String chatId) =>
       _req('POST', '/api/chats/$chatId/follow', null);
   Future<void> unfollowChannel(String chatId) =>
@@ -305,8 +309,10 @@ class ApiClient {
   /// Stage 1: share a Safari user as a contact card. The server
   /// validates that the user exists; content is JSON {"user_id"}.
   Future<Map<String, dynamic>> sendContact(String chatId, String userId) =>
-      _req('POST', '/api/chats/$chatId/messages',
-          {'kind': 'contact', 'content': jsonEncode({'user_id': userId})});
+      _req('POST', '/api/chats/$chatId/messages', {
+        'kind': 'contact',
+        'content': jsonEncode({'user_id': userId})
+      });
 
   /// v0.6 parity: reactions (POST {emoji} / DELETE ?emoji=).
   Future<Map<String, dynamic>> addReaction(String id, String emoji) =>
@@ -408,8 +414,8 @@ class ApiClient {
   Future<List<dynamic>> listCalls() => _getList('/api/calls');
 
   // Stage 4 — Polls (WhatsApp parity).
-  Future<Map<String, dynamic>> createPoll(
-          String chatId, String question, List<String> options, bool allowMultiple) =>
+  Future<Map<String, dynamic>> createPoll(String chatId, String question,
+          List<String> options, bool allowMultiple) =>
       _req('POST', '/api/chats/$chatId/polls', {
         'question': question,
         'options': options,
@@ -448,16 +454,15 @@ class ApiClient {
       _req('GET', '/api/users/$userId/presence');
   Future<Map<String, dynamic>> getPrivacy() =>
       _req('GET', '/api/users/me/privacy');
-  Future<Map<String, dynamic>> setPrivacy(String visibility) =>
-      _req('PUT', '/api/users/me/privacy', {'last_seen_visibility': visibility});
+  Future<Map<String, dynamic>> setPrivacy(String visibility) => _req(
+      'PUT', '/api/users/me/privacy', {'last_seen_visibility': visibility});
 
   /// Stage 11 (Settings parity): one combined endpoint for every
   /// privacy setting — last seen, status, avatar, about, groups and
   /// read receipts. Partial update: only the fields present change.
   Future<Map<String, dynamic>> getPrivacySettings() =>
       _req('GET', '/api/users/me/privacy-settings');
-  Future<Map<String, dynamic>> setPrivacySettings(
-          Map<String, dynamic> patch) =>
+  Future<Map<String, dynamic>> setPrivacySettings(Map<String, dynamic> patch) =>
       _req('PUT', '/api/users/me/privacy-settings', patch);
 
   /// Stage 11: delete my account and everything it owns. The
@@ -590,15 +595,16 @@ class ApiClient {
       _req('POST', '/api/chats/$chatId/archive');
   Future<Map<String, dynamic>> unarchiveChat(String chatId) =>
       _req('POST', '/api/chats/$chatId/unarchive');
+
   /// Stage 1: mute / unmute a chat (per-user; no push for it).
   Future<Map<String, dynamic>> muteChat(String chatId) =>
       _req('POST', '/api/chats/$chatId/mute');
   Future<Map<String, dynamic>> unmuteChat(String chatId) =>
       _req('POST', '/api/chats/$chatId/unmute');
+
   /// Stage 1: pin / unpin one message in a chat (pinned banner).
   Future<Map<String, dynamic>> pinMessage(String chatId, String messageId) =>
-      _req('POST', '/api/chats/$chatId/pin-message',
-          {'message_id': messageId});
+      _req('POST', '/api/chats/$chatId/pin-message', {'message_id': messageId});
   Future<Map<String, dynamic>> unpinMessage(String chatId) =>
       _req('DELETE', '/api/chats/$chatId/pin-message');
   Future<Map<String, dynamic>> setFolder(String chatId, String folder) =>
@@ -618,7 +624,7 @@ class ApiClient {
       {UsageCategory category = UsageCategory.media}) async {
     final req =
         http.MultipartRequest('POST', Uri.parse('$baseUrl/api/uploads'));
-    if (_token != null) req.headers['Authorization'] = 'Bearer $_token';
+    if (token != null) req.headers['Authorization'] = 'Bearer $token';
     req.files
         .add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
     final res = await http.Response.fromStream(await req.send());
@@ -644,12 +650,11 @@ class ApiClient {
   /// Auth header for players/loaders that fetch protected URLs
   /// (e.g. just_audio fetching /uploads/...).
   Map<String, String> get authHeaders => {
-        if (_token != null) 'Authorization': 'Bearer $_token',
+        if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  String? get token => _token;
 
   /// Stage 11: forget the token (after account deletion), so the
   /// app returns to the login screen and sends no more authed calls.
-  void clearToken() => _token = null;
+  void clearToken() => token = null;
 }
