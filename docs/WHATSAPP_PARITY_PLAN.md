@@ -374,3 +374,15 @@ Never present a demo feature as complete.
     adscroll-dev/Safari) — the push works with
     GH_CONFIG_DIR=$HOME/.config/gh-adscroll; no sign-in from her
     was needed. Still untested on a real phone.
+
+13. Invite links open a real page (gap found 2026-11-16): the /join
+    page (web/app/join/[token]) shows the group/channel preview
+    (name, member count, inviter) with a download button and a hint
+    for people who already have the app; all 11 site languages.
+    GET /api/invites/{token} is now public (joining still needs an
+    account). — DONE 2026-11-16 (commit 778093c, go test ./... all
+    pass, VERIFIED LIVE: /join/badtoken123 renders the not-found
+    page, /api/invites/badtoken123 answers 404 without auth). The
+    valid-invite rendering was verified locally against the real
+    backend with a real invite token; a live valid invite was not
+    testable without a live user account.
