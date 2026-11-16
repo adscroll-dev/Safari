@@ -145,5 +145,31 @@ void main() {
         label: 'story row');
     await tester.pump(const Duration(seconds: 1));
     await binding.takeScreenshot('stories');
+
+    // 6) Calls tab (premium empty state).
+    await tester.tap(find.text('Calls'));
+    await _waitFor(tester, find.text('No calls yet'), label: 'calls empty');
+    await tester.pump(const Duration(seconds: 1));
+    await binding.takeScreenshot('calls');
+
+    // 7) Communities tab (New community card + empty state).
+    await tester.tap(find.text('Communities'));
+    await _waitFor(tester, find.text('No communities yet'),
+        label: 'communities empty');
+    await tester.pump(const Duration(seconds: 1));
+    await binding.takeScreenshot('communities');
+
+    // 8) Dark mode (the user uses dark mode): toggle via the ⋮ menu,
+    // then capture the chat list and calls in dark mode.
+    await tester.tap(find.byIcon(Icons.more_vert));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Dark mode'));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Chats'));
+    await tester.pump(const Duration(seconds: 1));
+    await binding.takeScreenshot('chat-list-dark');
+    await tester.tap(find.text('Calls'));
+    await tester.pump(const Duration(seconds: 1));
+    await binding.takeScreenshot('calls-dark');
   });
 }
