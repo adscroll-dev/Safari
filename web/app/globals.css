@@ -77,11 +77,12 @@ input, button { font: inherit; }
   position: absolute;
   left: 50%;
   top: 50%;
-  /* The ring sits ON the planet's own ring ellipse, measured from the
-     logo image: center (258,275), a=212, b=76.7, tilt -18.1deg in the
-     512px square. At the 96px hero size that is an 80px circle
-     flattened by rotateX(69deg) and tilted -18deg, centered on the
-     image's ring center. */
+  /* A bright GLINT that travels around the logo's own ring — the ring
+     itself is the thick glossy one in the original logo image. Glint
+     ellipse measured from the logo: center (258,275), a=212, b=76.7,
+     tilt -18.1deg in the 512px square. At the 96px hero size that is
+     an 80px circle flattened by rotateX(69deg) and tilted -18deg,
+     centered on the image's ring center. */
   width: 80px;
   height: 80px;
   margin-left: -40px;
@@ -99,9 +100,13 @@ input, button { font: inherit; }
   height: 80px;
   margin-top: -40px;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, #2563eb, #7c3aed, #00c2ff, #2563eb);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  /* Mostly transparent: one bright arc (~25% of the circle) that
+     travels around the ring forever. Fat band so the glint is clearly
+     visible sitting on the ring. */
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 268deg, #ffffff 282deg, #7dd3fc 300deg, #00c2ff 318deg, #2563eb 340deg, transparent 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 10px), #000 calc(100% - 9px));
+  filter: drop-shadow(0 0 5px rgba(0, 194, 255, 0.9)) drop-shadow(0 0 2px rgba(255, 255, 255, 0.9));
   animation: safari-ring-spin 6s linear infinite;
 }
 @keyframes safari-ring-spin {

@@ -286,10 +286,10 @@ export default function LandingContent() {
               alignItems: "flex-start",
             }}
           >
-            {/* Planet-only logo (ring removed from the image) with the
-                code-drawn ring sitting exactly ON the planet's own ring
-                ellipse — the ring in the icon rotates forever, like the
-                iPhone Clock, never still. */}
+            {/* Her ORIGINAL logo, exactly as she sent it — the thick
+                glossy ring stays. A bright glint travels around the
+                ring forever, like the iPhone Clock — that IS the ring
+                rotating, never still. */}
             <div
               style={{
                 flexShrink: 0,
@@ -306,7 +306,7 @@ export default function LandingContent() {
               </div>
               <div className="safari-float">
                 <img
-                  src="/safari-logo-planet-no-ring.png"
+                  src="/safari-logo.png"
                   alt="Safari logo"
                   width={96}
                   height={96}
