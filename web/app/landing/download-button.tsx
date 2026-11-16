@@ -46,13 +46,16 @@ const apks: Apk[] = [
 ];
 
 const buttonStyle: React.CSSProperties = {
-  background: "linear-gradient(90deg,#2563eb,#7c3aed)",
+  background: "linear-gradient(90deg,#25D366,#00A884)",
   color: "#fff",
-  padding: "12px 24px",
+  padding: "16px 32px",
   borderRadius: 999,
   textDecoration: "none",
-  fontWeight: 700,
+  fontWeight: 800,
+  fontSize: 17,
   display: "inline-block",
+  boxShadow:
+    "0 14px 28px rgba(0,168,132,0.45), 0 3px 8px rgba(0,0,0,0.2)",
 };
 
 // Detect the visitor's phone processor (ABI) from the browser, so the
@@ -113,11 +116,13 @@ export default function DownloadButton({
   return (
     <section
       style={{
-        border: "2px solid #2563eb",
-        borderRadius: 16,
+        border: "2px solid #00A884",
+        borderRadius: 20,
         padding: 20,
-        background: "#eff6ff",
+        background: "linear-gradient(135deg,#E6F7EF,#D9F2E4)",
         marginBottom: 16,
+        boxShadow:
+          "0 12px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
       }}
     >
       <p style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>
@@ -127,7 +132,7 @@ export default function DownloadButton({
         {strings.detected} {apk.abi} · Size: {apk.size} ({apk.bytes})
       </p>
       <p style={{ margin: "0 0 12px" }}>
-        <a href={apk.href} style={buttonStyle}>
+        <a href={apk.href} style={buttonStyle} className="safari-btn">
           {strings.downloadButton}
         </a>
       </p>

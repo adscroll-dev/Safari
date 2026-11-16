@@ -20,3 +20,43 @@ body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Tahoma, san
 a { color: var(--vyro-violet); }
 button { cursor: pointer; }
 input, button { font: inherit; }
+
+/* 3D landing page: drifting glass orbs and chat bubbles, matching
+   the Safari app's animated registration page. */
+@keyframes safari-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(10px, -16px, 0); }
+}
+@keyframes safari-drift-alt {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-12px, 14px, 0); }
+}
+@keyframes safari-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.safari-orb {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+.safari-orb-a { animation: safari-drift 7s ease-in-out infinite; }
+.safari-orb-b { animation: safari-drift-alt 9s ease-in-out infinite; }
+.safari-bubble {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50% 50% 50% 8px;
+  pointer-events: none;
+}
+.safari-float { animation: safari-float 5s ease-in-out infinite; }
+.safari-shot { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+.safari-shot:hover { transform: translateY(-6px) rotate(-1deg); }
+.safari-btn { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.safari-btn:hover { transform: translateY(-2px); }
+@media (prefers-reduced-motion: reduce) {
+  .safari-orb-a, .safari-orb-b, .safari-float { animation: none; }
+}
