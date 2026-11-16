@@ -365,6 +365,12 @@ Never present a demo feature as complete.
     pickers), blocked-contacts list with Unblock, delete account
     (two confirmations, signs out to login), chat wallpaper picker;
     flutter analyze clean, 34/34 mobile tests pass; APKs published
-    to the download site (arm64 33,932,234 B, armeabi 27,076,028 B,
-    x86_64 36,468,427 B; aapt2 verified app.vyro 0.6.0 Safari). Still
-    untested on a real phone.
+    to the download site (arm64 33,932,234 B 595e2e16…970f76c,
+    armeabi 27,076,028 B, x86_64 36,468,427 B; aapt2 verified
+    app.vyro 0.6.0 Safari). DELIVERED 2026-11-16 ~06:55 +0430,
+    VERIFIED LIVE (landing hash, live APK SHA-256 match, /health
+    ok). NOTE: the first push failed with GitHub 403 because the
+    worker used the default gh config (Safari-svg, no permission on
+    adscroll-dev/Safari) — the push works with
+    GH_CONFIG_DIR=$HOME/.config/gh-adscroll; no sign-in from her
+    was needed. Still untested on a real phone.
