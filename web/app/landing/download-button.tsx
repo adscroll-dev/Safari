@@ -43,8 +43,11 @@ const apks: Apk[] = [
   },
 ];
 
+// Dark premium styling (2026-11-16 redesign): cyan-to-blue gradient
+// button with glow, dark glass card. Functionality unchanged: exactly
+// ONE auto-detected APK link, SHA-256 shown for verification.
 const buttonStyle: React.CSSProperties = {
-  background: "linear-gradient(90deg,#25D366,#00A884)",
+  background: "linear-gradient(90deg,#22d3ee,#2563eb 55%,#7c3aed)",
   color: "#fff",
   padding: "16px 32px",
   borderRadius: 999,
@@ -53,7 +56,7 @@ const buttonStyle: React.CSSProperties = {
   fontSize: 17,
   display: "inline-block",
   boxShadow:
-    "0 14px 28px rgba(0,168,132,0.45), 0 3px 8px rgba(0,0,0,0.2)",
+    "0 16px 34px rgba(37,99,235,0.5), 0 0 24px rgba(34,211,238,0.35)",
 };
 
 // Detect the visitor's phone processor (ABI) from the browser, so the
@@ -114,19 +117,27 @@ export default function DownloadButton({
   return (
     <section
       style={{
-        border: "2px solid #00A884",
+        border: "1px solid rgba(34,211,238,0.35)",
         borderRadius: 20,
         padding: 20,
-        background: "linear-gradient(135deg,#E6F7EF,#D9F2E4)",
+        background:
+          "linear-gradient(160deg, rgba(255,255,255,0.09), rgba(255,255,255,0.03))",
         marginBottom: 16,
         boxShadow:
-          "0 12px 28px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.08)",
+          "0 24px 48px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.14)",
       }}
     >
-      <p style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700 }}>
+      <p
+        style={{
+          margin: "0 0 4px",
+          fontSize: 18,
+          fontWeight: 700,
+          color: "#f1f5f9",
+        }}
+      >
         {strings.forYourPhone}
       </p>
-      <p style={{ margin: "0 0 12px", color: "#4b5563", fontSize: 14 }}>
+      <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 14 }}>
         {strings.detected} {apk.abi} · Size: {apk.size} ({apk.bytes})
       </p>
       <p style={{ margin: "0 0 12px" }}>
@@ -134,7 +145,7 @@ export default function DownloadButton({
           {strings.downloadButton}
         </a>
       </p>
-      <p style={{ margin: "0 0 4px", fontSize: 13, color: "#374151" }}>
+      <p style={{ margin: "0 0 4px", fontSize: 13, color: "#cbd5e1" }}>
         {strings.verify}
       </p>
       <code
@@ -142,10 +153,11 @@ export default function DownloadButton({
           display: "block",
           fontSize: 12,
           wordBreak: "break-all",
-          background: "#ffffff",
-          border: "1px solid #dbeafe",
+          background: "#0b1220",
+          border: "1px solid #1e293b",
           borderRadius: 8,
           padding: 10,
+          color: "#7dd3fc",
         }}
       >
         {apk.sha256}
