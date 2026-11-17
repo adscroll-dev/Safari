@@ -11,35 +11,35 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-16 with aapt2 (package app.vyro, version 0.7.3, label
+// 2026-11-17 with aapt2 (package app.vyro, version 0.7.4, label
 // "Safari"; live API https://vyro-api-wf4b.onrender.com present in
-// each APK's own libapp.so, no dev URL). Rebuilt 2026-11-16 17:41
-// +0430 — v0.7.3: premium futuristic Safari UI (midnight navy,
-// cyan/purple glass, floating nav, premium empty states).
+// each APK's own libapp.so, no dev URL). Rebuilt 2026-11-17 18:06
+// +0430 — v0.7.4: stage 2 UI redesign (aurora glass, fixed Updates
+// bottom cutoff, polished Chats, no DEBUG banner).
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.7.3-arm64-v8a.apk",
-    size: "34.3 MB",
-    bytes: "34,332,045 bytes",
+    href: "/downloads/safari-0.7.4-arm64-v8a.apk",
+    size: "34.9 MB",
+    bytes: "34,929,282 bytes",
     sha256:
-      "1e5b99bab02150ade35ae0eed7eec2003d017a1b56e5bacb3e1830b26ce650a3",
+      "12dc3b56cf2986f5942cf447eba0ecfd03fad61c692ae972a9ac8c678b18fc77",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.7.3-armeabi-v7a.apk",
-    size: "27.4 MB",
-    bytes: "27,426,689 bytes",
+    href: "/downloads/safari-0.7.4-armeabi-v7a.apk",
+    size: "28.0 MB",
+    bytes: "28,023,910 bytes",
     sha256:
-      "7b0e3262c5bfc717b2bf21bc4725030ac945b060cd2e8c7c326099c386237733",
+      "a68e5a2fa7b96171ec2e7b15c75a268bb12f6e26ee007d0073085ffbe34be58a",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.7.3-x86_64.apk",
-    size: "36.8 MB",
-    bytes: "36,802,692 bytes",
+    href: "/downloads/safari-0.7.4-x86_64.apk",
+    size: "37.4 MB",
+    bytes: "37,399,937 bytes",
     sha256:
-      "967808438aee1bf35fd26a831a151bd3fb43a7c5d6f22873abccf80293952cc0",
+      "5060305acf6999d335aad9c914c2aefbe9caa2a3f02bfc370fc335d6895f17fc",
   },
 ];
 
