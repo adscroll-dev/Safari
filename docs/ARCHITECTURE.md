@@ -1,4 +1,4 @@
-# VYRO — Architecture
+# Safari — Architecture
 
 Slogan: **Connect Beyond Limits**
 
@@ -42,7 +42,7 @@ having a single API; Flutter covers mobile + desktop, Next.js covers web.
 | Web client | Next.js 14 (App Router), React, TypeScript | `web/` | Skeleton + working login/chat UI against the Go API (needs `npm install`) |
 | Mobile/desktop | Flutter 3 (Dart) | `mobile/` | Skeleton + login/chat screens against the Go API (needs Flutter SDK) |
 | Calls | WebRTC (STUN + self-hosted coturn TURN, v0.6) | `internal/ws/hub.go`, `web/lib/use-call.ts` | Signaling done + audio calls in web (v0.5); TURN client wired (v0.6); live media untested |
-| E2EE | VYRO E2EE v1 (X3DH + Double Ratchet, audited primitives only) | `backend/internal/e2ee/`, `web/lib/e2ee.ts` | 1:1 DMs done (v0.5), proven interoperable; groups not done |
+| E2EE | Safari E2EE v1 (X3DH + Double Ratchet, audited primitives only) | `backend/internal/e2ee/`, `web/lib/e2ee.ts` | 1:1 DMs done (v0.5), proven interoperable; groups not done |
 | Web Push | VAPID (RFC 8292) | `internal/push/`, `web/public/sw.js` | Done (v0.5); subscriptions in-memory; real browser push service untested |
 
 ## Backend layout
@@ -58,7 +58,7 @@ backend/
     middleware/               # JWT auth, CORS, JSON helpers
     handlers/                 # REST handlers (auth, users, chats, messages, keys, push)
     ws/                       # WebSocket hub (rooms + call signaling)
-    e2ee/                     # VYRO E2EE v1: X3DH + Double Ratchet (v0.5)
+    e2ee/                     # Safari E2EE v1: X3DH + Double Ratchet (v0.5)
     push/                     # Web Push / VAPID (v0.5)
   migrations/001_init.sql     # PostgreSQL schema (004_v05.sql adds E2EE sign-key columns)
   Dockerfile / docker-compose.yml / .env.example
@@ -239,7 +239,7 @@ were proven (`internal/push/push_test.go`,
 ## E2EE — v0.5
 
 See `docs/SECURITY.md` for the full design. In short: X3DH + Double
-Ratchet ("VYRO E2EE v1", 1:1 DMs, one device), Go
+Ratchet ("Safari E2EE v1", 1:1 DMs, one device), Go
 (`backend/internal/e2ee/`) and TypeScript/WebCrypto (`web/lib/e2ee.ts`,
 `web/lib/e2ee-store.ts`) implementations proven interoperable in both
 directions. Key bundle endpoint `GET /api/keys/{userId}/bundle`
@@ -257,7 +257,7 @@ ciphertext envelope as `Content` and are excluded from search.
   disabled, with a free alternative noted in the README.
 - Free push: web push (VAPID, self-hosted) is implemented in v0.5;
   FCM's free tier is not wired (the browser push service delivers
-  VAPID pushes without any VYRO-side FCM account).
+  VAPID pushes without any Safari-side FCM account).
 
 ## Roadmap
 
@@ -272,7 +272,7 @@ ciphertext envelope as `Content` and are excluded from search.
    pin/archive/folders, stories, bots, group admin enforcement,
    Redis-backed rate limiting, E2EE key foundation (keys only),
    familiar web/mobile UI.
-5. **v0.5** — ✅ (done 2026-11-12): real E2EE for 1:1 DMs (VYRO E2EE
+5. **v0.5** — ✅ (done 2026-11-12): real E2EE for 1:1 DMs (Safari E2EE
    v1 — X3DH + Double Ratchet, Go + TypeScript/WebCrypto, proven
    interoperable; Safety Number in the web UI), WebRTC call signaling
    + audio calls in the web client (media untested live), Web Push

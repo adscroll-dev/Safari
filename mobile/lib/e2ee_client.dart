@@ -2,10 +2,9 @@
 //
 // Owns the device identity, signed pre-key, one-time pre-keys, 1:1
 // Double Ratchet sessions and group Sender Keys, and talks to the
-// backend key/sender-key endpoints. Private keys are stored in
-// SharedPreferences as base64 — dev-grade, same as the web client's
-// localStorage storage; a production client should use the OS
-// keystore. Private keys never leave the device.
+// backend key/sender-key endpoints. Private keys are stored in the OS
+// keystore, migrating legacy SharedPreferences values on first access.
+// Private keys never leave the device.
 //
 // Wire format is identical to web/lib/e2ee.ts and
 // backend/internal/e2ee, so a mobile client and a web client can
@@ -13,16 +12,27 @@
 // Go-produced vector in web/lib/e2ee-vector.json).
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'e2ee.dart';
+import 'e2ee_key_storage.dart';
 
 class E2eeClient {
-  E2eeClient(this.api, this.deviceId);
+  E2eeClient(
+    this.api,
+    this.deviceId, {
+    SecureValueStorage? secureStorage,
+    void Function(String message)? onStorageWarning,
+  })  : _secureStorage = secureStorage ?? const FlutterSecureValueStorage(),
+        _onStorageWarning = onStorageWarning ?? debugPrint;
 
   final ApiClient api;
   final String deviceId;
+  final SecureValueStorage _secureStorage;
+  final void Function(String message) _onStorageWarning;
+  E2eeKeyStorage? _keyStorage;
 
   Identity? identity;
   SignedPreKey? signedPreKey;
@@ -41,23 +51,29 @@ class E2eeClient {
   Future<void> ensureSetup(String userId) async {
     if (_setupDone) return;
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString('$_prefsPrefix:identity:$deviceId');
+    final storage = _keyStorage = E2eeKeyStorage(
+      preferences: prefs,
+      secureStorage: _secureStorage,
+      onWarning: _onStorageWarning,
+    );
+    final stored = await storage.read('$_prefsPrefix:identity:$deviceId');
     if (stored != null) {
       try {
         identity =
             Identity.fromJson(jsonDecode(stored) as Map<String, dynamic>);
-        final spkRaw = prefs.getString('$_prefsPrefix:spk:$deviceId');
+        final spkRaw = await storage.read('$_prefsPrefix:spk:$deviceId');
         if (spkRaw != null) {
           signedPreKey =
               SignedPreKey.fromJson(jsonDecode(spkRaw) as Map<String, dynamic>);
         }
-        final opkRaw = prefs.getString('$_prefsPrefix:opks:$deviceId');
+        final opkRaw = await storage.read('$_prefsPrefix:opks:$deviceId');
         if (opkRaw != null) {
           oneTimePreKeys = (jsonDecode(opkRaw) as List)
               .map((e) => OneTimePreKey.fromJson(e as Map<String, dynamic>))
               .toList();
         }
-        final sessionsRaw = prefs.getString('$_prefsPrefix:sessions:$deviceId');
+        final sessionsRaw =
+            await storage.read('$_prefsPrefix:sessions:$deviceId');
         if (sessionsRaw != null) {
           for (final e
               in (jsonDecode(sessionsRaw) as Map<String, dynamic>).entries) {
@@ -75,7 +91,7 @@ class E2eeClient {
       oneTimePreKeys = [
         for (var i = 0; i < 10; i++) await generateOneTimePreKey(100 + i),
       ];
-      await _persist(prefs);
+      await _persist(storage);
       // Publish ONLY public key material.
       await api.uploadIdentityKey(
         deviceId,
@@ -91,28 +107,32 @@ class E2eeClient {
       ]);
     }
     try {
-      await api.registerDevice(deviceId, 'VYRO mobile');
+      await api.registerDevice(deviceId, 'Safari mobile');
     } catch (_) {
       // Device registry is best-effort; E2EE works without it.
     }
     _setupDone = true;
   }
 
-  Future<void> _persist(SharedPreferences prefs) async {
+  Future<void> _persist(E2eeKeyStorage storage) async {
     if (identity == null) return;
-    await prefs.setString(
+    await storage.write(
         '$_prefsPrefix:identity:$deviceId', jsonEncode(identity!.toJson()));
     if (signedPreKey != null) {
-      await prefs.setString(
+      await storage.write(
           '$_prefsPrefix:spk:$deviceId', jsonEncode(signedPreKey!.toJson()));
     }
-    await prefs.setString('$_prefsPrefix:opks:$deviceId',
+    await storage.write('$_prefsPrefix:opks:$deviceId',
         jsonEncode([for (final k in oneTimePreKeys) k.toJson()]));
   }
 
   Future<void> persistSessions() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    final storage = _keyStorage ??= E2eeKeyStorage(
+      preferences: await SharedPreferences.getInstance(),
+      secureStorage: _secureStorage,
+      onWarning: _onStorageWarning,
+    );
+    await storage.write(
         '$_prefsPrefix:sessions:$deviceId',
         jsonEncode(
             {for (final e in sessions.entries) e.key: e.value.toState()}));

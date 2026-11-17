@@ -1,8 +1,8 @@
-// VYRO local AI for mobile (v0.6) — a faithful Dart port of
+// Safari local AI for mobile (v0.6) — a faithful Dart port of
 // web/lib/local-ai.ts. HONEST LABELING:
 // - There is NO cloud AI and NO paid translation API behind this.
 // - The assistant is a small rule-based responder that answers
-//   questions about VYRO itself and a few general prompts. It runs
+//   questions about Safari itself and a few general prompts. It runs
 //   entirely on the device.
 // - Translation is a small built-in English<->Persian dictionary
 //   (common words and phrases). It is NOT a full translator: unknown
@@ -33,8 +33,8 @@ final List<_Rule> _rules = [
     // after Persian letters. The lookahead stops at the next letter.
     RegExp(r'^(hi|hello|hey|salam|سلام|درود)(?![a-zA-Z\u0600-\u06FF])',
         caseSensitive: false),
-    "Hello! I'm the local VYRO assistant (on-device, rule-based — not a cloud AI). Ask me how to use VYRO, or type \"help\".",
-    "سلام! من دستیار محلی وایرو هستم (روی دستگاه، مبتنی بر قانون — هوش مصنوعی ابری نیست). بپرسید چطور از وایرو استفاده کنید، یا «help» بنویسید.",
+    "Hello! I'm the local Safari assistant (on-device, rule-based — not a cloud AI). Ask me how to use Safari, or type \"help\".",
+    "سلام! من دستیار محلی سافاری هستم (روی دستگاه، مبتنی بر قانون — هوش مصنوعی ابری نیست). بپرسید چطور از سافاری استفاده کنید، یا «help» بنویسید.",
   ),
   _Rule(
     RegExp(r'voice|صوتی|میکروفون|میکروفن|ضبط', caseSensitive: false),
@@ -44,8 +44,8 @@ final List<_Rule> _rules = [
   _Rule(
     RegExp(r'help|راهنما|کمک|چه کار|چی کار|چطور|چگونه|how (do|can|to)',
         caseSensitive: false),
-    "I can help with VYRO: send text, photos, files, voice messages (🎤 button), stories, voice calls, disappearing messages, scheduled messages, search, and end-to-end encrypted DMs (🔒 button). What would you like to do?",
-    "می‌توانم در استفاده از وایرو کمک کنم: ارسال متن، عکس، فایل، پیام صوتی (دکمه 🎤)، استوری، تماس صوتی، پیام‌های ناپدیدشونده، پیام زمان‌بندی‌شده، جست‌وجو و گفت‌وگوی رمزگذاری‌شده سرتاسری (دکمه 🔒). چه کاری می‌خواهید انجام دهید؟",
+    "I can help with Safari: send text, photos, files, voice messages (🎤 button), stories, voice calls, disappearing messages, scheduled messages, search, and end-to-end encrypted DMs (🔒 button). What would you like to do?",
+    "می‌توانم در استفاده از سافاری کمک کنم: ارسال متن، عکس، فایل، پیام صوتی (دکمه 🎤)، استوری، تماس صوتی، پیام‌های ناپدیدشونده، پیام زمان‌بندی‌شده، جست‌وجو و گفت‌وگوی رمزگذاری‌شده سرتاسری (دکمه 🔒). چه کاری می‌خواهید انجام دهید؟",
   ),
   _Rule(
     RegExp(r'encrypt|رمز|امن|e2ee|lock|قفل', caseSensitive: false),
@@ -78,15 +78,15 @@ final List<_Rule> _rules = [
     "ترجمه: زیر هر پیام متنی 🌐 را بزنید تا با فرهنگ لغت محلی (انگلیسی ↔ فارسی) ترجمه شود. فقط واژه‌های رایج را می‌داند — مترجم کامل نیست و نتیجه نشان می‌دهد چقدر پوشش داده است.",
   ),
   _Rule(
-    RegExp(r'who are you|what are you|vyro|وایرو|تو کی|چی هستی',
+    RegExp(r'who are you|what are you|safari|سافاری|تو کی|چی هستی',
         caseSensitive: false),
-    "VYRO is a free messenger — 'Connect Beyond Limits'. This assistant is a small on-device helper, not a cloud AI: it only knows how VYRO works.",
-    "وایرو یک پیام‌رسان رایگان است — «فراتر از مرزها وصل شو». این دستیار یک کمک‌کننده کوچک روی دستگاه است، نه هوش مصنوعی ابری: فقط نحوه کار وایرو را می‌داند.",
+    "Safari is a free messenger — 'Connect Beyond Limits'. This assistant is a small on-device helper, not a cloud AI: it only knows how Safari works.",
+    "سافاری یک پیام‌رسان رایگان است — «فراتر از مرزها وصل شو». این دستیار یک کمک‌کننده کوچک روی دستگاه است، نه هوش مصنوعی ابری: فقط نحوه کار سافاری را می‌داند.",
   ),
   _Rule(
     RegExp(r'thank|مرسی|ممنون|تشکر', caseSensitive: false),
-    "You're welcome! Anything else about VYRO?",
-    "خواهش می‌کنم! چیز دیگری درباره وایرو هست؟",
+    "You're welcome! Anything else about Safari?",
+    "خواهش می‌کنم! چیز دیگری درباره سافاری هست؟",
   ),
   _Rule(
     RegExp(r'bye|خداحافظ|بای', caseSensitive: false),
@@ -96,9 +96,9 @@ final List<_Rule> _rules = [
 ];
 
 const _fallbackEn =
-    "I'm a small local assistant and I only know how VYRO works — I can't answer general questions or browse the web. Try \"help\", or ask about voice messages, encryption, calls, stories, disappearing or scheduled messages.";
+    "I'm a small local assistant and I only know how Safari works — I can't answer general questions or browse the web. Try \"help\", or ask about voice messages, encryption, calls, stories, disappearing or scheduled messages.";
 const _fallbackFa =
-    "من یک دستیار محلی کوچک هستم و فقط نحوه کار وایرو را می‌دانم — نمی‌توانم به سؤال‌های عمومی پاسخ دهم یا در وب بگردم. «help» را امتحان کنید یا درباره پیام صوتی، رمزگذاری، تماس، استوری، پیام ناپدیدشونده یا زمان‌بندی‌شده بپرسید.";
+    "من یک دستیار محلی کوچک هستم و فقط نحوه کار سافاری را می‌دانم — نمی‌توانم به سؤال‌های عمومی پاسخ دهم یا در وب بگردم. «help» را امتحان کنید یا درباره پیام صوتی، رمزگذاری، تماس، استوری، پیام ناپدیدشونده یا زمان‌بندی‌شده بپرسید.";
 
 ({String text, AiLang lang}) assistantReply(String input) {
   final lang = detectLang(input);

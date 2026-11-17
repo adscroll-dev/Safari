@@ -1,7 +1,7 @@
-# VYRO Mobile / Desktop (Flutter)
+# Safari Mobile / Desktop (Flutter)
 
 Flutter client for Android, iOS, Windows and macOS — one codebase.
-Mobile-first: this is where VYRO is built first.
+Mobile-first: this is where Safari is built first.
 
 ## What works in v0.6 (mobile)
 
@@ -40,13 +40,13 @@ Mobile-first: this is where VYRO is built first.
 - **Voice messages**: record with Opus at 12 kbps (falls back to
   AAC-LC 16 kbps, then WAV), upload via `/api/uploads`, play back.
 - **Local AI (on-device, no cloud)**: 🤖 assistant (rule-based, knows
-  how VYRO works — honestly labelled, not a cloud AI), dictionary
+  how Safari works — honestly labelled, not a cloud AI), dictionary
   translation EN↔FA with a reported coverage % (tap 🌐 on any text
   message), and smart-reply chips for the last incoming message.
   Nothing here makes a network request.
 - **Bots**: create/list/delete bots, set webhook URL (Settings → My
   bots). The token is shown once at creation.
-- **Data Saver (default ON)** — VYRO uses far less data than
+- **Data Saver (default ON)** — Safari uses far less data than
   Telegram/WhatsApp: tap-to-download media, photos compressed before
   upload, voice calls Opus 12 kbps (~0.09 MB/min vs ~0.3–0.5 on
   WhatsApp), video calls start at 150 kbps (~1.1 MB/min), usage meter
@@ -155,7 +155,7 @@ flutter test      # 33 tests: E2EE interop + round-trips, Data Saver
 
 - `build/app/outputs/flutter-apk/app-release.apk` — 101,011,626 bytes
   (96.3 MB), package `app.vyro`, version 0.6.0 (versionCode 1),
-  minSdk 23, targetSdk 34, label "VYRO", VYRO gradient launcher icon.
+  minSdk 23, targetSdk 34, label "Safari", Safari gradient launcher icon.
 - SHA-256:
   `8a717aa83b26cf916b4f109aa16a2a3b27a84bd93a0fdf41e2b8ca6bc97fc592`
 - Also copied to `../web/public/downloads/vyro-0.6.0.apk` and listed
@@ -183,15 +183,15 @@ the build failed twice (R8 `OutOfMemoryError: Java heap space`, then
 the split packager `OutOfMemoryError`).
 
 All verified with `aapt dump badging`: package `app.vyro`,
-versionName 0.6.0 (versionCodes 2001 / 1001 / 4001), label "VYRO".
+versionName 0.6.0 (versionCodes 2001 / 1001 / 4001), label "Safari".
 Copied to `../web/public/downloads/vyro-0.6.0-<abi>.apk` and offered
 on the download-only landing page (`/landing`, arm64 first, fat APK
 kept as fallback). Still debug-signed and never installed/run on a
 real device.
 
-The official APK is published ONLY on VYRO's own official website
+The official APK is published ONLY on Safari's own official website
 (`/landing` download section, with version + SHA-256 checksum).
-Never install VYRO APKs from other sites — the app itself warns
+Never install Safari APKs from other sites — the app itself warns
 about this on the login screen and in Settings.
 
 ### Build notes (why the sandbox build needs all this)
@@ -203,7 +203,7 @@ about this on the login screen and in Settings.
   does not compile. The fork changes 2 lines in
   `SurfaceTextureRenderer.java` (`onSurfaceAvailable` →
   `onSurfaceCreated`). See `plugins/flutter_webrtc/FORK_README.md`.
-  When VYRO upgrades to a Flutter whose engine uses the newer
+  When Safari upgrades to a Flutter whose engine uses the newer
   Callback shape, switch back to the stock 1.x package.
 - The Gradle init script (`~/.gradle/init.d/local-repo.gradle`, not
   in the repo) also adds a stand-in `flutter` extension (Flutter's
@@ -222,8 +222,11 @@ about this on the login screen and in Settings.
 
 - iOS needs a Mac with Xcode and cannot be built on this Linux machine
   (no IPA yet).
-- The release APK is **signed with the debug key** — a release
-  keystore is needed before wide distribution.
+- APKs built before the local release keystore was configured remain
+  debug-signed. New release builds use the release keystore configured
+  from the untracked `secrets/key.properties` file. Since that signing
+  key differs from the debug key, installing a new release APK over an
+  older debug-signed install requires uninstalling the old app first.
 - Push notifications are **not** available on mobile yet (no Firebase
   project — FCM is not set up).
 - Live two-device testing (real-time speed, calls between real peers,

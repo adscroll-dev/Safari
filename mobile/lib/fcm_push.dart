@@ -91,7 +91,7 @@ class FcmPush {
       // Foreground: the message is already in the chat over WebSocket;
       // show it as an in-app banner via the callback, never navigate.
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final title = message.notification?.title ?? 'VYRO';
+        final title = message.notification?.title ?? 'Safari';
         final body = message.notification?.body ?? 'New message';
         final chatId = message.data['chat_id'];
         onForegroundMessage(

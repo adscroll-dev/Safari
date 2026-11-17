@@ -29,8 +29,9 @@ func newTestHandler() *Handler {
 // fakeMailer captures verification emails in tests instead of sending
 // them. The plain code is only ever read back by the test itself.
 type fakeMailer struct {
-	mu   sync.Mutex
-	sent []fakeMail
+	mu            sync.Mutex
+	sent          []fakeMail
+	lastCodeReads map[string]int
 }
 
 type fakeMail struct {
@@ -51,17 +52,43 @@ func (f *fakeMailer) Send(to, subject, body string) error {
 // lastCode returns the 6-digit code from the most recent email sent to
 // the given address, or "" when none was sent.
 func (f *fakeMailer) lastCode(to string) string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	for i := len(f.sent) - 1; i >= 0; i-- {
-		if f.sent[i].to == to {
-			return codeRe.FindString(f.sent[i].body)
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		f.mu.Lock()
+		count := 0
+		var latest string
+		for _, sent := range f.sent {
+			if sent.to == to {
+				count++
+				latest = sent.body
+			}
 		}
+		if count > f.lastCodeReads[to] {
+			if f.lastCodeReads == nil {
+				f.lastCodeReads = make(map[string]int)
+			}
+			f.lastCodeReads[to] = count
+			f.mu.Unlock()
+			return codeRe.FindString(latest)
+		}
+		f.mu.Unlock()
+		time.Sleep(time.Millisecond)
 	}
 	return ""
 }
 
 func (f *fakeMailer) count(to string) int {
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if count := f.countNow(to); count > 0 {
+			return count
+		}
+		time.Sleep(time.Millisecond)
+	}
+	return f.countNow(to)
+}
+
+func (f *fakeMailer) countNow(to string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := 0
@@ -71,6 +98,28 @@ func (f *fakeMailer) count(to string) int {
 		}
 	}
 	return n
+}
+
+func (f *fakeMailer) firstBody(to string) string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, sent := range f.sent {
+		if sent.to == to {
+			return sent.body
+		}
+	}
+	return ""
+}
+
+type blockingMailer struct {
+	started chan struct{}
+	release chan struct{}
+}
+
+func (m *blockingMailer) Send(string, string, string) error {
+	close(m.started)
+	<-m.release
+	return nil
 }
 
 var codeRe = regexp.MustCompile(`\b\d{6}\b`)

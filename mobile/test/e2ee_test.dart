@@ -11,10 +11,44 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vyro/data_saver.dart';
 import 'package:vyro/e2ee.dart';
+import 'package:vyro/e2ee_key_storage.dart';
 
 void main() {
+  test('E2EE key storage migrates legacy preferences before deleting them',
+      () async {
+    SharedPreferences.setMockInitialValues({'identity': 'legacy-private-key'});
+    final preferences = await SharedPreferences.getInstance();
+    final secure = _FakeSecureStorage();
+    final storage = E2eeKeyStorage(
+      preferences: preferences,
+      secureStorage: secure,
+    );
+
+    expect(await storage.read('identity'), 'legacy-private-key');
+    expect(secure.values['identity'], 'legacy-private-key');
+    expect(preferences.containsKey('identity'), isFalse);
+  });
+
+  test('E2EE key storage preserves legacy keys and warns on secure failure',
+      () async {
+    SharedPreferences.setMockInitialValues({'identity': 'legacy-private-key'});
+    final preferences = await SharedPreferences.getInstance();
+    final warnings = <String>[];
+    final storage = E2eeKeyStorage(
+      preferences: preferences,
+      secureStorage: _FakeSecureStorage(fail: true),
+      onWarning: warnings.add,
+    );
+
+    expect(await storage.read('identity'), 'legacy-private-key');
+    expect(preferences.getString('identity'), 'legacy-private-key');
+    expect(warnings, hasLength(1));
+    expect(warnings.single, contains('falling back'));
+  });
+
   test('Go -> Dart: decrypt the Go-produced vector envelope', () async {
     final vec =
         jsonDecode(await File('../web/lib/e2ee-vector.json').readAsString())
@@ -97,4 +131,23 @@ void main() {
     final compressed = DataSaver.compressImage(png);
     expect(compressed.length, lessThan(png.length));
   });
+}
+
+class _FakeSecureStorage implements SecureValueStorage {
+  _FakeSecureStorage({this.fail = false});
+
+  final bool fail;
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> read(String key) async {
+    if (fail) throw StateError('secure storage unavailable');
+    return values[key];
+  }
+
+  @override
+  Future<void> write(String key, String value) async {
+    if (fail) throw StateError('secure storage unavailable');
+    values[key] = value;
+  }
 }

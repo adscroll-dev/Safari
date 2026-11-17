@@ -1,10 +1,10 @@
-# VYRO — Security Design
+# Safari — Security Design
 
 > **Status (v0.5, honest):** E2EE for 1:1 DMs is implemented and tested
-> (see "End-to-End Encryption (v0.5)" below) — but it is **VYRO E2EE v1**,
+> (see "End-to-End Encryption (v0.5)" below) — but it is **Safari E2EE v1**,
 > a Signal-style X3DH + Double Ratchet construction built from audited
 > primitives, **not** libsignal, **not** Signal-interoperable, and **not**
-> independently audited as a protocol. Do not market VYRO as "Signal" or
+> independently audited as a protocol. Do not market Safari as "Signal" or
 > as "audited end-to-end encryption". Group E2EE does not exist yet.
 >
 > **Messages in 1:1 DMs with E2EE turned on are ciphertext on the
@@ -18,7 +18,7 @@
 | Password storage | bcrypt, cost 12, via `golang.org/x/crypto/bcrypt`. Plaintext passwords are never stored, logged, or returned. Minimum 8 characters (`internal/auth/auth.go`). |
 | Authentication | JWT HS256, `golang-jwt/jwt/v5`, signed with `JWT_SECRET` from the environment. Expiry 24 h by default (`JWT_EXPIRY_HOURS`). Tokens are validated on every protected route (`internal/middleware/auth.go`). |
 | Login rate limiting | In-memory fixed window: 5 failed attempts per 15 min per (IP + email). Returns HTTP 429. Successful login resets the counter (`internal/auth/ratelimit.go`). Since v0.4 a Redis-backed limiter (`internal/auth/redislimiter.go`, go-redis v9.8, same `Limiter` interface) is used when `REDIS_URL` is set and Redis answers PING, with automatic fail-open to the in-memory limiter on Redis errors. **Tested against real Redis 7.0.15 in v0.5** (`TestRedisLimiterLive`; go-redis pinned to v9.8 because older versions send `CLIENT SETINFO`, which Redis < 7.2 rejects). |
-| Email verification (v0.7) | Registration and login both finish with a random 6-digit code emailed to the user (`POST /api/auth/register` → `verify-register`, `POST /api/auth/login` → `verify-login`; `POST /api/auth/resend-code` re-sends). Codes expire after 10 minutes, are single-use, allow max 5 failed attempts (the 5th returns 429 and invalidates the code), and resends are capped at one per 60 s per (email, purpose). **Only the SHA-256 hash of a code is stored** (`email_codes.code_hash`); the plain code exists only in the email and is never logged or returned by the API. Pending registrations (`pending_users`) hold an already bcrypt-hashed password and are deleted on verification — no user row exists before the code is confirmed. Mail is sent via plain `net/smtp` (STARTTLS, Gmail relay by default, `SMTP_*` env); when no SMTP is configured the endpoints return 503 and never fake a code. Tested in `internal/handlers/verify_test.go` (happy path, wrong/expired code, 5-attempt invalidation, resend cooldown + invalidation, 503 without mailer) and live against a local SMTP sink (`backend/scripts/smtp-sink`). |
+| Email verification (v0.7) | Registration and login both finish with a random 6-digit code emailed to the user (`POST /api/auth/register` → `verify-register`, `POST /api/auth/login` → `verify-login`; `POST /api/auth/resend-code` re-sends). Codes expire after 10 minutes, are single-use, allow max 5 failed attempts (the 5th returns 429 and invalidates the code), and resends are capped at one per 60 s per (email, purpose). **New codes are stored as HMAC-SHA-256 hashes keyed by `JWT_SECRET`** (`email_codes.code_hash`), so a database dump alone cannot brute-force them; pre-upgrade codes remain valid until their existing expiry. The plain code exists only in the email and is never logged or returned by the API. Pending registrations (`pending_users`) hold an already bcrypt-hashed password and are deleted on verification — no user row exists before the code is confirmed. Mail is sent via plain `net/smtp` (STARTTLS, Gmail relay by default, `SMTP_*` env); when no SMTP is configured the endpoints return 503 and never fake a code. Tested in `internal/handlers/verify_test.go` (happy path, wrong/expired code, 5-attempt invalidation, resend cooldown + invalidation, 503 without mailer) and live against a local SMTP sink (`backend/scripts/smtp-sink`). |
 | Group/channel admin enforcement (v0.4) | Roles `owner`/`admin`/`member` are enforced in handlers, not just in the schema: only owner/admin can add/remove members, only the owner can change roles, the owner cannot be removed or demote themselves. Tested in `handlers_v04_test.go` (TestV04Admin). |
 | Bot tokens (v0.4) | A bot token is returned exactly once at creation; only its SHA-256 hash is stored (`bots.token_hash`). Bot API calls authenticate with `X-Bot-Token`. Listing bots never leaks the token. |
 | Disappearing messages (v0.4) | `ttl_seconds` (60..604800) sets `expires_at`; expired messages are hidden from lists/search and soft-deleted by `PurgeExpired`. This is server-side deletion, not cryptographic erasure — copies on other devices are out of scope. |
@@ -29,7 +29,7 @@
 | Web Push privacy (v0.5) | Push payloads never contain message content — only "New message from <name>" (or "New encrypted message" for E2EE). The push service therefore never sees plaintext (`internal/handlers/v05.go`, `internal/push/push.go`). Subscriptions that the push service reports gone (410/404) are removed. |
 | Call signaling (v0.5) | WebRTC offer/answer/ICE are relayed verbatim through the WebSocket room of the chat; the server never inspects or stores them, and only room members receive them (`internal/ws/hub.go`). Media is peer-to-peer (STUN, plus the self-hosted coturn TURN relay wired in v0.6). |
 
-## End-to-End Encryption — VYRO E2EE v1 (implemented in v0.5)
+## End-to-End Encryption — Safari E2EE v1 (implemented in v0.5)
 
 **Scope: 1:1 DMs only, one device per user (device `"default"`).**
 Group E2EE does not exist; group messages are plaintext on the server.
@@ -159,7 +159,7 @@ implementations were proven against each other (see "Interop proof").
 
 ## What this document is not
 
-It is not a security audit, and VYRO v0.5 must not be marketed as
+It is not a security audit, and Safari v0.5 must not be marketed as
 "audited end-to-end encryption" — the E2EE construction is Signal-style
 but not libsignal, not Signal-interoperable, and not independently
 reviewed. Group chats are not end-to-end encrypted at all.

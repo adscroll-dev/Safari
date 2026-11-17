@@ -421,20 +421,53 @@ class WaAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         boxShadow: const [
           BoxShadow(
-            color: Color(0x3322D3EE),
-            blurRadius: 8,
-            offset: Offset(0, 3),
+            color: Color(0x4422D3EE),
+            blurRadius: 11,
+            offset: Offset(0, 4),
+          ),
+          BoxShadow(
+            color: Color(0x55202A52),
+            blurRadius: 4,
+            offset: Offset(0, 2),
           ),
         ],
       ),
       alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: radius * 0.75,
-        ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: 1,
+            left: radius * 0.2,
+            right: radius * 0.2,
+            height: radius * 0.62,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(radius),
+                gradient: const LinearGradient(
+                  colors: [Color(0x55FFFFFF), Color(0x00FFFFFF)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ),
+          Text(
+            initial,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: radius * 0.75,
+              shadows: const [
+                Shadow(
+                  color: Color(0x44301E70),
+                  blurRadius: 5,
+                  offset: Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
     if (!ring) return avatar;
@@ -443,6 +476,13 @@ class WaAvatar extends StatelessWidget {
       decoration: const BoxDecoration(
         gradient: VyroColors.storyRing,
         shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x3322D3EE),
+            blurRadius: 11,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Container(
         padding: const EdgeInsets.all(2),
@@ -478,17 +518,17 @@ class SafariGlassCard extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final borderGradient = LinearGradient(
       colors: dark
-          ? const [Color(0x7740DDF4), Color(0x557A62EC), Color(0x4440DDF4)]
-          : const [Color(0x9940CBE7), Color(0x665B78E8), Color(0x553FC9D8)],
+          ? const [Color(0x9940DDF4), Color(0x667A62EC), Color(0x5540DDF4)]
+          : const [Color(0xBB40CBE7), Color(0x775B78E8), Color(0x663FC9D8)],
       begin: Alignment.topLeft,
       end: Alignment.bottomRight,
     );
     final surfaceGradient = LinearGradient(
       colors: dark
-          ? const [Color(0xFF14233B), Color(0xF20C1729)]
-          : const [Color(0xFFFFFFFF), Color(0xF5F7FBFF)],
+          ? const [Color(0xF51D3552), Color(0xF20D192D), Color(0xF7091425)]
+          : const [Color(0xFFFFFFFF), Color(0xFBF9FCFF), Color(0xF2EDF4FA)],
       begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
+      end: Alignment.bottomRight,
     );
     final card = Container(
       decoration: BoxDecoration(
@@ -496,14 +536,19 @@ class SafariGlassCard extends StatelessWidget {
         gradient: borderGradient,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(dark ? 0.30 : 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(dark ? 0.40 : 0.10),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
           BoxShadow(
-            color: VyroColors.glowCyan.withOpacity(dark ? 0.28 : 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 2),
+            color: VyroColors.glowCyan.withOpacity(dark ? 0.32 : 0.16),
+            blurRadius: 22,
+            offset: const Offset(0, 3),
+          ),
+          BoxShadow(
+            color: VyroColors.glowPurple.withOpacity(dark ? 0.16 : 0.08),
+            blurRadius: 30,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -523,28 +568,52 @@ class SafariGlassCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(radius - 1),
             child: Stack(
               children: [
-                Padding(
-                  padding: padding ?? const EdgeInsets.all(16),
-                  child: child,
+                Positioned(
+                  top: 1,
+                  left: 1,
+                  right: 1,
+                  height: 58,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(radius - 1),
+                        ),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withOpacity(dark ? 0.10 : 0.58),
+                            Colors.white.withOpacity(dark ? 0.025 : 0.12),
+                            Colors.transparent,
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
                 Positioned(
                   top: 0,
-                  left: radius / 2,
-                  right: radius / 2,
-                  height: 1,
+                  left: radius * 0.8,
+                  right: radius * 0.8,
+                  height: 1.5,
                   child: IgnorePointer(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
                             Colors.transparent,
-                            Colors.white.withOpacity(dark ? 0.2 : 0.9),
+                            Colors.white.withOpacity(dark ? 0.34 : 0.95),
                             Colors.transparent,
                           ],
                         ),
                       ),
                     ),
                   ),
+                ),
+                Padding(
+                  padding: padding ?? const EdgeInsets.all(16),
+                  child: child,
                 ),
               ],
             ),
@@ -582,8 +651,8 @@ class SafariFilterChip extends StatelessWidget {
         color: selected
             ? null
             : dark
-                ? WaColors.darkSurface2.withOpacity(0.82)
-                : Colors.white.withOpacity(0.9),
+                ? WaColors.darkSurface2.withOpacity(0.88)
+                : Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: selected
@@ -595,9 +664,14 @@ class SafariFilterChip extends StatelessWidget {
         boxShadow: selected
             ? const [
                 BoxShadow(
-                  color: Color(0x4422D3EE),
-                  blurRadius: 12,
-                  offset: Offset(0, 4),
+                  color: Color(0x5522D3EE),
+                  blurRadius: 15,
+                  offset: Offset(0, 5),
+                ),
+                BoxShadow(
+                  color: Color(0x338B5CF6),
+                  blurRadius: 20,
+                  offset: Offset(0, 3),
                 ),
               ]
             : null,
@@ -665,12 +739,38 @@ class SafariHeroCard extends StatelessWidget {
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x5522D3EE),
-                  blurRadius: 14,
-                  offset: Offset(0, 4),
+                  blurRadius: 18,
+                  offset: Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Color(0x338B5CF6),
+                  blurRadius: 22,
+                  offset: Offset(0, 3),
                 ),
               ],
             ),
-            child: Icon(icon, color: Colors.white, size: 27),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  top: 1,
+                  left: 5,
+                  right: 5,
+                  height: 24,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(
+                        colors: [Color(0x66FFFFFF), Color(0x00FFFFFF)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ),
+                Icon(icon, color: Colors.white, size: 27),
+              ],
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -738,10 +838,16 @@ class SafariGradientButton extends StatelessWidget {
             boxShadow: const [
               BoxShadow(
                 color: Color(0x4422D3EE),
-                blurRadius: 12,
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+              BoxShadow(
+                color: Color(0x338B5CF6),
+                blurRadius: 22,
                 offset: Offset(0, 4),
               ),
             ],
+            border: Border.all(color: const Color(0x66FFFFFF)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -812,24 +918,73 @@ class SafariEmptyState extends StatelessWidget {
                 Container(
                   width: compact ? 78 : 96,
                   height: compact ? 78 : 96,
-                  decoration: const BoxDecoration(
-                    gradient: VyroColors.brandGradient,
+                  padding: const EdgeInsets.all(1.5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xCCFFFFFF),
+                        Color(0x7722D3EE),
+                        Color(0x998B5CF6),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0x5522D3EE),
-                        blurRadius: 28,
-                        offset: Offset(0, 8),
+                        color: VyroColors.glowCyan.withOpacity(0.75),
+                        blurRadius: 30,
+                        offset: const Offset(0, 8),
                       ),
                       BoxShadow(
-                        color: Color(0x338B5CF6),
+                        color: VyroColors.glowPurple.withOpacity(0.55),
                         blurRadius: 48,
-                        offset: Offset(0, 12),
+                        offset: const Offset(0, 12),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(dark ? 0.28 : 0.08),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
                       ),
                     ],
                   ),
-                  child:
-                      Icon(icon, size: compact ? 36 : 44, color: Colors.white),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: VyroColors.brandGradient,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Positioned(
+                          top: 2,
+                          left: 12,
+                          right: 12,
+                          height: compact ? 30 : 38,
+                          child: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(50),
+                              ),
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0x66FFFFFF),
+                                  Color(0x00FFFFFF),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          icon,
+                          size: compact ? 36 : 44,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
             SizedBox(height: compact ? 14 : 24),
             Text(
@@ -839,7 +994,7 @@ class SafariEmptyState extends StatelessWidget {
                 fontSize: compact ? 18 : 19,
                 fontWeight: FontWeight.w800,
                 color: dark ? WaColors.darkText : WaColors.lightText,
-                letterSpacing: 0.2,
+                letterSpacing: 0.1,
               ),
             ),
             SizedBox(height: compact ? 6 : 8),
@@ -883,6 +1038,27 @@ class SafariAuroraBackdrop extends StatelessWidget {
         IgnorePointer(
           child: Stack(
             children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: dark
+                          ? const [
+                              Color(0x0C22D3EE),
+                              Color(0x00060B18),
+                              Color(0x148B5CF6),
+                            ]
+                          : const [
+                              Color(0x0822D3EE),
+                              Color(0x00F4F8FC),
+                              Color(0x108B5CF6),
+                            ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                ),
+              ),
               Positioned(
                 top: -105,
                 left: -95,
@@ -893,7 +1069,7 @@ class SafariAuroraBackdrop extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        VyroColors.glowCyan.withOpacity(dark ? 0.42 : 0.2),
+                        VyroColors.glowCyan.withOpacity(dark ? 0.50 : 0.24),
                         Colors.transparent,
                       ],
                     ),
@@ -910,7 +1086,7 @@ class SafariAuroraBackdrop extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: RadialGradient(
                       colors: [
-                        VyroColors.glowPurple.withOpacity(dark ? 0.48 : 0.2),
+                        VyroColors.glowPurple.withOpacity(dark ? 0.54 : 0.24),
                         Colors.transparent,
                       ],
                     ),

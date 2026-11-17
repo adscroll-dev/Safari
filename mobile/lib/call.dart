@@ -81,11 +81,15 @@ class CallController {
   // loudspeaker instead of the earpiece. Defaults to earpiece.
   bool speakerOn = false;
   bool _iceRestarted = false;
+  bool _directRemoteDescriptionSet = false;
+  final List<RTCIceCandidate> _pendingDirectIce = [];
 
   // Stage 3: group calls (mesh) — one peer connection per member.
   bool isGroup = false;
   final Map<String, RTCPeerConnection> _groupPcs = {};
   final Map<String, MediaStream?> _groupRemoteStreams = {};
+  final Map<String, List<RTCIceCandidate>> _pendingGroupIce = {};
+  final Set<String> _groupRemoteDescriptions = {};
   final Set<String> _groupPeers = {};
   final Map<String, Map<String, dynamic>> _pendingGroupOffers = {};
   final _groupStreamsController = StreamController<void>.broadcast();
@@ -260,6 +264,8 @@ class CallController {
       {required String chatId,
       required String peerId,
       bool video = false}) async {
+    _pendingDirectIce.clear();
+    _directRemoteDescriptionSet = false;
     this.chatId = chatId;
     this.peerId = peerId;
     this.video = video;
@@ -285,6 +291,8 @@ class CallController {
   /// Returns the incoming call for the UI to accept/decline.
   IncomingCall handleOffer(
       String chatId, String peerId, Map<String, dynamic> offer) {
+    _pendingDirectIce.clear();
+    _directRemoteDescriptionSet = false;
     this.chatId = chatId;
     this.peerId = peerId;
     video = offer['video'] == true;
@@ -300,6 +308,8 @@ class CallController {
     _localStream!.getTracks().forEach(_pc!.addTrack);
     await _pc!.setRemoteDescription(RTCSessionDescription(
         call.offer['sdp'] as String, call.offer['type'] as String));
+    _directRemoteDescriptionSet = true;
+    await _flushDirectIce();
     final answer = await _pc!.createAnswer(
         {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
     final capped = capSdpBitrates(answer.sdp ?? '', video: video);
@@ -382,6 +392,8 @@ class CallController {
     _localStream!.getTracks().forEach(pc.addTrack);
     await pc.setRemoteDescription(RTCSessionDescription(
         call.offer['sdp'] as String, call.offer['type'] as String));
+    _groupRemoteDescriptions.add(call.peerId);
+    await _flushGroupIce(call.peerId);
     final answer = await pc.createAnswer(
         {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
     final capped = capSdpBitrates(answer.sdp ?? '', video: video);
@@ -432,6 +444,8 @@ class CallController {
     if (pc == null) return;
     await pc.setRemoteDescription(RTCSessionDescription(
         answer['sdp'] as String, answer['type'] as String));
+    _groupRemoteDescriptions.add(peerId);
+    await _flushGroupIce(peerId);
     _callStartedAt ??= DateTime.now();
     state = CallState.inCall;
     _stateController.add(state);
@@ -439,13 +453,17 @@ class CallController {
 
   Future<void> handleGroupIce(
       String peerId, Map<String, dynamic> candidate) async {
-    final pc = _groupPcs[peerId];
-    if (pc == null) return;
-    await pc.addCandidate(RTCIceCandidate(
+    final ice = RTCIceCandidate(
       candidate['candidate'] as String?,
       candidate['sdpMid'] as String?,
       candidate['sdpMLineIndex'] as int?,
-    ));
+    );
+    final pc = _groupPcs[peerId];
+    if (pc == null || !_groupRemoteDescriptions.contains(peerId)) {
+      _pendingGroupIce.putIfAbsent(peerId, () => []).add(ice);
+      return;
+    }
+    await pc.addCandidate(ice);
   }
 
   /// End a group call for us: one broadcast call-end reaches every
@@ -486,6 +504,8 @@ class CallController {
     }
     _groupPcs.clear();
     _groupRemoteStreams.clear();
+    _pendingGroupIce.clear();
+    _groupRemoteDescriptions.clear();
     _groupPeers.clear();
     _pendingGroupOffers.clear();
     await _cleanup();
@@ -535,18 +555,45 @@ class CallController {
     if (_pc == null) return;
     await _pc!.setRemoteDescription(RTCSessionDescription(
         answer['sdp'] as String, answer['type'] as String));
+    _directRemoteDescriptionSet = true;
+    await _flushDirectIce();
     _callStartedAt ??= DateTime.now();
     state = CallState.inCall;
     _stateController.add(state);
   }
 
   Future<void> handleIce(Map<String, dynamic> candidate) async {
-    if (_pc == null) return;
-    await _pc!.addCandidate(RTCIceCandidate(
+    final ice = RTCIceCandidate(
       candidate['candidate'] as String?,
       candidate['sdpMid'] as String?,
       candidate['sdpMLineIndex'] as int?,
-    ));
+    );
+    final pc = _pc;
+    if (pc == null || !_directRemoteDescriptionSet) {
+      _pendingDirectIce.add(ice);
+      return;
+    }
+    await pc.addCandidate(ice);
+  }
+
+  Future<void> _flushDirectIce() async {
+    final pc = _pc;
+    if (pc == null || !_directRemoteDescriptionSet) return;
+    final pending = List<RTCIceCandidate>.of(_pendingDirectIce);
+    _pendingDirectIce.clear();
+    for (final candidate in pending) {
+      await pc.addCandidate(candidate);
+    }
+  }
+
+  Future<void> _flushGroupIce(String peerId) async {
+    final pc = _groupPcs[peerId];
+    if (pc == null || !_groupRemoteDescriptions.contains(peerId)) return;
+    final pending =
+        List<RTCIceCandidate>.of(_pendingGroupIce.remove(peerId) ?? []);
+    for (final candidate in pending) {
+      await pc.addCandidate(candidate);
+    }
   }
 
   /// Drop video mid-call and continue audio-only (Data Saver fallback).
@@ -598,6 +645,8 @@ class CallController {
     _localStream = null;
     _remoteStream = null;
     _pc = null;
+    _pendingDirectIce.clear();
+    _directRemoteDescriptionSet = false;
     chatId = '';
     peerId = '';
     isGroup = false;

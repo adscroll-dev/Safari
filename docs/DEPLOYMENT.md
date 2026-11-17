@@ -1,4 +1,4 @@
-# VYRO — استقرار عمومی / Public Deployment
+# Safari — استقرار عمومی / Public Deployment
 
 > وضعیت: **هنوز زنده/عمومی نیست — NOT LIVE YET.**
 > هیچ URL عمومی‌ای وجود ندارد و هیچ حسابی در هیچ هاستی ثبت نشده است.
@@ -106,7 +106,7 @@ With more than one backend replica you need shared object storage
 - متادیتای SEO در `web/app/layout.tsx`: عنوان، توضیح، کلمات کلیدی،
   Open Graph و Twitter Card.
 - صفحه لندینگ عمومی: `web/app/landing/page.tsx` — فارسی + انگلیسی،
-  معرفی VYRO، ویژگی‌ها، و اعلام «بتا / beta». مسیر: `/landing`.
+  معرفی Safari، ویژگی‌ها، و اعلام «بتا / beta». مسیر: `/landing`.
 - `web/public/robots.txt` — به خزنده‌ها می‌گوید چه چیزی را بخوانند.
 - `web/public/sitemap.xml` — صفحات `/` و `/landing` (با دامنه جایگزین).
 - `web/Dockerfile` — بیلد وب برای Docker (قبلاً نبود).
@@ -136,7 +136,7 @@ In the web client (`web/`):
 # همه با هم (Docker) — در این محیط تست نشد، Docker نصب نیست
 docker compose up --build
 # backend:  http://localhost:8080/health   → {"version":"0.5.0", ...}
-# web:      http://localhost:3000          → صفحه اصلی VYRO
+# web:      http://localhost:3000          → صفحه اصلی Safari
 # landing:  http://localhost:3000/landing  → صفحه معرفی
 
 # یا جداگانه:

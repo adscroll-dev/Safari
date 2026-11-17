@@ -1,4 +1,4 @@
-// Sponsored stories — VYRO earns money from day one through ads in the
+// Sponsored stories — Safari earns money from day one through ads in the
 // Stories section.
 //
 // Honesty rules for this file:
@@ -96,10 +96,10 @@ const List<SponsoredStory> demoSponsoredStories = [
   ),
   SponsoredStory(
     id: 'demo-3',
-    advertiserName: 'VYRO',
-    title: 'VYRO — Connect Beyond Limits. Share VYRO with a friend.',
-    linkUrl: 'https://vyro.example',
-    callToAction: 'Share VYRO',
+    advertiserName: 'Safari',
+    title: 'Safari — Connect Beyond Limits. Share Safari with a friend.',
+    linkUrl: 'https://example.com',
+    callToAction: 'Share Safari',
   ),
 ];
 
@@ -208,7 +208,7 @@ class SponsoredCapTracker {
 
 /// A business's request to run a sponsored story.
 ///
-/// Stored ON THIS DEVICE ONLY (SharedPreferences) until the VYRO ad
+/// Stored ON THIS DEVICE ONLY (SharedPreferences) until the Safari ad
 /// service exists. Nothing is uploaded, emailed, or sent anywhere, and
 /// the submission sheet tells the business exactly that.
 class SponsoredSubmission {
