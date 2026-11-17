@@ -742,7 +742,7 @@ export default function LandingContent() {
               </a>
             </div>
             <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 18 }}>
-              {t.free} · {t.requires} · 0.7.3 (Beta)
+              {t.free} · {t.requires} · 0.7.4 (Beta)
             </p>
           </div>
 
@@ -1141,7 +1141,7 @@ export default function LandingContent() {
             style={{ overflow: "hidden" }}
           >
             {[
-              [t.versionLabel, "0.7.3 (Beta)"],
+              [t.versionLabel, "0.7.4 (Beta)"],
               [t.sizeLabel, "34.3 MB · 27.4 MB · 36.8 MB"],
               [t.updated, "Nov 16, 2026"],
               [t.requires, "Android 6.0+"],
