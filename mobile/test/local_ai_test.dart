@@ -1,4 +1,4 @@
-// VYRO mobile local-AI + call bitrate tests.
+// Safari mobile local-AI + call bitrate tests.
 //
 // The assistant, dictionary translation and smart replies are local
 // and rule-based (no network, no cloud AI); these tests pin their
@@ -15,13 +15,13 @@ void main() {
     final hi = assistantReply('hello');
     expect(hi.text, contains('Hello'));
     final help = assistantReply('help');
-    expect(help.text, contains('VYRO'));
+    expect(help.text, contains('Safari'));
     final fa = assistantReply('سلام');
     expect(fa.lang, AiLang.fa);
     expect(fa.text, contains('سلام'));
     // Unknown general question: honest fallback, not a made-up answer.
     final other = assistantReply('what is the capital of France?');
-    expect(other.text, contains('only know how VYRO works'));
+    expect(other.text, contains('only know how Safari works'));
   });
 
   test('Dictionary translation EN->FA with coverage', () {

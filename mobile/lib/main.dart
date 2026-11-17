@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'api.dart';
@@ -28,11 +29,10 @@ import 'share_file.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Firebase (FCM push) on mobile only: the web build uses Web Push
-  // (VAPID) and has no Firebase options. Failures are swallowed inside
-  // initFirebaseForMain — the app works without push.
+  // Register FCM's background handler before the app starts. Failures
+  // are swallowed by the initializer; the app works without push.
   await FcmPush.initFirebaseForMain();
   runApp(const VyroApp());
 }
@@ -200,6 +200,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
+  late final Future<void> _prefsInitialization;
   final _api = ApiClient();
   final _usage = DataUsageTracker();
   final _email = TextEditingController();
@@ -239,8 +240,7 @@ class _HomePageState extends State<HomePage>
   final List<Map<String, dynamic>> _outbox = [];
   // Animated registration page: the orbs, bubbles and logo drift.
   late final AnimationController _authAnim;
-  // Planet logo orbit: the ring around the logo tile rotates forever,
-  // like the iPhone Clock — never still (8s per revolution).
+  // Planet logo orbit: animate once on first appearance, then hold.
   late final AnimationController _ringAnim;
   int _tabIndex = 0; // 0 = chats, 1 = updates, 2 = communities, 3 = calls
   // WhatsApp navigation: Settings lives in the ⋮ menu, not a tab.
@@ -251,6 +251,8 @@ class _HomePageState extends State<HomePage>
   int _ttlSeconds = 0; // disappearing-message TTL (0 = off)
   DateTime _lastTypingAt = DateTime.fromMillisecondsSinceEpoch(0);
   WebSocketChannel? _ws;
+  Timer? _wsChatRefreshTimer;
+  DateTime? _lastWsChatRefreshAt;
   E2eeClient? _e2ee;
   CallController? _call;
   final RTCVideoRenderer _remoteRenderer = RTCVideoRenderer();
@@ -360,12 +362,12 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.addObserver(this);
     _authAnim =
         AnimationController(vsync: this, duration: const Duration(seconds: 7))
-          ..repeat();
+          ..forward();
     _ringAnim =
         AnimationController(vsync: this, duration: const Duration(seconds: 8))
-          ..repeat();
+          ..forward();
     _remoteRenderer.initialize();
-    _initPrefs();
+    _prefsInitialization = _initPrefs();
     // Offline mode: reopen the last session from the device cache.
     unawaited(_restoreSession());
     // Stage 3: refresh the in-call duration label once a second
@@ -898,6 +900,7 @@ class _HomePageState extends State<HomePage>
     WidgetsBinding.instance.removeObserver(this);
     _authAnim.dispose();
     _ringAnim.dispose();
+    _wsChatRefreshTimer?.cancel();
     _ws?.sink.close();
     _call?.dispose();
     _remoteRenderer.dispose();
@@ -926,9 +929,14 @@ class _HomePageState extends State<HomePage>
   int _resendIn = 0;
   Timer? _resendTimer;
   final _codeCtrl = TextEditingController();
+  bool _busy = false;
 
   Future<void> _auth() async {
-    setState(() => _error = null);
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       final out = _registerMode
           ? await _api.register(
@@ -951,7 +959,9 @@ class _HomePageState extends State<HomePage>
       // Older server that still returns a token directly.
       await _finishLogin(out['user'] as Map<String, dynamic>);
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -1050,60 +1060,57 @@ class _HomePageState extends State<HomePage>
       _syncGroupRenderers();
       if (mounted) setState(() {});
     });
-    await _refreshChats();
-    // Stage 7: blocked users (for Block/Unblock labels) + the
-    // communities for the Communities tab.
-    try {
-      final blocked = await _api.listBlocked();
-      if (mounted) {
-        setState(() => _blockedUserIds.addAll(blocked.cast<String>()));
-      }
-    } catch (_) {}
-    await _refreshCommunities();
-    // Stage 3: call history for the Calls tab.
-    await _refreshCalls();
-    // Stage 11: combined privacy settings — last seen, status,
-    // avatar/about/groups privacy, read receipts — in one request
-    // instead of two. Falls back to the older single-setting
-    // endpoints if the server does not have it yet.
-    try {
-      final s = await _api.getPrivacySettings();
-      if (mounted) {
-        setState(() {
-          _lastSeenVisibility =
-              s['last_seen_visibility'] as String? ?? 'everyone';
-          _statusPrivacy = s['status_privacy'] as String? ?? 'everyone';
-          _avatarPrivacy = s['avatar_privacy'] as String? ?? 'everyone';
-          _aboutPrivacy = s['about_privacy'] as String? ?? 'everyone';
-          _groupsPrivacy = s['groups_privacy'] as String? ?? 'everyone';
-          _readReceipts = s['read_receipts'] as bool? ?? true;
-        });
-      }
-    } catch (_) {
+    Future<void> refreshBlocked() async {
       try {
-        final privacy = await _api.getPrivacy();
+        final blocked = await _api.listBlocked();
         if (mounted) {
-          setState(() => _lastSeenVisibility =
-              privacy['last_seen_visibility'] as String? ?? 'everyone');
-        }
-      } catch (_) {}
-      try {
-        final statusPrivacy = await _api.getStatusPrivacy();
-        if (mounted) {
-          setState(() => _statusPrivacy =
-              statusPrivacy['status_privacy'] as String? ?? 'everyone');
+          setState(() => _blockedUserIds.addAll(blocked.cast<String>()));
         }
       } catch (_) {}
     }
-    try {
-      final stories = await _api.listStories();
-      setState(() => _stories = stories);
-    } catch (_) {}
+
+    Future<void> refreshPrivacy() async {
+      try {
+        final s = await _api.getPrivacySettings();
+        if (mounted) {
+          setState(() {
+            _lastSeenVisibility =
+                s['last_seen_visibility'] as String? ?? 'everyone';
+            _statusPrivacy = s['status_privacy'] as String? ?? 'everyone';
+            _avatarPrivacy = s['avatar_privacy'] as String? ?? 'everyone';
+            _aboutPrivacy = s['about_privacy'] as String? ?? 'everyone';
+            _groupsPrivacy = s['groups_privacy'] as String? ?? 'everyone';
+            _readReceipts = s['read_receipts'] as bool? ?? true;
+          });
+        }
+      } catch (_) {
+        try {
+          final privacy = await _api.getPrivacy();
+          if (mounted) {
+            setState(() => _lastSeenVisibility =
+                privacy['last_seen_visibility'] as String? ?? 'everyone');
+          }
+        } catch (_) {}
+        try {
+          final statusPrivacy = await _api.getStatusPrivacy();
+          if (mounted) {
+            setState(() => _statusPrivacy =
+                statusPrivacy['status_privacy'] as String? ?? 'everyone');
+          }
+        } catch (_) {}
+      }
+    }
+
+    Future<void> refreshStories() async {
+      try {
+        final stories = await _api.listStories();
+        if (mounted) setState(() => _stories = stories);
+      } catch (_) {}
+    }
+
     _connectWs();
-    // FCM push: register this device's token so the server can wake
-    // the app when a message arrives while it is closed. Best effort:
-    // a failure here never breaks login or chat.
-    await FcmPush.init(
+    // FCM is best-effort and must not hold up the signed-in screen.
+    unawaited(FcmPush.init(
       api: _api,
       deviceId: _deviceId,
       onOpenChat: (chatId) => _openChatById(chatId),
@@ -1121,14 +1128,26 @@ class _HomePageState extends State<HomePage>
           ),
         );
       },
-    );
+    ));
+
+    await Future.wait<void>([
+      _refreshChats(),
+      refreshBlocked(),
+      _refreshCommunities(),
+      _refreshCalls(),
+      refreshPrivacy(),
+      refreshStories(),
+    ]);
   }
 
   void _connectWs() {
     final token = _api.token;
     if (token == null) return;
     final wsUrl = _api.baseUrl.replaceFirst('http', 'ws');
-    _ws = WebSocketChannel.connect(Uri.parse('$wsUrl/ws?token=$token'));
+    _ws = IOWebSocketChannel.connect(
+      Uri.parse('$wsUrl/ws'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
     _ws!.stream.listen((raw) {
       final ev = jsonDecode(raw) as Map<String, dynamic>;
       final type = ev['type'] as String? ?? '';
@@ -1141,14 +1160,14 @@ class _HomePageState extends State<HomePage>
           // Real unread marker for a chat that is not open.
           setState(() => _unreadChatIds.add(msg['chat_id'] as String));
         }
-        _refreshChats();
+        _scheduleWsChatRefresh();
       } else if (type == 'message_sync' && ev['message'] != null) {
         // Multi-device: our own other device sent a message.
         final msg = ev['message'] as Map<String, dynamic>;
         if (_activeChat != null && msg['chat_id'] == _activeChat!['id']) {
           setState(() => _messages = [..._messages, msg]);
         }
-        _refreshChats();
+        _scheduleWsChatRefresh();
       } else if (type == 'typing' &&
           _activeChat != null &&
           ev['chat_id'] == _activeChat!['id']) {
@@ -1224,6 +1243,26 @@ class _HomePageState extends State<HomePage>
       if (mounted) setState(() => _offline = true);
     }, onDone: () {
       if (mounted) setState(() => _offline = true);
+    });
+  }
+
+  void _scheduleWsChatRefresh() {
+    if (_wsChatRefreshTimer != null) return;
+    final now = DateTime.now();
+    final lastRefresh = _lastWsChatRefreshAt;
+    final delay = lastRefresh == null
+        ? Duration.zero
+        : const Duration(seconds: 2) - now.difference(lastRefresh);
+    if (delay <= Duration.zero) {
+      _lastWsChatRefreshAt = now;
+      unawaited(_refreshChats());
+      return;
+    }
+    _wsChatRefreshTimer = Timer(delay, () {
+      _wsChatRefreshTimer = null;
+      if (!mounted) return;
+      _lastWsChatRefreshAt = DateTime.now();
+      unawaited(_refreshChats());
     });
   }
 
@@ -1379,6 +1418,7 @@ class _HomePageState extends State<HomePage>
   /// Reopen the last session without internet, like WhatsApp: the
   /// saved token signs the app in and the cached chats show at once.
   Future<void> _restoreSession() async {
+    await _prefsInitialization;
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('vyro_session_token');
     final rawUser = prefs.getString('vyro_session_user');
@@ -1388,6 +1428,7 @@ class _HomePageState extends State<HomePage>
       _api.token = token;
       await _loadCachedChats();
       await _loadOutbox();
+      _locked = _appLock?.enabled == true;
       await _finishLogin(u, persist: false);
     } catch (_) {
       // Corrupt or expired session: fall through to the login page.
@@ -3308,7 +3349,11 @@ class _HomePageState extends State<HomePage>
   }
 
   /// Big gradient-green 3D button (Create account / Log in / Verify).
-  Widget _authButton({required String label, required VoidCallback onPressed}) {
+  Widget _authButton({
+    required String label,
+    required VoidCallback onPressed,
+    bool busy = false,
+  }) {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -3322,7 +3367,7 @@ class _HomePageState extends State<HomePage>
         ],
       ),
       child: FilledButton(
-        onPressed: onPressed,
+        onPressed: busy ? null : onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -3330,11 +3375,28 @@ class _HomePageState extends State<HomePage>
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         ),
-        child: Text(label,
-            style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: Colors.white)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (busy) ...[
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white)),
+          ],
+        ),
       ),
     );
   }
@@ -3632,6 +3694,7 @@ class _HomePageState extends State<HomePage>
                   _authButton(
                     label: _registerMode ? 'Create account' : 'Log in',
                     onPressed: _auth,
+                    busy: _busy,
                   ),
                   const SizedBox(height: 6),
                   TextButton(
@@ -4012,24 +4075,38 @@ class _HomePageState extends State<HomePage>
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: dark
-                ? const [Color(0xF21A2A43), Color(0xF20B1729)]
-                : const [Color(0xF9FFFFFF), Color(0xF0F1F6FC)],
+                ? const [
+                    Color(0xF7243B58),
+                    Color(0xF4142035),
+                    Color(0xF20B1729),
+                  ]
+                : const [
+                    Color(0xFCFFFFFF),
+                    Color(0xF8F9FCFF),
+                    Color(0xF0EAF1F8),
+                  ],
             begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: dark ? const Color(0x6641CDE7) : const Color(0x5541AFCB),
+            color: dark ? const Color(0x8841CDE7) : const Color(0x7741AFCB),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(dark ? 0.45 : 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 9),
+              color: Colors.black.withOpacity(dark ? 0.50 : 0.14),
+              blurRadius: 28,
+              offset: const Offset(0, 11),
             ),
             BoxShadow(
-              color: VyroColors.glowCyan.withOpacity(dark ? 0.18 : 0.1),
-              blurRadius: 22,
+              color: VyroColors.glowCyan.withOpacity(dark ? 0.22 : 0.12),
+              blurRadius: 26,
+              offset: const Offset(0, 2),
+            ),
+            BoxShadow(
+              color: VyroColors.glowPurple.withOpacity(dark ? 0.12 : 0.06),
+              blurRadius: 30,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -4050,34 +4127,76 @@ class _HomePageState extends State<HomePage>
                           gradient:
                               _tabIndex == i ? VyroColors.brandGradient : null,
                           borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: _tabIndex == i
+                                ? const Color(0x66FFFFFF)
+                                : Colors.transparent,
+                          ),
                           boxShadow: _tabIndex == i
                               ? [
                                   const BoxShadow(
                                     color: Color(0x5522D3EE),
-                                    blurRadius: 12,
-                                    offset: Offset(0, 4),
+                                    blurRadius: 16,
+                                    offset: Offset(0, 5),
+                                  ),
+                                  const BoxShadow(
+                                    color: Color(0x338B5CF6),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 3),
                                   ),
                                 ]
                               : null,
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Stack(
+                          alignment: Alignment.center,
                           children: [
-                            Icon(
-                              _tabIndex == i ? activeIcon : icon,
-                              size: 22,
-                              color: _tabIndex == i ? Colors.white : inactive,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              isPersian ? faLabel : label,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: _tabIndex == i
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: _tabIndex == i ? Colors.white : inactive,
+                            if (_tabIndex == i)
+                              Positioned(
+                                top: 1,
+                                left: 10,
+                                right: 10,
+                                height: 24,
+                                child: IgnorePointer(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(18),
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0x55FFFFFF),
+                                          Color(0x00FFFFFF),
+                                        ],
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _tabIndex == i ? activeIcon : icon,
+                                  size: 22,
+                                  color:
+                                      _tabIndex == i ? Colors.white : inactive,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isPersian ? faLabel : label,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: _tabIndex == i
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    letterSpacing:
+                                        _tabIndex == i && !isPersian ? 0.1 : 0,
+                                    color: _tabIndex == i
+                                        ? Colors.white
+                                        : inactive,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -4125,18 +4244,47 @@ class _HomePageState extends State<HomePage>
       child: Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: VyroColors.brandGradient,
           shape: BoxShape.circle,
-          boxShadow: [
+          border: Border.all(color: const Color(0x99FFFFFF)),
+          boxShadow: const [
             BoxShadow(
               color: Color(0x5522D3EE),
-              blurRadius: 14,
-              offset: Offset(0, 5),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Color(0x338B5CF6),
+              blurRadius: 24,
+              offset: Offset(0, 4),
             ),
           ],
         ),
-        child: Icon(icon, color: Colors.white, size: small ? 22 : 26),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              top: 2,
+              left: size * 0.2,
+              right: size * 0.2,
+              height: size * 0.42,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(size),
+                    gradient: const LinearGradient(
+                      colors: [Color(0x66FFFFFF), Color(0x00FFFFFF)],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Icon(icon, color: Colors.white, size: small ? 22 : 26),
+          ],
+        ),
       ),
     );
   }
@@ -4296,11 +4444,13 @@ class _HomePageState extends State<HomePage>
         dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
     final green = dark ? WaColors.accentDark : WaColors.accent;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       child: SafariGlassCard(
         padding: EdgeInsets.zero,
         radius: 18,
         child: ListTile(
+          minVerticalPadding: 10,
+          horizontalTitleGap: 12,
           leading: WaAvatar(label: title, radius: 26),
           title: Row(
             children: [
@@ -4312,6 +4462,7 @@ class _HomePageState extends State<HomePage>
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w600,
+                    letterSpacing: 0.05,
                   ),
                 ),
               ),
@@ -4334,6 +4485,7 @@ class _HomePageState extends State<HomePage>
                     color: unread > 0 ? green : secondary,
                     fontWeight:
                         unread > 0 ? FontWeight.w600 : FontWeight.normal,
+                    letterSpacing: 0.1,
                   ),
                 ),
             ],
@@ -4504,20 +4656,36 @@ class _HomePageState extends State<HomePage>
 
   Widget _sectionHeader(String text) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final muted =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-      child: Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Text(
-          text.toUpperCase(),
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
-            color:
-                dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 7),
+      child: Row(
+        children: [
+          Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.05,
+              color: muted,
+            ),
           ),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    muted.withOpacity(dark ? 0.34 : 0.30),
+                    muted.withOpacity(0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

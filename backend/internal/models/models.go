@@ -179,9 +179,9 @@ type Message struct {
 	Reactions       map[string][]string `json:"reactions,omitempty"` // emoji -> user ids
 	// ViewCount is the number of distinct viewers (Stage 5); only
 	// populated for channel posts.
-	ViewCount       int                 `json:"view_count,omitempty"`
-	CreatedAt       time.Time           `json:"created_at"`
-	UpdatedAt       time.Time           `json:"updated_at"`
+	ViewCount int       `json:"view_count,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // StatusFor computes the WhatsApp-style tick status from receipts and the
@@ -329,7 +329,7 @@ type Story struct {
 	Kind            string    `json:"kind"` // photo | video | text | audio (Stage 2)
 	TextContent     string    `json:"text_content,omitempty"`
 	BackgroundColor string    `json:"background_color,omitempty"`
-	ViewCount       int       `json:"view_count,omitempty"` // owner only, populated by ListStories
+	ViewCount       int       `json:"view_count,omitempty"`  // owner only, populated by ListStories
 	MyReaction      string    `json:"my_reaction,omitempty"` // requester's own reaction, if any
 	ExpiresAt       time.Time `json:"expires_at"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -376,7 +376,7 @@ type StoryReply struct {
 type EmailCode struct {
 	Email      string
 	Purpose    string // "register" | "login"
-	CodeHash   string // hex SHA-256 of the 6-digit code
+	CodeHash   string // keyed SHA-256 hex of the 6-digit code
 	Attempts   int    // failed verification attempts against this code
 	ExpiresAt  time.Time
 	ConsumedAt *time.Time
@@ -400,11 +400,11 @@ type PendingUser struct {
 // of people with an admin-only announcement group, subgroups
 // (ordinary group chats) and its own membership with roles.
 type Community struct {
-	ID                 string    `json:"id"`
-	Name               string    `json:"name"`
-	Description        string    `json:"description,omitempty"`
-	OwnerID            string    `json:"owner_id,omitempty"`
-	AnnouncementChatID string    `json:"announcement_chat_id,omitempty"`
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	Description        string `json:"description,omitempty"`
+	OwnerID            string `json:"owner_id,omitempty"`
+	AnnouncementChatID string `json:"announcement_chat_id,omitempty"`
 	// Computed, populated by list/detail endpoints.
 	MemberCount   int       `json:"member_count,omitempty"`
 	SubgroupCount int       `json:"subgroup_count,omitempty"`

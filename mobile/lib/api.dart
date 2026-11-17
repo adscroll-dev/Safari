@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart'
@@ -36,6 +37,19 @@ class ApiClient {
   /// Data Saver is ON by default: the UI must not auto-download media.
   bool dataSaver = true;
 
+  Future<T> _withTimeoutRetry<T>(Future<T> Function() request) async {
+    var attempt = 0;
+    while (true) {
+      try {
+        return await request().timeout(const Duration(seconds: 30));
+      } on TimeoutException {
+        if (attempt++ > 0) rethrow;
+      } on http.ClientException {
+        if (attempt++ > 0) rethrow;
+      }
+    }
+  }
+
   Map<String, String> get _headers => {
         'Content-Type': 'application/json',
         if (token != null) 'Authorization': 'Bearer $token',
@@ -45,16 +59,15 @@ class ApiClient {
       [Map<String, dynamic>? body]) async {
     final uri = Uri.parse('$baseUrl$path');
     final reqBytes = body == null ? 0 : utf8.encode(jsonEncode(body)).length;
-    final res = method == 'GET'
-        ? await http.get(uri, headers: _headers)
+    final res = await _withTimeoutRetry(() => method == 'GET'
+        ? http.get(uri, headers: _headers)
         : method == 'PUT'
-            ? await http.put(uri,
-                headers: _headers, body: jsonEncode(body ?? {}))
+            ? http.put(uri, headers: _headers, body: jsonEncode(body ?? {}))
             : method == 'DELETE'
-                ? await http.delete(uri,
+                ? http.delete(uri,
                     headers: _headers, body: jsonEncode(body ?? {}))
-                : await http.post(uri,
-                    headers: _headers, body: jsonEncode(body ?? {}));
+                : http.post(uri,
+                    headers: _headers, body: jsonEncode(body ?? {})));
     usage?.add(UsageCategory.chat, reqBytes + res.bodyBytes.length);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode >= 400) {
@@ -64,7 +77,8 @@ class ApiClient {
   }
 
   Future<List<dynamic>> _getList(String path) async {
-    final res = await http.get(Uri.parse('$baseUrl$path'), headers: _headers);
+    final res = await _withTimeoutRetry(
+        () => http.get(Uri.parse('$baseUrl$path'), headers: _headers));
     usage?.add(UsageCategory.chat, res.bodyBytes.length);
     if (res.statusCode >= 400) {
       throw Exception('Request failed: ${res.statusCode}');
@@ -206,7 +220,7 @@ class ApiClient {
   // Stage 9 — backup export (raw JSON) + storage report.
   Future<String> exportMyData() async {
     final uri = Uri.parse('$baseUrl/api/users/me/export');
-    final res = await http.get(uri, headers: _headers);
+    final res = await _withTimeoutRetry(() => http.get(uri, headers: _headers));
     usage?.add(UsageCategory.chat, res.bodyBytes.length);
     if (res.statusCode >= 400) {
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -556,8 +570,8 @@ class ApiClient {
   /// only called after the user taps Download, or when Data Saver
   /// is off). Returns the raw bytes; the caller records usage.
   Future<Uint8List> downloadFile(String fileUrl) async {
-    final res =
-        await http.get(Uri.parse('$baseUrl$fileUrl'), headers: _headers);
+    final res = await _withTimeoutRetry(
+        () => http.get(Uri.parse('$baseUrl$fileUrl'), headers: _headers));
     if (res.statusCode >= 400) {
       throw Exception('Download failed: ${res.statusCode}');
     }
@@ -622,12 +636,14 @@ class ApiClient {
   Future<Map<String, dynamic>> uploadFile(
       Uint8List bytes, String fileName, String mimeType,
       {UsageCategory category = UsageCategory.media}) async {
-    final req =
-        http.MultipartRequest('POST', Uri.parse('$baseUrl/api/uploads'));
-    if (token != null) req.headers['Authorization'] = 'Bearer $token';
-    req.files
-        .add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
-    final res = await http.Response.fromStream(await req.send());
+    final res = await _withTimeoutRetry(() async {
+      final req =
+          http.MultipartRequest('POST', Uri.parse('$baseUrl/api/uploads'));
+      if (token != null) req.headers['Authorization'] = 'Bearer $token';
+      req.files
+          .add(http.MultipartFile.fromBytes('file', bytes, filename: fileName));
+      return http.Response.fromStream(await req.send());
+    });
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode >= 400) {
       throw Exception(data['error'] ?? 'Upload failed: ${res.statusCode}');
@@ -652,7 +668,6 @@ class ApiClient {
   Map<String, String> get authHeaders => {
         if (token != null) 'Authorization': 'Bearer $token',
       };
-
 
   /// Stage 11: forget the token (after account deletion), so the
   /// app returns to the login screen and sends no more authed calls.

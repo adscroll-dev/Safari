@@ -209,7 +209,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.issueCode(req.Email, purposeRegister); err != nil {
-		log.Printf("register: send verification code failed: %v", err)
+		log.Printf("register: create verification code failed: %v", err)
 		_ = h.Store.DeletePendingUser(req.Email)
 		middleware.WriteError(w, http.StatusInternalServerError, "could not send verification email")
 		return

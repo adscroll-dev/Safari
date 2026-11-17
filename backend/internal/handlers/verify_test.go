@@ -52,7 +52,7 @@ func TestVerifyHappyPath(t *testing.T) {
 	if mail.count(email) != 1 {
 		t.Fatalf("expected exactly 1 email, got %d", mail.count(email))
 	}
-	body := mail.sent[0].body
+	body := mail.firstBody(email)
 	if !strings.Contains(body, "expires in 10 minutes") || !strings.Contains(body, "Never share this code") {
 		t.Fatalf("email body missing expiry/warning: %q", body)
 	}
@@ -66,7 +66,7 @@ func TestVerifyHappyPath(t *testing.T) {
 		t.Fatalf("GetEmailCode: %v", err)
 	}
 	if row.CodeHash == code || len(row.CodeHash) != 64 {
-		t.Fatalf("code must be stored as a SHA-256 hex hash, got %q", row.CodeHash)
+		t.Fatalf("code must be stored as a keyed SHA-256 hex hash, got %q", row.CodeHash)
 	}
 
 	// Verify-register: 201 with user + token. The code is single-use.
@@ -140,6 +140,50 @@ func TestVerifyHappyPath(t *testing.T) {
 	}
 }
 
+func TestRegisterReturnsBeforeEmailDelivery(t *testing.T) {
+	h := newTestHandler()
+	mailer := &blockingMailer{
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	h.Mailer = mailer
+	defer close(mailer.release)
+
+	result := make(chan struct {
+		code int
+		body string
+	}, 1)
+	go func() {
+		rec := doJSON(t, h, http.MethodPost, "/api/auth/register", map[string]string{
+			"email":        "fast-register@example.com",
+			"password":     "password-123",
+			"display_name": "Fast Register",
+		}, "")
+		result <- struct {
+			code int
+			body string
+		}{code: rec.Code, body: rec.Body.String()}
+	}()
+
+	select {
+	case response := <-result:
+		if response.code != http.StatusCreated {
+			t.Fatalf("register: expected 201, got %d %s", response.code, response.body)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("register waited for email delivery")
+	}
+	select {
+	case <-mailer.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("email delivery was not started")
+	}
+	row, err := h.Store.GetEmailCode("fast-register@example.com", purposeRegister)
+	if err != nil || len(row.CodeHash) != 64 {
+		t.Fatalf("verification code hash should be saved before delivery: row=%+v err=%v", row, err)
+	}
+}
+
 func TestVerifyWrongCodeRejected(t *testing.T) {
 	h := newTestHandler()
 	email := "wrongcode@example.com"
@@ -169,6 +213,26 @@ func TestVerifyWrongCodeRejected(t *testing.T) {
 	}, "")
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("real code after one wrong guess: expected 201, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestVerificationCodeHashIsKeyedAndLegacyCodesRemainUsable(t *testing.T) {
+	const code = "012345"
+	h := newTestHandler()
+
+	if hashCode(h.JWTSecret, code) == legacyHashCode(code) {
+		t.Fatal("verification-code hash must depend on the server secret")
+	}
+
+	email := "legacy-code@example.com"
+	if err := h.Store.SaveEmailCode(&models.EmailCode{
+		Email: email, Purpose: purposeLogin, CodeHash: legacyHashCode(code),
+		ExpiresAt: time.Now().UTC().Add(codeTTL),
+	}); err != nil {
+		t.Fatalf("SaveEmailCode: %v", err)
+	}
+	if valid, tooMany := h.verifyCode(email, purposeLogin, code); !valid || tooMany {
+		t.Fatalf("unexpired pre-upgrade code should remain usable: valid=%v tooMany=%v", valid, tooMany)
 	}
 }
 
@@ -473,13 +537,13 @@ func TestStoreVerificationRoundTrip(t *testing.T) {
 		t.Fatalf("GetPendingUser: %+v, %v", got, err)
 	}
 	if err := s.SaveEmailCode(&models.EmailCode{
-		Email: email, Purpose: "login", CodeHash: hashCode("123456"),
+		Email: email, Purpose: "login", CodeHash: hashCode("test-secret", "123456"),
 		ExpiresAt: now.Add(10 * time.Minute),
 	}); err != nil {
 		t.Fatalf("SaveEmailCode: %v", err)
 	}
 	row, err := s.GetEmailCode(email, "login")
-	if err != nil || row.CodeHash != hashCode("123456") || row.Attempts != 0 {
+	if err != nil || row.CodeHash != hashCode("test-secret", "123456") || row.Attempts != 0 {
 		t.Fatalf("GetEmailCode: %+v, %v", row, err)
 	}
 	n, err := s.IncrementCodeAttempts(email, "login")

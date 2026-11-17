@@ -1,14 +1,14 @@
-# VYRO — Connect Beyond Limits
+# Safari — Connect Beyond Limits
 
-> **VYRO** یک پیام‌رسان واقعی، سریع، امن و چندسکویی است که با هدف رقابت با
+> **Safari** یک پیام‌رسان واقعی، سریع، امن و چندسکویی است که با هدف رقابت با
 > Telegram و WhatsApp ساخته می‌شود — با معماری مشترک و فقط ابزارهای رایگان /
 > متن‌باز.
 >
-> **VYRO** is a real, fast, secure, multi-platform messenger built to
+> **Safari** is a real, fast, secure, multi-platform messenger built to
 > compete with Telegram and WhatsApp — one shared backend, only free /
 > open-source tools.
 
-![VYRO logo](brand/logo.svg)
+![Safari logo](brand/logo.svg)
 
 - **Slogan / شعار:** Connect Beyond Limits — فراتر از مرزها وصل شو
 - **Brand / برند:** آبی و بنفش (`#2563EB` → `#7C3AED`) — see `brand/BRAND.md`
@@ -20,14 +20,14 @@
 
 ## ⚠️ قانون صفر هزینه — Zero-cost rule
 
-**تا زمانی که تعداد کاربران ثبت‌نام‌شده VYRO به بیش از ۱۰٬۰۰۰ نفر نرسیده است:**
+**تا زمانی که تعداد کاربران ثبت‌نام‌شده Safari به بیش از ۱۰٬۰۰۰ نفر نرسیده است:**
 
 - هیچ سرویس پولی، هیچ اشتراک پولی، هیچ API پولی، هیچ سرور پولی.
 - فقط ابزارهای رایگان / متن‌باز: Go، Flutter، Next.js، PostgreSQL، Redis، Docker.
 - قابلیتی که بدون هزینه قابل اجرا نیست، فعلاً **غیرفعال** است و جایگزین
   رایگان آن در `docs/ARCHITECTURE.md` آمده است.
 
-**Until VYRO has more than 10,000 registered users:** no paid service,
+**Until Safari has more than 10,000 registered users:** no paid service,
 no paid subscription, no paid API, no paid server — free / open-source
 only. Features that need a paid service stay disabled, with a free
 alternative noted in `docs/ARCHITECTURE.md`.
@@ -84,7 +84,7 @@ go mod download
 go vet ./...
 go test ./...
 go run ./cmd/server
-# → VYRO backend listening on :8080
+# → Safari backend listening on :8080
 # → http://localhost:8080/health  →  {"status":"ok","service":"vyro-backend",...}
 ```
 
@@ -164,7 +164,7 @@ docker compose up --build
 
 ## API (v0.5)
 
-جدید در v0.5: رمزنگاری سرتاسری واقعی برای DMهای دونفره (VYRO E2EE v1 —
+جدید در v0.5: رمزنگاری سرتاسری واقعی برای DMهای دونفره (Safari E2EE v1 —
 X3DH + Double Ratchet، با Safety Number در وب)، سیگنالینگ تماس WebRTC،
 اعلان Web Push با VAPID، و تست‌شدن limiter با Redis واقعی و متدهای
 Postgres نسخه v0.4 با PostgreSQL واقعی.
@@ -340,7 +340,7 @@ Base: `http://localhost:8080` — Auth: `Authorization: Bearer <jwt>` (ادام�
   حباب پیام با تیک ✓/✓✓/✓✓ آبی و ساعت، نشان «در حال تایپ…»،
   دکمه‌های بزرگ ارسال/پیوست/لوکیشن، انتخاب TTL پیام ناپدیدشونده،
   زمان‌بندی پیام، پین/آرشیو از سربرگ چت، دکمه لوکیشن با
-  geolocation مرورگر. برند آبی-بنفش VYRO حفظ شده؛ طرح تلگرام و
+  geolocation مرورگر. برند آبی-بنفش Safari حفظ شده؛ طرح تلگرام و
   واتساپ کپی نشده است.
 - موبایل Flutter: فهرست چت با `ListTile`/آواتار، حباب با تیک و
   ساعت، نشان تایپ، دکمه ارسال بزرگ، ناوبری پایین (Chats/Stories)،
@@ -413,7 +413,7 @@ Base: `http://localhost:8080` — Auth: `Authorization: Bearer <jwt>` (ادام�
 
 - **E2EE گروهی:** فقط DM دونفره رمزنگاری می‌شود؛ پیام‌های گروه/کانال
   روی سرور متن ساده‌اند (Sender Keys پیاده نشده). همچنین E2EE
-  ساخته‌شده VYRO **libsignal نیست، با Signal سازگار نیست، و به‌عنوان
+  ساخته‌شده Safari **libsignal نیست، با Signal سازگار نیست، و به‌عنوان
   یک پروتکل به‌صورت مستقل بررسی (audit) نشده است** — فقط از
   primitiveهای بررسی‌شده استفاده می‌کند (جزئیات در
   `docs/SECURITY.md`). چنددستگاه هم نیست (یک دستگاه، `"default"`).
@@ -464,7 +464,7 @@ Base: `http://localhost:8080` — Auth: `Authorization: Bearer <jwt>` (ادام�
    پین/آرشیو/پوشه، استوری، ربات‌ها، مدیریت مدیران، limiter با Redis،
    زیرساخت کلید E2EE، چیدمان آشنای وب/موبایل.
 5. **v0.5** — ✅ (انجام شد ۲۰۲۶-۱۱-۱۲): E2EE واقعی برای DM دونفره
-   (VYRO E2EE v1 — X3DH + Double Ratchet، Go و TypeScript، اثبات
+   (Safari E2EE v1 — X3DH + Double Ratchet، Go و TypeScript، اثبات
    سازگاری دوسویه؛ Safety Number در وب)، سیگنالینگ تماس WebRTC +
    تماس صوتی در وب، Web Push با VAPID، تست limiter با Redis واقعی،
    تست متدهای Postgres نسخه v0.4 با PostgreSQL واقعی، اصلاح

@@ -10,13 +10,14 @@
 // Code rules: random 6 digits (crypto/rand, leading zeros allowed),
 // expires after 10 minutes, single-use, max 5 failed verification
 // attempts per code (the 5th failure invalidates it and returns 429),
-// resend cooldown 60 seconds per (email, purpose). Only the SHA-256
-// hash of a code is ever stored; the plain code is never logged or
+// resend cooldown 60 seconds per (email, purpose). Only a keyed hash
+// of a code is stored; the plain code is never logged or
 // returned by the API. When no mailer is configured (h.Mailer == nil)
 // the endpoints that must send mail return 503 and never fake a code.
 package handlers
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -56,8 +57,18 @@ func generateCode() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
-// hashCode is the only form of a code that is stored or compared.
-func hashCode(code string) string {
+// hashCode stores a keyed, domain-separated digest so a database dump
+// alone cannot be used to brute-force the million possible codes.
+func hashCode(secret, code string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte("safari-email-code-v1:"))
+	_, _ = mac.Write([]byte(code))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// legacyHashCode permits codes issued before keyed hashing to finish
+// during their existing 10-minute lifetime.
+func legacyHashCode(code string) string {
 	sum := sha256.Sum256([]byte(code))
 	return hex.EncodeToString(sum[:])
 }
@@ -77,25 +88,28 @@ func (h *Handler) mailerUnavailable(w http.ResponseWriter) {
 	middleware.WriteError(w, http.StatusServiceUnavailable, "email sending is not configured")
 }
 
-// issueCode generates a code, stores only its hash, and emails the
-// plain code to the user. On send failure the stored code is removed
-// again so a stale, undelivered code can never be verified.
+// issueCode generates a code and stores only its hash before returning.
+// Email delivery is asynchronous so a slow mail server does not delay
+// the response. A failed send is logged; the normal resend cooldown
+// allows the user to request another code.
 func (h *Handler) issueCode(email, purpose string) error {
 	code, err := generateCode()
 	if err != nil {
 		return err
 	}
 	now := time.Now().UTC()
+	codeHash := hashCode(h.JWTSecret, code)
 	if err := h.Store.SaveEmailCode(&models.EmailCode{
-		Email: email, Purpose: purpose, CodeHash: hashCode(code),
+		Email: email, Purpose: purpose, CodeHash: codeHash,
 		ExpiresAt: now.Add(codeTTL), CreatedAt: now,
 	}); err != nil {
 		return err
 	}
-	if err := h.Mailer.Send(email, "Safari verification code", codeEmailBody(code)); err != nil {
-		_ = h.Store.InvalidateEmailCode(email, purpose)
-		return err
-	}
+	go func() {
+		if err := h.Mailer.Send(email, "Safari verification code", codeEmailBody(code)); err != nil {
+			log.Printf("verification email send failed for %s (%s): %v", email, purpose, err)
+		}
+	}()
 	return nil
 }
 
@@ -110,7 +124,13 @@ func (h *Handler) verifyCode(email, purpose, code string) (valid, tooMany bool) 
 	if err != nil || row.ConsumedAt != nil || time.Now().UTC().After(row.ExpiresAt) {
 		return false, false
 	}
-	if subtle.ConstantTimeCompare([]byte(hashCode(code)), []byte(row.CodeHash)) == 1 {
+	currentHashMatch := subtle.ConstantTimeCompare(
+		[]byte(hashCode(h.JWTSecret, code)), []byte(row.CodeHash),
+	)
+	legacyHashMatch := subtle.ConstantTimeCompare(
+		[]byte(legacyHashCode(code)), []byte(row.CodeHash),
+	)
+	if currentHashMatch|legacyHashMatch == 1 {
 		_ = h.Store.ConsumeEmailCode(email, purpose)
 		return true, false
 	}
