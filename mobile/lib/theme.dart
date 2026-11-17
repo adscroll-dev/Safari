@@ -46,6 +46,12 @@ class VyroColors {
   /// Soft neon glow used behind hero icons and empty states.
   static const Color glowCyan = Color(0x5522D3EE);
   static const Color glowPurple = Color(0x448B5CF6);
+
+  static const LinearGradient heroGradient = LinearGradient(
+    colors: [Color(0xCC0D1D38), Color(0xCC151B40), Color(0xCC25164B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 /// Safari's premium palette, light and dark.
@@ -96,7 +102,8 @@ ThemeData vyroLightTheme() {
     colorScheme: scheme,
     useMaterial3: true,
     scaffoldBackgroundColor: WaColors.lightBackground,
-    fontFamily: 'Roboto',
+    fontFamily: 'Inter',
+    fontFamilyFallback: const ['Vazirmatn', 'Roboto'],
     appBarTheme: const AppBarTheme(
       backgroundColor: WaColors.lightHeader,
       foregroundColor: Colors.white,
@@ -174,7 +181,8 @@ ThemeData vyroDarkTheme() {
     colorScheme: scheme,
     useMaterial3: true,
     scaffoldBackgroundColor: WaColors.darkBackground,
-    fontFamily: 'Roboto',
+    fontFamily: 'Inter',
+    fontFamilyFallback: const ['Vazirmatn', 'Roboto'],
     appBarTheme: const AppBarTheme(
       backgroundColor: WaColors.darkHeader,
       foregroundColor: Colors.white,
@@ -483,6 +491,241 @@ class SafariGlassCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
         child: card,
+      ),
+    );
+  }
+}
+
+/// A compact animated filter chip for the main tab lists.
+class SafariFilterChip extends StatelessWidget {
+  const SafariFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+      decoration: BoxDecoration(
+        gradient: selected ? VyroColors.brandGradient : null,
+        color: selected
+            ? null
+            : dark
+                ? WaColors.darkSurface2.withOpacity(0.82)
+                : Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: selected
+              ? Colors.transparent
+              : dark
+                  ? WaColors.darkBorder
+                  : WaColors.lightBorder,
+        ),
+        boxShadow: selected
+            ? const [
+                BoxShadow(
+                  color: Color(0x4422D3EE),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 9),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : dark
+                        ? WaColors.darkText
+                        : WaColors.lightText,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dark-glass hero action with a luminous icon tile and a short description.
+class SafariHeroCard extends StatelessWidget {
+  const SafariHeroCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.actionLabel,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final String? actionLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final secondary =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: dark ? VyroColors.heroGradient : null,
+            color: dark ? null : Colors.white.withOpacity(0.94),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: dark ? const Color(0x665B52A9) : WaColors.lightBorder,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(dark ? 0.25 : 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 7),
+              ),
+              if (dark)
+                const BoxShadow(
+                  color: Color(0x2222D3EE),
+                  blurRadius: 18,
+                ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: VyroColors.brandGradient,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x5522D3EE),
+                      blurRadius: 14,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: Colors.white, size: 27),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 13, color: secondary),
+                    ),
+                    if (actionLabel != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        actionLabel!,
+                        style: const TextStyle(
+                          color: WaColors.accent,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: secondary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gradient call action used for voice and video call entry points.
+class SafariGradientButton extends StatelessWidget {
+  const SafariGradientButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+          decoration: BoxDecoration(
+            gradient: VyroColors.brandGradient,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x4422D3EE),
+                blurRadius: 12,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 19),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
