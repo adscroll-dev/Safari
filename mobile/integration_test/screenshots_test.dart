@@ -145,6 +145,10 @@ void main() {
         label: 'story row');
     await tester.pump(const Duration(seconds: 1));
     await binding.takeScreenshot('stories');
+    // Scroll to the bottom: the last item must clear the nav bar fully.
+    await tester.drag(find.text('CHANNELS'), const Offset(0, -320));
+    await tester.pump(const Duration(seconds: 1));
+    await binding.takeScreenshot('stories-bottom');
 
     // 6) Calls tab (premium empty state).
     await tester.tap(find.text('Calls'));

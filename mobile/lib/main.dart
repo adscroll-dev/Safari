@@ -86,6 +86,7 @@ class _VyroAppState extends State<VyroApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Safari',
+      debugShowCheckedModeBanner: false,
       themeMode: _mode,
       theme: vyroLightTheme(),
       darkTheme: vyroDarkTheme(),
@@ -4009,80 +4010,99 @@ class _HomePageState extends State<HomePage>
         margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
-          color: dark
-              ? WaColors.darkSurface.withOpacity(0.88)
-              : Colors.white.withOpacity(0.92),
+          gradient: LinearGradient(
+            colors: dark
+                ? const [Color(0xF21A2A43), Color(0xF20B1729)]
+                : const [Color(0xF9FFFFFF), Color(0xF0F1F6FC)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
           borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: dark ? WaColors.darkBorder : WaColors.lightBorder,
+            color: dark ? const Color(0x6641CDE7) : const Color(0x5541AFCB),
           ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(dark ? 0.45 : 0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              blurRadius: 24,
+              offset: const Offset(0, 9),
             ),
-            if (dark)
-              const BoxShadow(
-                color: Color(0x1A22D3EE),
-                blurRadius: 24,
-              ),
+            BoxShadow(
+              color: VyroColors.glowCyan.withOpacity(dark ? 0.18 : 0.1),
+              blurRadius: 22,
+            ),
           ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            for (final (icon, activeIcon, label, faLabel, i) in items)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tabIndex = i),
-                  behavior: HitTestBehavior.opaque,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    padding: const EdgeInsets.symmetric(vertical: 7),
-                    decoration: BoxDecoration(
-                      gradient: _tabIndex == i
-                          ? const LinearGradient(
-                              colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            )
-                          : null,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: _tabIndex == i
-                          ? [
-                              const BoxShadow(
-                                color: Color(0x5522D3EE),
-                                blurRadius: 12,
-                                offset: Offset(0, 4),
+            Row(
+              children: [
+                for (final (icon, activeIcon, label, faLabel, i) in items)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _tabIndex = i),
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.symmetric(vertical: 7),
+                        decoration: BoxDecoration(
+                          gradient:
+                              _tabIndex == i ? VyroColors.brandGradient : null,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: _tabIndex == i
+                              ? [
+                                  const BoxShadow(
+                                    color: Color(0x5522D3EE),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 4),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _tabIndex == i ? activeIcon : icon,
+                              size: 22,
+                              color: _tabIndex == i ? Colors.white : inactive,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              isPersian ? faLabel : label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: _tabIndex == i
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: _tabIndex == i ? Colors.white : inactive,
                               ),
-                            ]
-                          : null,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _tabIndex == i ? activeIcon : icon,
-                          size: 22,
-                          color: _tabIndex == i ? Colors.white : inactive,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isPersian ? faLabel : label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: _tabIndex == i
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: _tabIndex == i ? Colors.white : inactive,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                  ),
+              ],
+            ),
+            Positioned(
+              top: 0,
+              left: 18,
+              right: 18,
+              height: 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.white.withOpacity(dark ? 0.22 : 0.8),
+                      Colors.transparent,
+                    ],
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),
@@ -4150,17 +4170,23 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHomeBody() {
-    switch (_tabIndex) {
-      case 1:
-        return _buildUpdatesBody();
-      case 2:
-        return _buildCommunitiesBody();
-      case 3:
-        return _buildCallsBody();
-      case 0:
-      default:
-        return _buildChatsBody();
-    }
+    final tab = switch (_tabIndex) {
+      1 => _buildUpdatesBody(),
+      2 => _buildCommunitiesBody(),
+      3 => _buildCallsBody(),
+      _ => _buildChatsBody(),
+    };
+    return SafariAuroraBackdrop(
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 240),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeOut,
+        child: KeyedSubtree(
+          key: ValueKey<int>(_tabIndex),
+          child: tab,
+        ),
+      ),
+    );
   }
 
   // --- Chats tab: Safari list -------------------------------
@@ -4285,7 +4311,7 @@ class _HomePageState extends State<HomePage>
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 16,
-                    fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w600,
                   ),
                 ),
               ),
@@ -4304,7 +4330,7 @@ class _HomePageState extends State<HomePage>
                 Text(
                   timeLabel,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: unread > 0 ? green : secondary,
                     fontWeight:
                         unread > 0 ? FontWeight.w600 : FontWeight.normal,
@@ -4320,7 +4346,7 @@ class _HomePageState extends State<HomePage>
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     color: unread > 0
                         ? Theme.of(context).colorScheme.onSurface
                         : secondary,
@@ -4518,7 +4544,9 @@ class _HomePageState extends State<HomePage>
     final secondary =
         dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(
+        bottom: 120 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
       children: [
         _sectionHeader('Stories'),
         SizedBox(
@@ -4619,12 +4647,12 @@ class _HomePageState extends State<HomePage>
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: SafariGlassCard(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   Container(
-                    width: 64,
-                    height: 64,
+                    width: 56,
+                    height: 56,
                     decoration: const BoxDecoration(
                       gradient: VyroColors.brandGradient,
                       shape: BoxShape.circle,
@@ -4637,9 +4665,9 @@ class _HomePageState extends State<HomePage>
                       ],
                     ),
                     child: const Icon(Icons.campaign_outlined,
-                        size: 30, color: Colors.white),
+                        size: 27, color: Colors.white),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   const Text('No channels yet',
                       style:
                           TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -4647,11 +4675,11 @@ class _HomePageState extends State<HomePage>
                   Text('Channels you follow will appear here.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 13, color: secondary)),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
+                  const SizedBox(height: 12),
+                  SafariGradientButton(
                     onPressed: _showChannelSearch,
-                    icon: const Icon(Icons.search, size: 18),
-                    label: const Text('Find channels'),
+                    icon: Icons.search,
+                    label: 'Find channels',
                   ),
                 ],
               ),
@@ -4891,7 +4919,7 @@ class _HomePageState extends State<HomePage>
           actionLabel: 'Create community',
           onTap: _createCommunity,
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 8),
         if (_communities.isEmpty)
           SafariEmptyState(
             icon: Icons.groups_outlined,
@@ -4899,6 +4927,7 @@ class _HomePageState extends State<HomePage>
             subtitle: 'Create a community to bring related groups together.',
             buttonLabel: 'New community',
             onPressed: _createCommunity,
+            compact: true,
           )
         else
           for (final c in _communities)
@@ -4908,42 +4937,9 @@ class _HomePageState extends State<HomePage>
                 onTap: () => _showCommunityDetail(c),
                 child: Row(
                   children: [
-                    Builder(
-                      builder: (context) {
-                        final name = c['name'] as String? ?? 'Community';
-                        final g = WaAvatar.gradientFor(name);
-                        final initial = name.isEmpty
-                            ? '?'
-                            : name.substring(0, 1).toUpperCase();
-                        return Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: g,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x3322D3EE),
-                                blurRadius: 8,
-                                offset: Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 22,
-                            ),
-                          ),
-                        );
-                      },
+                    WaAvatar(
+                      label: c['name'] as String? ?? 'Community',
+                      radius: 26,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -6172,6 +6168,7 @@ class _HomePageState extends State<HomePage>
                   buttonLabel: _calls.isEmpty ? 'Start a call' : null,
                   onPressed:
                       _calls.isEmpty ? () => _startNewCall(video: false) : null,
+                  compact: true,
                 )
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -6398,12 +6395,7 @@ class _HomePageState extends State<HomePage>
   /// Type and folder filters share one row. Long-press a folder chip
   /// to rename or delete it.
   Widget _chatFilterChips() {
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final isPersian = Localizations.localeOf(context).languageCode == 'fa';
-    final selectedBg = dark ? const Color(0xFF06B6D4) : const Color(0xFF0891B2);
-    const selectedFg = Colors.white;
-    final unselectedBg = dark ? WaColors.darkSurface2 : const Color(0xFFEDF2F7);
-    final unselectedFg = dark ? WaColors.darkText : WaColors.lightText;
     const filters = [
       ('All', 'همه'),
       ('Personal', 'شخصی'),
@@ -6412,27 +6404,12 @@ class _HomePageState extends State<HomePage>
     ];
     Widget chip(String label, bool selected, VoidCallback onTap,
         {VoidCallback? onLongPress}) {
-      final w = GestureDetector(
+      return SafariFilterChip(
+        label: label,
+        selected: selected,
+        onTap: onTap,
         onLongPress: onLongPress,
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          showCheckmark: false,
-          selectedColor: selectedBg,
-          backgroundColor: unselectedBg,
-          labelStyle: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? selectedFg : unselectedFg,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-            side: BorderSide.none,
-          ),
-          onSelected: (_) => onTap(),
-        ),
       );
-      return w;
     }
 
     return SingleChildScrollView(
@@ -6472,16 +6449,10 @@ class _HomePageState extends State<HomePage>
                 onLongPress: () => _manageFolder(f)),
             const SizedBox(width: 6),
           ],
-          ActionChip(
-            label: const Text('+ Folder'),
-            backgroundColor: unselectedBg,
-            labelStyle: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: unselectedFg),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-              side: BorderSide.none,
-            ),
-            onPressed: _createFolder,
+          chip(
+            '+ Folder',
+            false,
+            _createFolder,
           ),
         ],
       ),
