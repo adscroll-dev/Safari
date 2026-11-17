@@ -1142,7 +1142,7 @@ export default function LandingContent() {
           >
             {[
               [t.versionLabel, "0.7.5 (Beta)"],
-              [t.sizeLabel, "34.9 MB · 28.0 MB · 37.4 MB"],
+              [t.sizeLabel, "35.1 MB · 28.2 MB · 37.6 MB"],
               [t.updated, "Nov 16, 2026"],
               [t.requires, "Android 6.0+"],
               [t.offeredBy, "Safari Team"],

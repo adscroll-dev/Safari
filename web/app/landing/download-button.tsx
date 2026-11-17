@@ -11,35 +11,38 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-17 with aapt2 (package app.vyro, version 0.7.4, label
+// 2026-11-17 with aapt2 (package app.vyro, version 0.7.5, label
 // "Safari"; live API https://vyro-api-wf4b.onrender.com present in
-// each APK's own libapp.so, no dev URL). Rebuilt 2026-11-17 18:06
-// +0430 — v0.7.4: stage 2 UI redesign (aurora glass, fixed Updates
-// bottom cutoff, polished Chats, no DEBUG banner).
+// each APK's own libapp.so, no dev URL; CAMERA permission present;
+// release-signed with the Safari Release cert, SHA-256
+// 9368f4db62b68230946883a146dabd06a2437cf25e01a85206b5be70087ab077).
+// Rebuilt 2026-11-17 20:42 +0430 — v0.7.5: stage 3 UI polish + speed
+// fixes + ChatGPT stage 1 (CAMERA permission, E2EE keys in OS
+// keystore, release signing).
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.7.4-arm64-v8a.apk",
-    size: "34.9 MB",
-    bytes: "34,929,282 bytes",
+    href: "/downloads/safari-0.7.5-arm64-v8a.apk",
+    size: "35.1 MB",
+    bytes: "35,086,287 bytes",
     sha256:
-      "12dc3b56cf2986f5942cf447eba0ecfd03fad61c692ae972a9ac8c678b18fc77",
+      "b444a9d216a2601065a6f589008184780744bfbccf94a414e9c2e60f3e0164d4",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.7.4-armeabi-v7a.apk",
-    size: "28.0 MB",
-    bytes: "28,023,910 bytes",
+    href: "/downloads/safari-0.7.5-armeabi-v7a.apk",
+    size: "28.2 MB",
+    bytes: "28,213,679 bytes",
     sha256:
-      "a68e5a2fa7b96171ec2e7b15c75a268bb12f6e26ee007d0073085ffbe34be58a",
+      "f86702abdf5c9b4070d99303d922b8b8463130cb3aed2be0dd99fa1291b1588a",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.7.4-x86_64.apk",
-    size: "37.4 MB",
-    bytes: "37,399,937 bytes",
+    href: "/downloads/safari-0.7.5-x86_64.apk",
+    size: "37.6 MB",
+    bytes: "37,556,939 bytes",
     sha256:
-      "5060305acf6999d335aad9c914c2aefbe9caa2a3f02bfc370fc335d6895f17fc",
+      "e282f0efea61af0f02f995d91bfe5bb76ddd4201ea87f17c619d0aee83cc6e29",
   },
 ];
 
