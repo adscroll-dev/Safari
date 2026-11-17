@@ -14,6 +14,7 @@ import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vyro/data_saver.dart';
 import 'package:vyro/e2ee.dart';
+import 'package:vyro/e2ee_chat_state.dart';
 import 'package:vyro/e2ee_key_storage.dart';
 
 void main() {
@@ -32,21 +33,70 @@ void main() {
     expect(preferences.containsKey('identity'), isFalse);
   });
 
-  test('E2EE key storage preserves legacy keys and warns on secure failure',
+  test('E2EE key storage never returns a legacy key if migration fails',
       () async {
     SharedPreferences.setMockInitialValues({'identity': 'legacy-private-key'});
     final preferences = await SharedPreferences.getInstance();
     final warnings = <String>[];
     final storage = E2eeKeyStorage(
       preferences: preferences,
-      secureStorage: _FakeSecureStorage(fail: true),
+      secureStorage: _FakeSecureStorage(failWrite: true),
       onWarning: warnings.add,
     );
 
-    expect(await storage.read('identity'), 'legacy-private-key');
+    await expectLater(
+      storage.read('identity'),
+      throwsA(isA<E2eeSecureStorageException>()),
+    );
     expect(preferences.getString('identity'), 'legacy-private-key');
     expect(warnings, hasLength(1));
-    expect(warnings.single, contains('falling back'));
+    expect(warnings.single, contains('E2EE is disabled'));
+  });
+
+  test('E2EE key storage never falls back to legacy keys when reads fail',
+      () async {
+    SharedPreferences.setMockInitialValues({'identity': 'legacy-private-key'});
+    final preferences = await SharedPreferences.getInstance();
+    final storage = E2eeKeyStorage(
+      preferences: preferences,
+      secureStorage: _FakeSecureStorage(failRead: true),
+    );
+
+    await expectLater(
+      storage.read('identity'),
+      throwsA(isA<E2eeSecureStorageException>()),
+    );
+    expect(preferences.getString('identity'), 'legacy-private-key');
+  });
+
+  test('E2EE key storage never writes private keys to preferences on failure',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final storage = E2eeKeyStorage(
+      preferences: preferences,
+      secureStorage: _FakeSecureStorage(failWrite: true),
+    );
+
+    await expectLater(
+      storage.write('identity', 'private-key'),
+      throwsA(isA<E2eeSecureStorageException>()),
+    );
+    expect(preferences.containsKey('identity'), isFalse);
+    expect(preferences.getString('identity'), isNull);
+  });
+
+  test('E2EE chat settings survive recreation and are account-specific',
+      () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    await E2eeChatState(preferences).save('alice', {'chat-1', 'chat-2'});
+
+    final restartedState = E2eeChatState(preferences);
+    expect(restartedState.load('alice'), {'chat-1', 'chat-2'});
+    expect(restartedState.load('bob'), isEmpty);
+    await restartedState.save('alice', {'chat-2'});
+    expect(E2eeChatState(preferences).load('alice'), {'chat-2'});
   });
 
   test('Go -> Dart: decrypt the Go-produced vector envelope', () async {
@@ -108,11 +158,16 @@ void main() {
   });
 
   test('Group Sender Keys round-trip', () async {
-    final sender = await GroupSender.generate('alice', 'default');
+    final sender = await GroupSender.generate('alice', 'alice-phone');
     final receiver = GroupReceiver.fromDistribution(
-        'alice', 'default', sender.distribution());
-    final env = await sender.encrypt('سلام گروه');
-    expect(await receiver.decrypt(env), 'سلام گروه');
+        'alice', 'alice-phone', sender.distribution());
+    final first = await sender.encrypt('سلام گروه');
+    expect(await receiver.decrypt(first), 'سلام گروه');
+
+    final restoredSender = GroupSender.fromJson(sender.toJson());
+    final restoredReceiver = GroupReceiver.fromJson(receiver.toJson());
+    final next = await restoredSender.encrypt('continued after restart');
+    expect(await restoredReceiver.decrypt(next), 'continued after restart');
   });
 
   test('Data Saver: voice calls ~0.09 MB/min, photos shrink', () {
@@ -134,20 +189,24 @@ void main() {
 }
 
 class _FakeSecureStorage implements SecureValueStorage {
-  _FakeSecureStorage({this.fail = false});
+  _FakeSecureStorage({
+    this.failRead = false,
+    this.failWrite = false,
+  });
 
-  final bool fail;
+  final bool failRead;
+  final bool failWrite;
   final Map<String, String> values = {};
 
   @override
   Future<String?> read(String key) async {
-    if (fail) throw StateError('secure storage unavailable');
+    if (failRead) throw StateError('secure storage unavailable');
     return values[key];
   }
 
   @override
   Future<void> write(String key, String value) async {
-    if (fail) throw StateError('secure storage unavailable');
+    if (failWrite) throw StateError('secure storage unavailable');
     values[key] = value;
   }
 }

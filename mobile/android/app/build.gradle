@@ -46,8 +46,9 @@ configurations.all {
 
 android {
     namespace = "app.vyro"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
+    buildToolsVersion = "36.0.0"
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -77,7 +78,8 @@ android {
         // minSdk 23 (not Flutter's default 21): the record_android plugin
         // declares minSdk 23, and the manifest merger fails otherwise.
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
+        // Keep Flutter's base build number; split APKs adjust it (2007 -> arm64 4007).
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

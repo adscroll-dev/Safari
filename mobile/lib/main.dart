@@ -21,6 +21,7 @@ import 'call.dart';
 import 'chat_extras.dart';
 import 'data_saver.dart';
 import 'e2ee_client.dart';
+import 'e2ee_chat_state.dart';
 import 'fcm_push.dart';
 import 'link_preview.dart';
 import 'local_ai.dart';
@@ -265,6 +266,7 @@ class _HomePageState extends State<HomePage>
   Timer? _callTicker;
   String _deviceId = 'mobile-default';
   final Set<String> _e2eeChats = {}; // chat ids with E2EE enabled
+  bool _e2eeStateLoaded = false;
   Map<String, dynamic>? _replyTo;
   String? _editingId;
   List<dynamic> _searchResults = [];
@@ -1014,6 +1016,22 @@ class _HomePageState extends State<HomePage>
 
   Future<void> _finishLogin(Map<String, dynamic> u,
       {bool persist = true}) async {
+    await _prefsInitialization;
+    final userId = u['id'] as String;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _e2eeChats
+        ..clear()
+        ..addAll(E2eeChatState(prefs).load(userId));
+      _e2eeStateLoaded = true;
+    } catch (e) {
+      _e2eeStateLoaded = false;
+      if (mounted) {
+        setState(() => _error =
+            'Could not restore this account’s E2EE chat settings. Sending is '
+                'blocked until they can be loaded. $e');
+      }
+    }
     // Offline mode: remember the session on the device, so the app
     // opens without internet like WhatsApp.
     if (persist) {
@@ -1028,14 +1046,14 @@ class _HomePageState extends State<HomePage>
     // E2EE setup: generate/load the device identity and publish
     // public keys. Private keys never leave the device.
     _e2ee = E2eeClient(_api, _deviceId);
-    _e2ee!.setOwnUserId(u['id'] as String);
+    _e2ee!.setOwnUserId(userId);
     try {
-      await _e2ee!.ensureSetup(u['id'] as String);
+      await _e2ee!.ensureSetup(userId);
     } catch (e) {
       // Offline: no error — the chats still open from the cache.
       if (!_isNetworkError(e)) {
-        setState(() => _error = 'E2EE setup failed (chats still work '
-            'unencrypted): $e');
+        setState(() => _error = 'E2EE unavailable: $e E2EE-protected chats '
+            'are blocked until secure key storage works.');
       }
     }
     _call = CallController(
@@ -1633,6 +1651,26 @@ class _HomePageState extends State<HomePage>
     final content = _draft.text;
     final replyTo = _replyTo;
     final editingId = _editingId;
+    final chatId = _activeChat!['id'] as String;
+    final e2eeEnabled = _e2eeChats.contains(chatId);
+    if (!_e2eeStateLoaded) {
+      setState(() => _error =
+          'Cannot verify this account’s E2EE settings. Sending is blocked; '
+              'restart the app and try again.');
+      return;
+    }
+    if (e2eeEnabled && (_e2ee == null || !_e2ee!.isReady)) {
+      setState(() => _error =
+          'E2EE is enabled for this chat, but secure keys are unavailable. '
+              'The message was not sent.');
+      return;
+    }
+    if (e2eeEnabled && editingId != null) {
+      setState(() => _error =
+          'Editing messages is unavailable in E2EE chats; no plaintext was '
+              'sent.');
+      return;
+    }
     _draft.clear();
     // v0.7 drafts: the text was sent, so the saved draft goes away.
     await _drafts?.clear(_activeChat!['id'] as String);
@@ -1651,10 +1689,9 @@ class _HomePageState extends State<HomePage>
         });
         return;
       }
-      final chatId = _activeChat!['id'] as String;
       final chatType = _activeChat!['type'] as String? ?? 'dm';
       Map<String, dynamic> msg;
-      if (_e2eeChats.contains(chatId) && _e2ee != null) {
+      if (e2eeEnabled) {
         if (chatType == 'dm') {
           final otherId = await _peerUserId();
           if (otherId.isEmpty) {
@@ -1711,6 +1748,44 @@ class _HomePageState extends State<HomePage>
         return;
       }
       setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _setE2eeEnabled(String chatId, bool enabled) async {
+    final userId = _user?['id'] as String?;
+    if (!_e2eeStateLoaded || userId == null) {
+      setState(() => _error =
+          'Cannot verify this account’s E2EE settings. Please sign in again.');
+      return;
+    }
+    if (enabled && (_e2ee == null || !_e2ee!.isReady)) {
+      setState(() => _error =
+          'E2EE cannot be enabled because secure key storage is unavailable.');
+      return;
+    }
+    final updated = Set<String>.from(_e2eeChats);
+    if (enabled) {
+      updated.add(chatId);
+    } else {
+      updated.remove(chatId);
+    }
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      await E2eeChatState(preferences).save(userId, updated);
+      if (mounted) {
+        setState(() {
+          _e2eeChats
+            ..clear()
+            ..addAll(updated);
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error =
+            'Could not save this chat’s E2EE setting. The setting was not '
+                'changed. $e');
+      }
     }
   }
 
@@ -3941,13 +4016,7 @@ class _HomePageState extends State<HomePage>
                 _showScheduled();
                 break;
               case 'e2ee':
-                setState(() {
-                  if (isE2ee) {
-                    _e2eeChats.remove(chat['id']);
-                  } else {
-                    _e2eeChats.add(chat['id']);
-                  }
-                });
+                await _setE2eeEnabled(chat['id'] as String, !isE2ee);
                 break;
               case 'search':
                 _showSearchSheet();

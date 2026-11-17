@@ -20,6 +20,15 @@ class FlutterSecureValueStorage implements SecureValueStorage {
       _storage.write(key: key, value: value);
 }
 
+class E2eeSecureStorageException implements Exception {
+  const E2eeSecureStorageException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class E2eeKeyStorage {
   E2eeKeyStorage({
     required SharedPreferences preferences,
@@ -40,7 +49,9 @@ class E2eeKeyStorage {
       secureValue = await _secureStorage.read(key);
     } catch (error) {
       _warnUnavailable(error);
-      return _preferences.getString(key);
+      throw const E2eeSecureStorageException(
+        'E2EE is unavailable because secure key storage could not be accessed.',
+      );
     }
     if (secureValue != null) return secureValue;
 
@@ -49,22 +60,36 @@ class E2eeKeyStorage {
 
     try {
       await _secureStorage.write(key, legacyValue);
+      final migratedValue = await _secureStorage.read(key);
+      if (migratedValue != legacyValue) {
+        throw StateError('Secure storage did not verify the migrated key');
+      }
       await _preferences.remove(key);
+      return migratedValue;
     } catch (error) {
       _warnUnavailable(error);
+      throw const E2eeSecureStorageException(
+        'E2EE is unavailable because the legacy key could not be migrated '
+        'and verified in secure storage.',
+      );
     }
-    return legacyValue;
   }
 
   Future<void> write(String key, String value) async {
     try {
       await _secureStorage.write(key, value);
+      if (await _secureStorage.read(key) != value) {
+        throw StateError('Secure storage did not verify the written key');
+      }
       if (_preferences.containsKey(key)) {
         await _preferences.remove(key);
       }
     } catch (error) {
       _warnUnavailable(error);
-      await _preferences.setString(key, value);
+      throw const E2eeSecureStorageException(
+        'E2EE is unavailable because the private key could not be stored '
+        'and verified securely.',
+      );
     }
   }
 
@@ -72,8 +97,8 @@ class E2eeKeyStorage {
     if (_warned) return;
     _warned = true;
     _onWarning(
-      'Secure storage unavailable; E2EE private keys are falling back to '
-      'SharedPreferences. $error',
+      'Secure storage unavailable; E2EE is disabled until private keys can '
+      'be stored securely. $error',
     );
   }
 }

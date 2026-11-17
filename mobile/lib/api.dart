@@ -503,8 +503,15 @@ class ApiClient {
   Future<Map<String, dynamic>> uploadPreKeys(
           String deviceId, List<Map<String, dynamic>> keys) =>
       _req('POST', '/api/keys/prekeys', {'device_id': deviceId, 'keys': keys});
-  Future<Map<String, dynamic>> fetchKeyBundle(String userId) =>
-      _req('GET', '/api/keys/$userId/bundle');
+  Future<Map<String, dynamic>> fetchKeyBundle(String userId,
+          {String? deviceId}) =>
+      _req(
+          'GET',
+          deviceId == null
+              ? '/api/keys/$userId/bundle'
+              : '/api/keys/$userId/$deviceId/bundle');
+  Future<List<dynamic>> listUserDevices(String userId) =>
+      _getList('/api/users/$userId/devices');
   Future<Map<String, dynamic>> fetchPreKey(String userId, String deviceId) =>
       _req('GET', '/api/keys/$userId/$deviceId/prekey');
   Future<Map<String, dynamic>> sendE2eeMessage(

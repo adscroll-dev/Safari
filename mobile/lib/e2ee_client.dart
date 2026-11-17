@@ -41,7 +41,7 @@ class E2eeClient {
   final Map<String, GroupSender> groupSenders = {};
   final Map<String, GroupReceiver> groupReceivers = {};
 
-  bool get isReady => identity != null;
+  bool get isReady => _setupDone && identity != null;
   bool _setupDone = false;
 
   static const String _prefsPrefix = 'vyro_e2ee_v1';
@@ -81,8 +81,25 @@ class E2eeClient {
                 Session.fromState(e.value as Map<String, dynamic>);
           }
         }
-      } catch (_) {
+        final groupsRaw = await storage.read('$_prefsPrefix:groups:$deviceId');
+        if (groupsRaw != null) {
+          final groups = jsonDecode(groupsRaw) as Map<String, dynamic>;
+          groupSenders.addAll((groups['senders'] as Map<String, dynamic>).map(
+            (key, value) => MapEntry(
+                key, GroupSender.fromJson(value as Map<String, dynamic>)),
+          ));
+          groupReceivers.addAll((groups['receivers'] as Map<String, dynamic>)
+              .map((key, value) => MapEntry(
+                  key, GroupReceiver.fromJson(value as Map<String, dynamic>))));
+        }
+      } catch (error) {
+        if (error is E2eeSecureStorageException) rethrow;
         identity = null;
+        signedPreKey = null;
+        oneTimePreKeys = [];
+        sessions.clear();
+        groupSenders.clear();
+        groupReceivers.clear();
       }
     }
     if (identity == null) {
@@ -106,11 +123,7 @@ class E2eeClient {
           {'key_id': k.id, 'public_key': b64(k.pub)},
       ]);
     }
-    try {
-      await api.registerDevice(deviceId, 'Safari mobile');
-    } catch (_) {
-      // Device registry is best-effort; E2EE works without it.
-    }
+    await api.registerDevice(deviceId, 'Safari mobile');
     _setupDone = true;
   }
 
@@ -136,6 +149,27 @@ class E2eeClient {
         '$_prefsPrefix:sessions:$deviceId',
         jsonEncode(
             {for (final e in sessions.entries) e.key: e.value.toState()}));
+  }
+
+  Future<void> persistGroupKeys() async {
+    final storage = _keyStorage ??= E2eeKeyStorage(
+      preferences: await SharedPreferences.getInstance(),
+      secureStorage: _secureStorage,
+      onWarning: _onStorageWarning,
+    );
+    await storage.write(
+      '$_prefsPrefix:groups:$deviceId',
+      jsonEncode({
+        'senders': {
+          for (final entry in groupSenders.entries)
+            entry.key: entry.value.toJson(),
+        },
+        'receivers': {
+          for (final entry in groupReceivers.entries)
+            entry.key: entry.value.toJson(),
+        },
+      }),
+    );
   }
 
   // ---------------------------------------------------------- 1:1 DMs
@@ -175,14 +209,25 @@ class E2eeClient {
     return text;
   }
 
-  Future<Session> _sessionFor(String peerUserId) async {
-    final existing = sessions[peerUserId];
+  Future<Session> _sessionFor(String peerUserId, {String? peerDeviceId}) async {
+    var targetDeviceId = peerDeviceId;
+    if (targetDeviceId == null) {
+      final devices = await api.listUserDevices(peerUserId);
+      if (devices.isNotEmpty) {
+        targetDeviceId =
+            (devices.first as Map<String, dynamic>)['device_id'] as String;
+      }
+    }
+    final sessionId =
+        targetDeviceId == null ? peerUserId : '$peerUserId|$targetDeviceId';
+    final existing = sessions[sessionId];
     if (existing != null) return existing;
     if (identity == null) throw Exception('E2EE not set up on this device');
-    final bundleJson = await api.fetchKeyBundle(peerUserId);
+    final bundleJson =
+        await api.fetchKeyBundle(peerUserId, deviceId: targetDeviceId);
     final session =
         await initiateSession(identity!, KeyBundle.fromJson(bundleJson));
-    sessions[peerUserId] = session;
+    sessions[sessionId] = session;
     return session;
   }
 
@@ -197,35 +242,48 @@ class E2eeClient {
     var sender = groupSenders[chatId];
     var isNew = false;
     if (sender == null) {
-      sender = await GroupSender.generate('', deviceId);
+      if (_ownUserId.isEmpty) throw Exception('E2EE account is not set up');
+      sender = await GroupSender.generate(_ownUserId, deviceId);
       groupSenders[chatId] = sender;
       isNew = true;
     }
+    final ownReceiverKey = '$_ownUserId:$deviceId:${sender.keyId}';
+    groupReceivers.putIfAbsent(
+      ownReceiverKey,
+      () => GroupReceiver.fromDistribution(
+          _ownUserId, deviceId, sender!.distribution()),
+    );
     if (isNew) {
-      // Distribute the sender key to every other member device.
-      // We only know member user ids here; the server stores one
-      // envelope per (user, device) and members fetch by device id.
-      // The default device id is "default" (see backend devices).
       for (final memberId in memberUserIds) {
-        if (memberId == _ownUserId) continue;
-        try {
-          final session = await _sessionFor(memberId);
+        final devices = await api.listUserDevices(memberId);
+        final deviceIds = devices.isEmpty
+            ? <String>['default']
+            : devices
+                .map((device) =>
+                    (device as Map<String, dynamic>)['device_id'] as String)
+                .toList();
+        for (final recipientDeviceId in deviceIds) {
+          if (memberId == _ownUserId && recipientDeviceId == deviceId) {
+            continue;
+          }
+          final session =
+              await _sessionFor(memberId, peerDeviceId: recipientDeviceId);
           final dist = sender.distribution();
           final env = await session.encrypt(jsonEncode(dist.toJson()));
           await api.uploadSenderKey(chatId,
               senderDeviceId: deviceId,
               keyId: sender.keyId,
               forUserId: memberId,
-              forDeviceId: 'default',
+              forDeviceId: recipientDeviceId,
               ciphertext: env.toJsonString());
-        } catch (_) {
-          // One unreachable member must not block the group message;
-          // they fetch the distribution when they come online.
+          await persistSessions();
         }
       }
-      await persistSessions();
     }
+    await persistGroupKeys();
     final env = await sender.encrypt(plaintext);
+    await groupReceivers[ownReceiverKey]!.decrypt(env);
+    await persistGroupKeys();
     return env.toJsonString();
   }
 
@@ -260,12 +318,15 @@ class E2eeClient {
     if (receiver == null) {
       throw Exception('No sender key for this group message yet');
     }
-    return receiver.decrypt(env);
+    final plaintext = await receiver.decrypt(env);
+    await persistGroupKeys();
+    return plaintext;
   }
 
   /// Rotate the group sender key (call when membership changes).
   Future<void> rotateGroupKey(String chatId) async {
     groupSenders.remove(chatId);
+    await persistGroupKeys();
   }
 
   String _ownUserId = '';

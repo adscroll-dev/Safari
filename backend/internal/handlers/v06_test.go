@@ -279,6 +279,150 @@ func TestGroupE2EEEndToEnd(t *testing.T) {
 	_ = aliceID
 }
 
+func TestGroupE2EEUsesRegisteredDeviceIDs(t *testing.T) {
+	h := newTestHandler()
+	aliceToken, aliceID := register(t, h, "alice-device@example.com", "alice")
+	bobToken, bobID := register(t, h, "bob-device@example.com", "bob")
+	aliceDeviceID, bobDeviceID := "alice-phone", "bob-tablet"
+	aliceKeys, bobKeys := newTestIdentity(t), newTestIdentity(t)
+
+	for _, account := range []struct {
+		token, deviceID string
+	}{
+		{aliceToken, aliceDeviceID},
+		{bobToken, bobDeviceID},
+	} {
+		rec := doJSON(t, h, http.MethodPost, "/api/devices", map[string]interface{}{
+			"device_id": account.deviceID, "name": account.deviceID, "platform": "android",
+		}, account.token)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("register device %s: %d %s", account.deviceID, rec.Code, rec.Body.String())
+		}
+	}
+	uploadTestKeys(t, h, aliceToken, aliceDeviceID, aliceKeys)
+	uploadTestKeys(t, h, bobToken, bobDeviceID, bobKeys)
+
+	rec := doJSON(t, h, http.MethodGet, "/api/users/"+bobID+"/devices", nil, aliceToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list Bob devices: %d %s", rec.Code, rec.Body.String())
+	}
+	var bobDevices []struct {
+		DeviceID string `json:"device_id"`
+	}
+	mustJSON(t, rec, &bobDevices)
+	if len(bobDevices) != 1 || bobDevices[0].DeviceID != bobDeviceID {
+		t.Fatalf("registered recipient devices = %+v, want %q", bobDevices, bobDeviceID)
+	}
+
+	bundle := fetchTestBundle(t, h, aliceToken, bobID, bobDeviceID)
+	if bundle.DeviceID != bobDeviceID || bundle.DHPub != b64enc(bobKeys.ident.DHPub) {
+		t.Fatalf("recipient key bundle did not match registered device %q: %+v", bobDeviceID, bundle)
+	}
+	rec = doJSON(t, h, http.MethodPost, "/api/chats", map[string]interface{}{
+		"type": "group", "title": "device-id test", "member_ids": []string{bobID},
+	}, aliceToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("create group: %d %s", rec.Code, rec.Body.String())
+	}
+	var chat struct {
+		ID string `json:"id"`
+	}
+	mustJSON(t, rec, &chat)
+
+	senderKey, err := e2ee.NewSenderKey("alice-device-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender := e2ee.NewGroupSender(aliceID, aliceDeviceID, senderKey)
+	session, err := e2ee.Initiate(aliceKeys.ident, bundle)
+	if err != nil {
+		t.Fatalf("initiate device-bound session: %v", err)
+	}
+	dist, err := senderKey.Marshal(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	distEnvelope, err := session.Encrypt(dist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	distJSON, _ := json.Marshal(distEnvelope)
+	rec = doJSON(t, h, http.MethodPost, "/api/chats/"+chat.ID+"/sender-keys", map[string]interface{}{
+		"sender_device_id": aliceDeviceID, "key_id": "alice-device-key",
+		"for_user_id": bobID, "for_device_id": bobDeviceID,
+		"ciphertext": string(distJSON),
+	}, aliceToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("upload device-bound sender key: %d %s", rec.Code, rec.Body.String())
+	}
+
+	rec = doJSON(t, h, http.MethodGet, "/api/chats/"+chat.ID+"/sender-keys?device_id="+bobDeviceID, nil, bobToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("fetch sender key for registered device: %d %s", rec.Code, rec.Body.String())
+	}
+	var distributions []struct {
+		Ciphertext string `json:"ciphertext"`
+	}
+	mustJSON(t, rec, &distributions)
+	if len(distributions) != 1 {
+		t.Fatalf("registered device received %d sender keys, want 1", len(distributions))
+	}
+	var receivedEnvelope e2ee.Envelope
+	if err := json.Unmarshal([]byte(distributions[0].Ciphertext), &receivedEnvelope); err != nil {
+		t.Fatal(err)
+	}
+	receivedOPK := bobKeys.opks[receivedEnvelope.OPKID]
+	peerSession, err := e2ee.ReceiveInit(
+		bobKeys.ident, bobKeys.spk, receivedOPK,
+		mustB64(t, receivedEnvelope.IK), mustB64(t, receivedEnvelope.EK),
+		aliceID, aliceDeviceID,
+	)
+	if err != nil {
+		t.Fatalf("receive sender-key distribution: %v", err)
+	}
+	distPlaintext, err := peerSession.Decrypt(&receivedEnvelope)
+	if err != nil {
+		t.Fatalf("decrypt sender-key distribution: %v", err)
+	}
+	decodedDistribution, err := e2ee.UnmarshalDistribution(distPlaintext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	receiver, err := e2ee.NewGroupReceiver(aliceID, aliceDeviceID, decodedDistribution)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const plaintext = "device-bound group message"
+	groupEnvelope, err := sender.Encrypt([]byte(plaintext))
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupJSON, _ := json.Marshal(groupEnvelope)
+	rec = doJSON(t, h, http.MethodPost, "/api/chats/"+chat.ID+"/messages", map[string]interface{}{
+		"content": string(groupJSON), "kind": "e2ee",
+	}, aliceToken)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("send device-bound group message: %d %s", rec.Code, rec.Body.String())
+	}
+	decrypted, err := receiver.Decrypt(groupEnvelope)
+	if err != nil {
+		t.Fatalf("decrypt device-bound group message: %v", err)
+	}
+	if string(decrypted) != plaintext {
+		t.Fatalf("decrypted message = %q, want %q", decrypted, plaintext)
+	}
+}
+
+func mustB64(t *testing.T, value string) []byte {
+	t.Helper()
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		t.Fatalf("decode base64 envelope field: %v", err)
+	}
+	return decoded
+}
+
 func TestGroupE2EEValidation(t *testing.T) {
 	h := newTestHandler()
 	aliceTok, aliceID := register(t, h, "alice@example.com", "alice")
