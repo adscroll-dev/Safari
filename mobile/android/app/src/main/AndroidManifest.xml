@@ -9,6 +9,12 @@
          needs BLUETOOTH_CONNECT; the legacy BLUETOOTH permission (capped
          at API 30 by the WebRTC plugin) no longer covers it. -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- ChatGPT 0.7.7 review: MODIFY_AUDIO_SETTINGS was never declared,
+         but the call code switches speakerphone and Bluetooth SCO
+         (setSpeakerphoneOn / setBluetoothScoOn). Without it, audio-route
+         switching can silently fail on some devices. Normal permission,
+         granted automatically at install. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
