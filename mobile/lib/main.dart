@@ -214,6 +214,7 @@ class _HomePageState extends State<HomePage>
   final _draft = TextEditingController();
   final _searchCtrl = TextEditingController();
   final _chatListSearchCtrl = TextEditingController();
+  final _chatListScrollController = ScrollController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
   bool _chatsLoaded = false;
@@ -234,6 +235,7 @@ class _HomePageState extends State<HomePage>
   // Users by id, loaded with the chat list so a DM can show the other
   // person's name instead of the literal type ("dm").
   Map<String, Map<String, dynamic>> _usersById = {};
+  final Map<String, Map<String, dynamic>> _presenceByUserId = {};
   List<dynamic> _messages = [];
   List<dynamic> _stories = [];
   Map<String, dynamic>? _activeChat;
@@ -927,6 +929,7 @@ class _HomePageState extends State<HomePage>
     _draft.dispose();
     _searchCtrl.dispose();
     _chatListSearchCtrl.dispose();
+    _chatListScrollController.dispose();
     super.dispose();
   }
 
@@ -1214,6 +1217,14 @@ class _HomePageState extends State<HomePage>
         setState(() => _typingUser = (ev['user_id'] as String?) ?? 'Someone');
         Future.delayed(const Duration(seconds: 3), () {
           if (mounted) setState(() => _typingUser = '');
+        });
+      } else if (type == 'presence' && ev['user_id'] is String) {
+        final userId = ev['user_id'] as String;
+        setState(() {
+          _presenceByUserId[userId] = {
+            ...?_presenceByUserId[userId],
+            'is_online': ev['online'] == true,
+          };
         });
       } else if ((type == 'message_read' || type == 'message_delivered') &&
           ev['message_id'] != null) {
@@ -1608,6 +1619,7 @@ class _HomePageState extends State<HomePage>
       // v0.7 drafts: restore the unsent text of this chat, if any.
       _draft.text = _drafts?.draftFor(chatId) ?? '';
     });
+    if (chat['type'] == 'dm') unawaited(_refreshPeerPresence(chat));
     // Offline mode: show the saved messages at once, then refresh.
     final cached = await _loadCachedMessages(chatId);
     if (cached.isNotEmpty && mounted) {
@@ -1644,6 +1656,17 @@ class _HomePageState extends State<HomePage>
       if (_isNetworkError(e) && mounted) {
         setState(() => _offline = true);
       }
+    }
+  }
+
+  Future<void> _refreshPeerPresence(Map<String, dynamic> chat) async {
+    final peerId = _peerId(chat);
+    if (peerId.isEmpty) return;
+    try {
+      final presence = await _api.getPresence(peerId);
+      if (mounted) setState(() => _presenceByUserId[peerId] = presence);
+    } catch (_) {
+      // Presence is optional UI; an unavailable request leaves it blank.
     }
   }
 
@@ -4006,12 +4029,6 @@ class _HomePageState extends State<HomePage>
         actions: const [],
       );
     }
-    final section = switch (_tabIndex) {
-      1 => 'Updates',
-      2 => 'Communities',
-      3 => 'Calls',
-      _ => 'Chats',
-    };
     final actions = <Widget>[
       IconButton(
         icon: const Icon(Icons.search),
@@ -4074,21 +4091,19 @@ class _HomePageState extends State<HomePage>
       titleWidget: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (_tabIndex == 0) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(9),
-              child: Image.asset(
-                'assets/safari-logo-transparent.png',
-                width: 30,
-                height: 30,
-                fit: BoxFit.cover,
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: Image.asset(
+              'assets/safari-logo-transparent.png',
+              width: 30,
+              height: 30,
+              fit: BoxFit.cover,
             ),
-            const SizedBox(width: 10),
-          ],
+          ),
+          const SizedBox(width: 10),
           Flexible(
             child: Text(
-              _orbitText(section),
+              'Safari',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: OrbitalTypography.pageTitle.copyWith(
@@ -4111,18 +4126,22 @@ class _HomePageState extends State<HomePage>
     final type = chat['type'] as String? ?? 'dm';
     final title = _chatTitle(chat);
     final isE2ee = _e2eeChats.contains(chat['id']);
+    final peerPresence = _presenceByUserId[_peerId(chat)];
+    final lastSeen = peerPresence?['last_seen_at'] as String?;
     final subtitle = _typingUser.isNotEmpty
         ? '$_typingUser is typing…'
         : type == 'group' || type == 'channel'
             ? '${(chat['member_ids'] as List?)?.length ?? 0} members'
-            : _peerUsername(chat);
+            : peerPresence?['is_online'] == true
+                ? 'online'
+                : _presenceSubtitle(lastSeen);
     return vyroAppBar(
       context,
       titleWidget: InkWell(
         onTap: type == 'dm' ? null : _showMembers,
         child: Row(
           children: [
-            WaAvatar(label: title, radius: 20),
+            OrbitAvatar(label: title, radius: 22),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -4139,15 +4158,16 @@ class _HomePageState extends State<HomePage>
                       color: Colors.white,
                     ),
                   ),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withOpacity(0.8),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -4184,6 +4204,7 @@ class _HomePageState extends State<HomePage>
                 } else {
                   await _api.pinChat(chat['id'] as String);
                 }
+
                 await _refreshChats();
                 setState(() => _activeChat = _chats.firstWhere(
                     (c) => (c as Map)['id'] == chat['id'],
@@ -4299,6 +4320,11 @@ class _HomePageState extends State<HomePage>
     return '';
   }
 
+  String _presenceSubtitle(String? raw) {
+    final time = _parseTime(raw);
+    return time == null ? '' : 'last seen ${_callTimeLabel(time)}';
+  }
+
   /// @username of the other member of a DM (chat header subtitle).
   String _peerUsername(Map<String, dynamic> chat) {
     final me = _user?['id'] as String?;
@@ -4329,6 +4355,17 @@ class _HomePageState extends State<HomePage>
         (sum, chat) => sum + _unreadCount(chat as Map<String, dynamic>),
       ),
       onSelected: (index) => setState(() => _tabIndex = index),
+      onHome: () {
+        if (_tabIndex != 0) {
+          setState(() => _tabIndex = 0);
+        } else if (_chatListScrollController.hasClients) {
+          _chatListScrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      },
     );
   }
 
@@ -4433,34 +4470,34 @@ class _HomePageState extends State<HomePage>
     return SafariAuroraBackdrop(
       child: SizedBox.expand(
         child: AnimatedSwitcher(
-        duration: reduceMotion
-            ? const Duration(milliseconds: 80)
-            : const Duration(milliseconds: 260),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeOutCubic,
-        transitionBuilder: (child, animation) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: reduceMotion
-                ? child
-                : SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.025),
-                      end: Offset.zero,
-                    ).animate(curved),
-                    child: child,
-                  ),
-          );
-        },
-        child: KeyedSubtree(
-          key: ValueKey<int>(_tabIndex),
-          child: tab,
+          duration: reduceMotion
+              ? const Duration(milliseconds: 80)
+              : const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeOutCubic,
+          transitionBuilder: (child, animation) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: reduceMotion
+                  ? child
+                  : SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.025),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+            );
+          },
+          child: KeyedSubtree(
+            key: ValueKey<int>(_tabIndex),
+            child: tab,
+          ),
         ),
-      ),
       ),
     );
   }
@@ -4483,8 +4520,8 @@ class _HomePageState extends State<HomePage>
           return c['type'] == 'dm';
         case 'Groups':
           return c['type'] == 'group';
-        case 'Unread':
-          return _unreadCount(c) > 0;
+        case 'Channels':
+          return c['type'] == 'channel';
         default:
           return true;
       }
@@ -4498,6 +4535,12 @@ class _HomePageState extends State<HomePage>
                 _chatPreview(c).toLowerCase().contains(query) ||
                 _peerUsername(c).toLowerCase().contains(query);
           }).toList();
+    final pinnedChats = shown
+        .where((chat) => (chat as Map<String, dynamic>)['pinned'] == true)
+        .toList();
+    final regularChats = shown
+        .where((chat) => (chat as Map<String, dynamic>)['pinned'] != true)
+        .toList();
     return Column(
       children: [
         _offlineBanner(),
@@ -4548,21 +4591,30 @@ class _HomePageState extends State<HomePage>
                           onPressed: _chats.isEmpty ? _showNewChatSheet : null,
                           emblem: const NexusEmptyOrbit(),
                         )
-                      : ListView.builder(
-                          itemCount: shown.length +
-                              (!_showArchived &&
-                                      archived.isNotEmpty &&
-                                      _chatTypeFilter == 'All' &&
-                                      _folderFilter.isEmpty
-                                  ? 1
-                                  : 0),
-                          itemBuilder: (context, i) {
-                            if (i == shown.length &&
-                                !_showArchived &&
+                      : ListView(
+                          controller: _chatListScrollController,
+                          padding: const EdgeInsets.only(bottom: 8),
+                          children: [
+                            if (_showArchived) ...[
+                              for (final chat in shown)
+                                _chatRow(chat as Map<String, dynamic>),
+                            ] else ...[
+                              if (pinnedChats.isNotEmpty) ...[
+                                _chatSectionHeader('Pinned'),
+                                for (final chat in pinnedChats)
+                                  _chatRow(chat as Map<String, dynamic>),
+                              ],
+                              if (regularChats.isNotEmpty) ...[
+                                _chatSectionHeader('Chats'),
+                                for (final chat in regularChats)
+                                  _chatRow(chat as Map<String, dynamic>),
+                              ],
+                            ],
+                            if (!_showArchived &&
                                 archived.isNotEmpty &&
                                 _chatTypeFilter == 'All' &&
-                                _folderFilter.isEmpty) {
-                              return Padding(
+                                _folderFilter.isEmpty)
+                              Padding(
                                 padding: const EdgeInsetsDirectional.fromSTEB(
                                     20, 5, 20, 5),
                                 child: ListTile(
@@ -4575,10 +4627,8 @@ class _HomePageState extends State<HomePage>
                                   onTap: () =>
                                       setState(() => _showArchived = true),
                                 ),
-                              );
-                            }
-                            return _chatRow(shown[i] as Map<String, dynamic>);
-                          },
+                              ),
+                          ],
                         ),
         ),
       ],
@@ -4594,8 +4644,7 @@ class _HomePageState extends State<HomePage>
         // A true pill: radius well past half the height, with a faint
         // cyan outline so the capsule reads as one rounded unit.
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-            color: OrbitalColors.electricCyan.withOpacity(0.16)),
+        border: Border.all(color: OrbitalColors.electricCyan.withOpacity(0.16)),
       ),
       child: TextField(
         controller: _chatListSearchCtrl,
@@ -4634,6 +4683,18 @@ class _HomePageState extends State<HomePage>
       ),
     );
   }
+
+  Widget _chatSectionHeader(String label) => Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 4),
+        child: Text(
+          label,
+          style: OrbitalTypography.secondary.copyWith(
+            color: OrbitalColors.moonlight,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+        ),
+      );
 
   Widget _buildChatsSkeleton() {
     return OrbitShimmer(
@@ -4958,11 +5019,11 @@ class _HomePageState extends State<HomePage>
       child: Row(
         children: [
           Text(
-            text.toUpperCase(),
+            text,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w800,
-              letterSpacing: 1.05,
+              letterSpacing: 0.2,
               color: muted,
             ),
           ),
@@ -4992,6 +5053,14 @@ class _HomePageState extends State<HomePage>
     return members is List ? members.length : null;
   }
 
+  String _channelPreviewLabel(Map<String, dynamic> channel) {
+    final preview = _chatPreview(channel);
+    final followers = _channelFollowerCount(channel);
+    if (followers == null) return preview;
+    final count = '$followers ${followers == 1 ? 'follower' : 'followers'}';
+    return preview.isEmpty ? count : '$preview · $count';
+  }
+
   // --- Updates tab: Stories + Channels (Safari) -------------------
   // Real user stories have cyan-purple rings; channel actions use
   // existing APIs and channel rows come from the loaded chat list.
@@ -5011,7 +5080,7 @@ class _HomePageState extends State<HomePage>
         bottom: 120 + MediaQuery.viewPaddingOf(context).bottom,
       ),
       children: [
-        _sectionHeader('Stories'),
+        _sectionHeader('Status'),
         SizedBox(
           height: 106,
           child: ListView(
@@ -5023,7 +5092,7 @@ class _HomePageState extends State<HomePage>
                 onTap: _postStory,
                 avatar: Stack(
                   children: [
-                    WaAvatar(label: myName, radius: 30),
+                    OrbitAvatar(label: myName, radius: 32),
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -5052,10 +5121,9 @@ class _HomePageState extends State<HomePage>
                   onLongPress: st['user_id'] == _user?['id']
                       ? () => _deleteStory(st)
                       : null,
-                  avatar: WaAvatar(
+                  avatar: OrbitAvatar(
                     label: _storyTitle(st),
                     radius: 30,
-                    ring: true,
                   ),
                 ),
             ],
@@ -5063,47 +5131,23 @@ class _HomePageState extends State<HomePage>
         ),
         _sectionHeader('Channels'),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-          child: SafariHeroCard(
-            icon: Icons.campaign_outlined,
-            title: 'Create your channel',
-            subtitle: 'Share updates with your followers',
-            actionLabel: 'Create channel',
-            onTap: () => _createGroupOrChannel(channel: true),
-          ),
-        ),
-        Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-          child: SafariGlassCard(
-            onTap: _showChannelSearch,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: WaColors.accent.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.search, color: WaColors.accent),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Find channels',
-                          style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600)),
-                      Text('Search public channels to follow',
-                          style: TextStyle(fontSize: 13, color: secondary)),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right, color: secondary),
-              ],
-            ),
+          child: Column(
+            children: [
+              _updatesActionCard(
+                icon: Icons.campaign_outlined,
+                title: 'Create channel',
+                subtitle: 'Share updates with your followers',
+                onTap: () => _createGroupOrChannel(channel: true),
+              ),
+              const SizedBox(height: 8),
+              _updatesActionCard(
+                icon: Icons.search,
+                title: 'Find channels',
+                subtitle: 'Explore public channels',
+                onTap: _showChannelSearch,
+              ),
+            ],
           ),
         ),
         if (channels.isEmpty)
@@ -5158,7 +5202,7 @@ class _HomePageState extends State<HomePage>
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   children: [
-                    WaAvatar(
+                    OrbitAvatar(
                         label: _chatTitle(ch as Map<String, dynamic>),
                         radius: 24),
                     const SizedBox(width: 12),
@@ -5166,45 +5210,74 @@ class _HomePageState extends State<HomePage>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(_chatTitle(ch),
-                              style: const TextStyle(
-                                  fontSize: 15, fontWeight: FontWeight.w600)),
-                          if (_channelFollowerCount(ch) != null)
-                            Text(
-                              '${_channelFollowerCount(ch)} ${_channelFollowerCount(ch) == 1 ? 'follower' : 'followers'}',
-                              style: TextStyle(fontSize: 13, color: secondary),
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  _chatTitle(ch),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                              if (ch['verified'] == true ||
+                                  ch['is_verified'] == true) ...[
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified,
+                                    size: 15,
+                                    color: OrbitalColors.electricCyan),
+                              ],
+                            ],
+                          ),
+                          Text(
+                            _channelPreviewLabel(ch),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 13, color: secondary),
+                          ),
                         ],
                       ),
                     ),
-                    if (_unreadCount(ch) > 0) ...[
-                      Container(
-                        constraints:
-                            const BoxConstraints(minWidth: 22, minHeight: 22),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        alignment: Alignment.center,
-                        decoration: const BoxDecoration(
-                          gradient: VyroColors.brandGradient,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x5522D3EE),
-                              blurRadius: 8,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _chatTimeLabel(ch),
+                          style: TextStyle(fontSize: 11, color: secondary),
+                        ),
+                        if (_unreadCount(ch) > 0) ...[
+                          Container(
+                            constraints: const BoxConstraints(
+                                minWidth: 22, minHeight: 22),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              gradient: VyroColors.brandGradient,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Color(0x5522D3EE),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Text(
-                          _unreadCount(ch) > 99 ? '99+' : '${_unreadCount(ch)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                            child: Text(
+                              _unreadCount(ch) > 99
+                                  ? '99+'
+                                  : '${_unreadCount(ch)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Icon(Icons.chevron_right, color: secondary),
+                          const SizedBox(width: 6),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -5245,6 +5318,49 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _updatesActionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return SafariGlassCard(
+      onTap: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: OrbitalColors.plasmaBlue.withOpacity(0.14),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: OrbitalColors.nebulaViolet.withOpacity(0.35),
+              ),
+            ),
+            child: Icon(icon, color: OrbitalColors.electricCyan),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 13, color: OrbitalColors.mutedBlue)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: OrbitalColors.mutedBlue),
+        ],
       ),
     );
   }
@@ -5383,6 +5499,7 @@ class _HomePageState extends State<HomePage>
           onTap: _createCommunity,
         ),
         const SizedBox(height: 8),
+        _sectionHeader('My Communities'),
         if (_communities.isEmpty)
           SafariEmptyState(
             icon: Icons.groups_outlined,
@@ -5395,14 +5512,16 @@ class _HomePageState extends State<HomePage>
         else
           for (final c in _communities)
             Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 8),
               child: SafariGlassCard(
                 onTap: () => _showCommunityDetail(c),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Row(
                   children: [
-                    WaAvatar(
+                    OrbitAvatar(
                       label: c['name'] as String? ?? 'Community',
-                      radius: 26,
+                      radius: 28,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -5417,24 +5536,46 @@ class _HomePageState extends State<HomePage>
                                 fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            _communityCountsLabel(c),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? WaColors.darkTextSecondary
-                                  : WaColors.lightTextSecondary,
-                            ),
-                          ),
+                          Text(_communityCountsLabel(c),
+                              style: TextStyle(fontSize: 13, color: secondary)),
                         ],
                       ),
                     ),
-                    Icon(Icons.chevron_right, color: secondary),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          _communityTimeLabel(c),
+                          style: TextStyle(fontSize: 11, color: secondary),
+                        ),
+                        if (_communityUnreadCount(c) > 0) ...[
+                          const SizedBox(height: 5),
+                          _unreadBadge(_communityUnreadCount(c)),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
             ),
+        const SizedBox(height: 4),
+        _sectionHeader('Discover'),
+        SafariGlassCard(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              const Icon(Icons.explore_outlined,
+                  color: OrbitalColors.electricCyan),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Community discovery is not available yet.',
+                  style: TextStyle(fontSize: 13, color: secondary),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -5443,10 +5584,44 @@ class _HomePageState extends State<HomePage>
     final counts = <String>[];
     final members = community['member_count'];
     final groups = community['subgroup_count'];
-    if (members is num) counts.add('$members members');
     if (groups is num) counts.add('$groups groups');
+    if (members is num) counts.add('$members members');
     return counts.join(' · ');
   }
+
+  String _communityTimeLabel(Map<String, dynamic> community) {
+    final time = _parseTime(community['created_at'] as String?);
+    return time == null ? '' : _callTimeLabel(time);
+  }
+
+  int _communityUnreadCount(Map<String, dynamic> community) {
+    final chatId = community['announcement_chat_id'];
+    if (chatId is! String) return 0;
+    for (final chat in _chats) {
+      if ((chat as Map)['id'] == chatId) {
+        return _unreadCount(chat as Map<String, dynamic>);
+      }
+    }
+    return 0;
+  }
+
+  Widget _unreadBadge(int unread) => Container(
+        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: OrbitalColors.electricCyan,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          unread > 99 ? '99+' : '$unread',
+          style: const TextStyle(
+            color: OrbitalColors.voidBlack,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 
   /// Stage 6: create a community (name + description). The server
   /// also creates the admin-only announcement group.
@@ -6639,67 +6814,92 @@ class _HomePageState extends State<HomePage>
                   itemBuilder: (context, index) {
                     final c = filteredCalls[index];
                     final missed = c['status'] == 'missed';
+                    final outgoing = c['direction'] == 'outgoing';
                     final name = (c['peer_name'] as String?) ?? '';
+                    final directionLabel = missed
+                        ? 'Missed call'
+                        : outgoing
+                            ? 'Outgoing call'
+                            : 'Incoming call';
+                    final directionColor = missed
+                        ? OrbitalColors.signalCoral
+                        : outgoing
+                            ? OrbitalColors.auroraMint
+                            : OrbitalColors.plasmaBlue;
+                    final directionIcon = missed
+                        ? Icons.call_missed
+                        : outgoing
+                            ? Icons.call_made
+                            : Icons.call_received;
+                    final time = _parseTime(c['started_at'] as String?);
                     return Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SafariGlassCard(
                         padding: EdgeInsets.zero,
                         radius: 18,
-                        child: ListTile(
-                          leading: WaAvatar(label: name, radius: 24),
-                          title: Text(name),
-                          subtitle: Row(
-                            children: [
-                              Icon(
-                                missed
-                                    ? Icons.call_missed
-                                    : c['direction'] == 'outgoing'
-                                        ? Icons.call_made
-                                        : Icons.call_received,
-                                size: 15,
-                                color: missed
-                                    ? const Color(0xFFF87171)
-                                    : WaColors.accent,
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  _callSubtitle(c),
-                                  style: TextStyle(
-                                    color: missed
-                                        ? const Color(0xFFF87171)
-                                        : secondary,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: () => _callBack(c),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 9),
+                            child: Row(
+                              children: [
+                                OrbitAvatar(label: name, radius: 26),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
+                                      const SizedBox(height: 3),
+                                      Row(
+                                        children: [
+                                          Icon(directionIcon,
+                                              size: 14, color: directionColor),
+                                          const SizedBox(width: 5),
+                                          Text(directionLabel,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: directionColor)),
+                                          if (!missed &&
+                                              c['duration_seconds'] is int) ...[
+                                            const SizedBox(width: 7),
+                                            Text(_callDurationText(c),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: secondary)),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          trailing: Container(
-                            width: 42,
-                            height: 42,
-                            decoration: const BoxDecoration(
-                              gradient: VyroColors.brandGradient,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Color(0x4422D3EE),
-                                  blurRadius: 10,
+                                if (time != null)
+                                  Padding(
+                                    padding: const EdgeInsetsDirectional.only(
+                                        end: 4),
+                                    child: Text(
+                                      '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                      style: TextStyle(
+                                          fontSize: 11, color: secondary),
+                                    ),
+                                  ),
+                                IconButton(
+                                  tooltip: 'Call details',
+                                  icon: Icon(Icons.info_outline,
+                                      color: secondary, size: 21),
+                                  onPressed: () => _showCallInfo(c),
                                 ),
                               ],
                             ),
-                            child: IconButton(
-                              icon: Icon(
-                                c['call_type'] == 'video'
-                                    ? Icons.videocam
-                                    : Icons.call,
-                                size: 20,
-                              ),
-                              color: Colors.white,
-                              onPressed: () => _callBack(c),
-                            ),
                           ),
-                          onTap: () => _callBack(c),
                         ),
                       ),
                     );
@@ -6710,23 +6910,50 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  String _callSubtitle(Map<String, dynamic> c) {
-    final missed = c['status'] == 'missed';
-    final startedAt = _parseTime(c['started_at'] as String?);
-    final parts = <String>[];
-    if (missed) {
-      parts.add('Missed');
-    } else {
-      final duration = c['duration_seconds'];
-      if (duration is int) {
-        parts.add(
-          '${(duration ~/ 60).toString().padLeft(2, '0')}:'
-          '${(duration % 60).toString().padLeft(2, '0')}',
-        );
-      }
-    }
-    if (startedAt != null) parts.add(_callTimeLabel(startedAt));
-    return parts.join(' · ');
+  String _callDurationText(Map<String, dynamic> call) {
+    final seconds = call['duration_seconds'] as int? ?? 0;
+    return '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  void _showCallInfo(Map<String, dynamic> call) {
+    final when = _parseTime(call['started_at'] as String?);
+    final missed = call['status'] == 'missed';
+    final direction = missed
+        ? 'Missed call'
+        : call['direction'] == 'outgoing'
+            ? 'Outgoing call'
+            : 'Incoming call';
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text((call['peer_name'] as String?) ?? ''),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(direction),
+            Text(call['call_type'] == 'video' ? 'Video call' : 'Voice call'),
+            if (when != null) Text(when.toLocal().toString()),
+            if (!missed && call['duration_seconds'] is int)
+              Text('Duration: ${_callDurationText(call)}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _callBack(call);
+            },
+            icon: const Icon(Icons.call),
+            label: const Text('Call back'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Safari time label for a DateTime (Stage 3): HH:MM today,
@@ -6858,12 +7085,7 @@ class _HomePageState extends State<HomePage>
   /// Type and folder filters share one row. Long-press a folder chip
   /// to rename or delete it.
   Widget _chatFilterChips() {
-    const filters = [
-      'All',
-      'Unread',
-      'Personal',
-      'Groups',
-    ];
+    const filters = ['All', 'Personal', 'Groups', 'Channels'];
     Widget chip(String label, bool selected, VoidCallback onTap,
         {VoidCallback? onLongPress}) {
       return SafariFilterChip(
@@ -6874,33 +7096,50 @@ class _HomePageState extends State<HomePage>
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 20, 10),
-      child: Row(
-        children: [
-          for (final filter in filters) ...[
-            chip(
-              _orbitText(filter),
-              _chatTypeFilter == filter && _folderFilter.isEmpty,
-              () => setState(() {
-                if (filter == 'All' ||
-                    (_chatTypeFilter == filter && _folderFilter.isEmpty)) {
-                  _chatTypeFilter = 'All';
-                  _folderFilter = '';
-                } else {
-                  _chatTypeFilter = filter;
-                  _folderFilter = '';
-                }
-              }),
-            ),
-            const SizedBox(width: 6),
-          ],
-          for (final f in _folderNames) ...[
-            chip(
-                f,
-                _folderFilter == f && _chatTypeFilter == 'All',
-                () => setState(() {
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 20, 8),
+          child: Row(
+            children: [
+              for (final filter in filters) ...[
+                chip(
+                  _orbitText(filter),
+                  _chatTypeFilter == filter && _folderFilter.isEmpty,
+                  () => setState(() {
+                    if (filter == 'All' ||
+                        (_chatTypeFilter == filter && _folderFilter.isEmpty)) {
+                      _chatTypeFilter = 'All';
+                      _folderFilter = '';
+                    } else {
+                      _chatTypeFilter = filter;
+                      _folderFilter = '';
+                    }
+                  }),
+                ),
+                const SizedBox(width: 6),
+              ],
+              IconButton(
+                tooltip: _orbitText('Add folder'),
+                icon: const Icon(Icons.create_new_folder_outlined),
+                color: OrbitalColors.mutedBlue,
+                onPressed: _createFolder,
+              ),
+            ],
+          ),
+        ),
+        if (_folderNames.isNotEmpty || _folderFilter.isNotEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsetsDirectional.fromSTEB(20, 0, 20, 8),
+            child: Row(
+              children: [
+                for (final f in _folderNames) ...[
+                  chip(
+                    f,
+                    _folderFilter == f && _chatTypeFilter == 'All',
+                    () => setState(() {
                       if (_folderFilter == f && _chatTypeFilter == 'All') {
                         _folderFilter = '';
                       } else {
@@ -6908,16 +7147,14 @@ class _HomePageState extends State<HomePage>
                         _chatTypeFilter = 'All';
                       }
                     }),
-                onLongPress: () => _manageFolder(f)),
-            const SizedBox(width: 6),
-          ],
-          chip(
-            _orbitText('Add folder'),
-            false,
-            _createFolder,
+                    onLongPress: () => _manageFolder(f),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+              ],
+            ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -8416,311 +8653,373 @@ class _HomePageState extends State<HomePage>
     final isE2ee = _e2eeChats.contains(_activeChat!['id']);
     return Container(
       decoration: chatBg,
-      child: Column(
+      child: Stack(
+        fit: StackFit.expand,
         children: [
-          _offlineBanner(),
-          if (_incomingCall != null) _incomingCallBanner(),
-          if (callState == CallState.inCall || callState == CallState.outgoing)
-            Container(
-              color: dark ? const Color(0xFF0C3D55) : const Color(0xFFD6F3FB),
-              padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                const Icon(Icons.call),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    callState == CallState.outgoing
-                        ? 'Calling… (Opus 12 kbps)'
-                        : 'In call — ${_callDurationLabel()}${_call?.isGroup == true ? ' · Group' : ''} · ~0.09 MB/min',
-                  ),
+          IgnorePointer(
+            child: Opacity(
+              opacity: dark ? 0.075 : 0.035,
+              child: Center(
+                child:                 Image.asset(
+                  'assets/safari-logo-transparent.png',
+                  width: MediaQuery.sizeOf(context).width * 0.9,
+                  height: MediaQuery.sizeOf(context).width * 0.9,
+                  fit: BoxFit.contain,
                 ),
-                // Stage 3: in-call controls — mic, camera, switch.
-                IconButton(
-                  icon:
-                      Icon(_call?.micMuted == true ? Icons.mic_off : Icons.mic),
-                  tooltip: _call?.micMuted == true ? 'Unmute' : 'Mute',
-                  onPressed: () {
-                    _call?.toggleMute();
-                    setState(() {});
-                  },
-                ),
-                // Speaker toggle: loudspeaker on/off (voice + video).
-                IconButton(
-                  icon: Icon(_call?.speakerOn == true
-                      ? Icons.volume_up
-                      : Icons.volume_down),
-                  tooltip:
-                      _call?.speakerOn == true ? 'Speaker off' : 'Speaker on',
-                  onPressed: () async {
-                    await _call?.toggleSpeaker();
-                    setState(() {});
-                  },
-                ),
-                if (_call?.video == true) ...[
-                  IconButton(
-                    icon: Icon(_call?.cameraOff == true
-                        ? Icons.videocam_off
-                        : Icons.videocam),
-                    tooltip: _call?.cameraOff == true
-                        ? 'Turn camera on'
-                        : 'Turn camera off',
-                    onPressed: () {
-                      _call?.toggleCamera();
-                      setState(() {});
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.cameraswitch),
-                    tooltip: 'Switch camera',
-                    onPressed: () async {
-                      await _call?.switchCamera();
-                      setState(() {});
-                    },
-                  ),
-                ],
-                if (_call?.video == true && _call?.audioOnly == false)
-                  TextButton(
-                    onPressed: () async {
-                      await _call?.dropToAudioOnly();
-                      setState(() {});
-                    },
-                    child: const Text('Audio only'),
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.call_end, color: Colors.red),
-                  tooltip: 'End call',
-                  onPressed: _endCallAndRecord,
-                ),
-              ]),
-            ),
-          if (_call?.video == true && _call?.remoteStream != null)
-            SizedBox(
-              height: 200,
-              child: RTCVideoView(_remoteRenderer),
-            ),
-          // Stage 3: group-call video tiles, one per connected member.
-          if (_call?.isGroup == true &&
-              _call?.video == true &&
-              _groupRenderers.isNotEmpty)
-            SizedBox(
-              height: 160,
-              child: GridView.count(
-                crossAxisCount: 2,
-                childAspectRatio: 4 / 3,
-                children: [
-                  for (final entry in _groupRenderers.entries)
-                    RTCVideoView(entry.value),
-                ],
               ),
-            ),
-          if (isE2ee)
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: dark ? const Color(0xFF0C2E3E) : const Color(0xFFFFF8C6),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.lock,
-                      size: 15, color: dark ? Colors.white70 : Colors.black54),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Messages are end-to-end encrypted. No one outside '
-                      'of this chat, not even Safari, can read or listen '
-                      'to them.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: dark ? Colors.white70 : Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          // Stage 1: pinned-message banner (WhatsApp-style).
-          if (_activeChat?['pinned_message'] is Map<String, dynamic>)
-            _pinnedBanner(
-                _activeChat!['pinned_message'] as Map<String, dynamic>),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
-              itemCount: _messages.length,
-              itemBuilder: (context, i) {
-                final m = _messages[i] as Map<String, dynamic>;
-                final showDate = i == 0 ||
-                    _messageDay(_messages[i - 1] as Map<String, dynamic>) !=
-                        _messageDay(m);
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (showDate) _dateChip(_messageDay(m)),
-                    _messageBubble(m),
-                    const SizedBox(height: 4),
-                  ],
-                );
-              },
             ),
           ),
-          if (_typingUser.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('$_typingUser is typing…',
-                    style: const TextStyle(
-                        fontSize: 12, fontStyle: FontStyle.italic)),
-              ),
-            ),
-          if (_replyTo != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              color: dark ? WaColors.darkInputBackground : Colors.grey.shade200,
-              child: Row(children: [
-                Expanded(
-                  child: Text(
-                    'Replying to: ${_decrypted[_replyTo!['id'] as String] ?? (_replyTo!['content'] as String? ?? '')}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => setState(() => _replyTo = null),
-                ),
-              ]),
-            ),
-          if (_editingId != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              color: Colors.amber.shade100,
-              child: Row(children: [
-                const Expanded(
-                    child: Text('Editing message…',
-                        style: TextStyle(fontSize: 12))),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () => setState(() {
-                    _editingId = null;
-                    _draft.clear();
-                  }),
-                ),
-              ]),
-            ),
-          if (_draftEmpty) _smartReplyChips(),
-          // Stage 5: in a channel only admins and the owner may
-          // post — followers see a read-only notice instead of
-          // the input bar.
-          if (_activeChat?['type'] == 'channel' &&
-              ((_activeChat?['roles'] as Map?)?[_user?['id']] ?? 'member') ==
-                  'member')
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              color: Colors.transparent,
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.campaign_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Only admins can post in this channel',
-                      style: TextStyle(fontSize: 13)),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
-              color: Colors.transparent,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: dark
-                            ? WaColors.darkInputBackground
-                            : WaColors.lightInputBackground,
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _draft,
-                              decoration: const InputDecoration(
-                                hintText: 'Message',
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                filled: false,
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 16, vertical: 12),
-                              ),
-                              onChanged: (_) => _sendTyping(),
-                              onSubmitted: (_) => _send(),
-                            ),
-                          ),
-                          if (_ttlSeconds > 0)
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Chip(
-                                label: Text(
-                                    '⏱ ${_ttlSeconds >= 86400 ? '1d' : _ttlSeconds >= 3600 ? '1h' : '1m'}'),
-                                visualDensity: VisualDensity.compact,
-                                onDeleted: () =>
-                                    setState(() => _ttlSeconds = 0),
-                              ),
-                            ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.attach_file,
-                              color:
-                                  dark ? WaColors.darkIcon : WaColors.lightIcon,
-                            ),
-                            tooltip:
-                                'Attach: photo, location, schedule, disappearing',
-                            onPressed: _showAttachSheet,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.camera_alt_outlined,
-                              color:
-                                  dark ? WaColors.darkIcon : WaColors.lightIcon,
-                            ),
-                            tooltip: 'Send photo',
-                            onPressed: _sendPhoto,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
+          Column(
+            children: [
+              _offlineBanner(),
+              if (_incomingCall != null) _incomingCallBanner(),
+              if (callState == CallState.inCall ||
+                  callState == CallState.outgoing)
+                Container(
+                  color:
+                      dark ? const Color(0xFF0C3D55) : const Color(0xFFD6F3FB),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(children: [
+                    const Icon(Icons.call),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        callState == CallState.outgoing
+                            ? 'Calling… (Opus 12 kbps)'
+                            : 'In call — ${_callDurationLabel()}${_call?.isGroup == true ? ' · Group' : ''} · ~0.09 MB/min',
                       ),
                     ),
+                    // Stage 3: in-call controls — mic, camera, switch.
+                    IconButton(
+                      icon: Icon(
+                          _call?.micMuted == true ? Icons.mic_off : Icons.mic),
+                      tooltip: _call?.micMuted == true ? 'Unmute' : 'Mute',
+                      onPressed: () {
+                        _call?.toggleMute();
+                        setState(() {});
+                      },
+                    ),
+                    // Speaker toggle: loudspeaker on/off (voice + video).
+                    IconButton(
+                      icon: Icon(_call?.speakerOn == true
+                          ? Icons.volume_up
+                          : Icons.volume_down),
+                      tooltip: _call?.speakerOn == true
+                          ? 'Speaker off'
+                          : 'Speaker on',
+                      onPressed: () async {
+                        await _call?.toggleSpeaker();
+                        setState(() {});
+                      },
+                    ),
+                    if (_call?.video == true) ...[
+                      IconButton(
+                        icon: Icon(_call?.cameraOff == true
+                            ? Icons.videocam_off
+                            : Icons.videocam),
+                        tooltip: _call?.cameraOff == true
+                            ? 'Turn camera on'
+                            : 'Turn camera off',
+                        onPressed: () {
+                          _call?.toggleCamera();
+                          setState(() {});
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.cameraswitch),
+                        tooltip: 'Switch camera',
+                        onPressed: () async {
+                          await _call?.switchCamera();
+                          setState(() {});
+                        },
+                      ),
+                    ],
+                    if (_call?.video == true && _call?.audioOnly == false)
+                      TextButton(
+                        onPressed: () async {
+                          await _call?.dropToAudioOnly();
+                          setState(() {});
+                        },
+                        child: const Text('Audio only'),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.call_end, color: Colors.red),
+                      tooltip: 'End call',
+                      onPressed: _endCallAndRecord,
+                    ),
+                  ]),
+                ),
+              if (_call?.video == true && _call?.remoteStream != null)
+                SizedBox(
+                  height: 200,
+                  child: RTCVideoView(_remoteRenderer),
+                ),
+              // Stage 3: group-call video tiles, one per connected member.
+              if (_call?.isGroup == true &&
+                  _call?.video == true &&
+                  _groupRenderers.isNotEmpty)
+                SizedBox(
+                  height: 160,
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    childAspectRatio: 4 / 3,
+                    children: [
+                      for (final entry in _groupRenderers.entries)
+                        RTCVideoView(entry.value),
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  if (_draftEmpty)
-                    VoiceRecordButton(
-                      api: _api,
-                      chatId: _activeChat!['id'] as String,
-                      onSent: _refreshMessages,
-                    )
-                  else
-                    _WaSendButton(onPressed: _send),
-                ],
+                ),
+              if (isE2ee)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: dark
+                        ? const Color(0xFF0C2E3E)
+                        : const Color(0xFFFFF8C6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.lock,
+                          size: 15,
+                          color: dark ? Colors.white70 : Colors.black54),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Messages are end-to-end encrypted. No one outside '
+                          'of this chat, not even Safari, can read or listen '
+                          'to them.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: dark ? Colors.white70 : Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Stage 1: pinned-message banner (WhatsApp-style).
+              if (_activeChat?['pinned_message'] is Map<String, dynamic>)
+                _pinnedBanner(
+                    _activeChat!['pinned_message'] as Map<String, dynamic>),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+                  itemCount: _messages.length,
+                  itemBuilder: (context, i) {
+                    final m = _messages[i] as Map<String, dynamic>;
+                    final showDate = i == 0 ||
+                        _messageDay(_messages[i - 1] as Map<String, dynamic>) !=
+                            _messageDay(m);
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (showDate) _dateChip(_messageDay(m)),
+                        _messageBubble(m),
+                        const SizedBox(height: 4),
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+              if (_typingUser.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('$_typingUser is typing…',
+                        style: const TextStyle(
+                            fontSize: 12, fontStyle: FontStyle.italic)),
+                  ),
+                ),
+              if (_replyTo != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  color: dark
+                      ? WaColors.darkInputBackground
+                      : Colors.grey.shade200,
+                  child: Row(children: [
+                    Expanded(
+                      child: Text(
+                        'Replying to: ${_decrypted[_replyTo!['id'] as String] ?? (_replyTo!['content'] as String? ?? '')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => setState(() => _replyTo = null),
+                    ),
+                  ]),
+                ),
+              if (_editingId != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  color: Colors.amber.shade100,
+                  child: Row(children: [
+                    const Expanded(
+                        child: Text('Editing message…',
+                            style: TextStyle(fontSize: 12))),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => setState(() {
+                        _editingId = null;
+                        _draft.clear();
+                      }),
+                    ),
+                  ]),
+                ),
+              if (_draftEmpty) _smartReplyChips(),
+              // Stage 5: in a channel only admins and the owner may
+              // post — followers see a read-only notice instead of
+              // the input bar.
+              if (_activeChat?['type'] == 'channel' &&
+                  ((_activeChat?['roles'] as Map?)?[_user?['id']] ??
+                          'member') ==
+                      'member')
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  color: Colors.transparent,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.campaign_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('Only admins can post in this channel',
+                          style: TextStyle(fontSize: 13)),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 10),
+                  color: Colors.transparent,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IconButton(
+                        tooltip: 'Add attachment',
+                        icon: const Icon(Icons.add_circle_outline,
+                            color: OrbitalColors.mutedBlue),
+                        onPressed: _showAttachSheet,
+                      ),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: dark
+                                ? OrbitalColors.deepSpace.withOpacity(0.94)
+                                : WaColors.lightInputBackground,
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                              color: OrbitalColors.plasmaBlue.withOpacity(0.35),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _draft,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Message',
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    filled: false,
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                  ),
+                                  onChanged: (_) => _sendTyping(),
+                                  onSubmitted: (_) => _send(),
+                                ),
+                              ),
+                              if (_ttlSeconds > 0)
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 4),
+                                  child: Chip(
+                                    label: Text(
+                                        '⏱ ${_ttlSeconds >= 86400 ? '1d' : _ttlSeconds >= 3600 ? '1h' : '1m'}'),
+                                    visualDensity: VisualDensity.compact,
+                                    onDeleted: () =>
+                                        setState(() => _ttlSeconds = 0),
+                                  ),
+                                ),
+                              IconButton(
+                                tooltip: 'Emoji',
+                                icon: const Icon(Icons.emoji_emotions_outlined,
+                                    color: OrbitalColors.mutedBlue),
+                                onPressed: _showComposerEmojiPicker,
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.attach_file,
+                                  color: OrbitalColors.nebulaViolet,
+                                ),
+                                tooltip: 'Attach a file or share',
+                                onPressed: _showAttachSheet,
+                              ),
+                              const SizedBox(width: 4),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      if (_draftEmpty)
+                        VoiceRecordButton(
+                          api: _api,
+                          chatId: _activeChat!['id'] as String,
+                          onSent: _refreshMessages,
+                        )
+                      else
+                        _WaSendButton(onPressed: _send),
+                    ],
+                  ),
+                ),
+              if (_error != null)
+                Text(_error!, style: const TextStyle(color: Colors.red)),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  void _showComposerEmojiPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            children: [
+              for (final emoji in _reactionEmojis)
+                IconButton(
+                  iconSize: 30,
+                  onPressed: () {
+                    final text = _draft.text;
+                    final selection = _draft.selection;
+                    final start =
+                        selection.isValid ? selection.start : text.length;
+                    final end = selection.isValid ? selection.end : text.length;
+                    _draft.value = TextEditingValue(
+                      text: text.replaceRange(start, end, emoji),
+                      selection: TextSelection.collapsed(
+                        offset: start + emoji.length,
+                      ),
+                    );
+                    Navigator.pop(context);
+                  },
+                  icon: Text(emoji, style: const TextStyle(fontSize: 27)),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -9047,11 +9346,17 @@ class _HomePageState extends State<HomePage>
     // v0.7 forwarding: "Forwarded from <name>" above the body.
     final fwdLabel = forwardedLabel(m);
     final bubbleColor = mine
-        ? (dark ? WaColors.darkBubbleOut : WaColors.lightBubbleOut)
-        : (dark ? WaColors.darkBubbleIn : WaColors.lightBubbleIn);
-    final textColor = dark ? WaColors.darkText : WaColors.lightText;
-    final metaColor =
-        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
+        ? Colors.transparent
+        : (dark
+            ? OrbitalColors.nebulaNavy.withOpacity(0.94)
+            : WaColors.lightBubbleIn);
+    final textColor =
+        mine ? Colors.white : (dark ? WaColors.darkText : WaColors.lightText);
+    final metaColor = mine
+        ? Colors.white.withOpacity(0.78)
+        : dark
+            ? WaColors.darkTextSecondary
+            : WaColors.lightTextSecondary;
     final tickColor = status == 'read' ? WaColors.readBlue : metaColor;
     final ticks = !mine
         ? ''
@@ -9080,7 +9385,17 @@ class _HomePageState extends State<HomePage>
               maxWidth: MediaQuery.of(context).size.width * 0.78,
             ),
             decoration: BoxDecoration(
-              color: bubbleColor,
+              color: mine ? null : bubbleColor,
+              gradient: mine
+                  ? const LinearGradient(
+                      colors: [
+                        Color(0xFF743EEA),
+                        Color(0xFF315FDB),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    )
+                  : null,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(18),
                 topRight: const Radius.circular(18),
@@ -9088,7 +9403,7 @@ class _HomePageState extends State<HomePage>
                 bottomRight: Radius.circular(mine ? 4 : 18),
               ),
               border: mine
-                  ? null
+                  ? Border.all(color: Colors.white.withOpacity(0.16))
                   : Border.all(
                       color: dark
                           ? const Color(0xFF1C2A44)
@@ -9096,9 +9411,11 @@ class _HomePageState extends State<HomePage>
                     ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.08),
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
+                  color: mine
+                      ? OrbitalColors.plasmaBlue.withOpacity(0.22)
+                      : Colors.black.withOpacity(0.18),
+                  blurRadius: mine ? 12 : 5,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),

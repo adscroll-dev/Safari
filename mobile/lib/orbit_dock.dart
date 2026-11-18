@@ -8,12 +8,14 @@ class OrbitDock extends StatelessWidget {
     required this.selectedIndex,
     required this.labels,
     required this.onSelected,
+    required this.onHome,
     this.unreadCount = 0,
   });
 
   final int selectedIndex;
   final List<String> labels;
   final ValueChanged<int> onSelected;
+  final VoidCallback onHome;
   final int unreadCount;
 
   static const _icons = [
@@ -27,10 +29,6 @@ class OrbitDock extends StatelessWidget {
   Widget build(BuildContext context) {
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-    // NOTE: no Center/Align here — as a Scaffold bottomNavigationBar this
-    // widget must size to its content. A Center expands to the full
-    // remaining height, which starves the Scaffold body to zero height
-    // (the whole tab content collapses and the dock floats mid-screen).
     return SafeArea(
       top: false,
       child: Align(
@@ -42,9 +40,9 @@ class OrbitDock extends StatelessWidget {
             margin: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 10),
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: OrbitalColors.deepSpace.withOpacity(0.94),
+              color: OrbitalColors.deepSpace.withOpacity(0.96),
               borderRadius: BorderRadius.circular(OrbitalRadii.dock),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
               boxShadow: const [
                 BoxShadow(
                   color: Color(0x66000000),
@@ -55,107 +53,47 @@ class OrbitDock extends StatelessWidget {
             ),
             child: Row(
               children: [
-                for (var index = 0; index < _icons.length; index++)
-                  Expanded(
-                    child: Semantics(
-                      button: true,
-                      selected: selectedIndex == index,
-                      label: labels[index],
-                      child: InkWell(
-                        onTap: () => onSelected(index),
-                        borderRadius: BorderRadius.circular(24),
-                        child: AnimatedContainer(
-                          duration: reduceMotion
-                              ? Duration.zero
-                              : const Duration(milliseconds: 160),
-                          curve: Curves.easeOutCubic,
-                          constraints: const BoxConstraints(minHeight: 52),
-                          padding: const EdgeInsets.symmetric(vertical: 5),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: 36,
-                                height: 30,
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    if (selectedIndex == index)
-                                      const Positioned.fill(
-                                        child: CustomPaint(
-                                          painter: _OrbitArcPainter(),
-                                        ),
-                                      ),
-                                    AnimatedScale(
-                                      duration: reduceMotion
-                                          ? Duration.zero
-                                          : const Duration(milliseconds: 160),
-                                      scale: selectedIndex == index ? 1.08 : 1,
-                                      curve: Curves.easeOutCubic,
-                                      child: Icon(
-                                        selectedIndex == index
-                                            ? _icons[index].$2
-                                            : _icons[index].$1,
-                                        size: 21,
-                                        color: selectedIndex == index
-                                            ? OrbitalColors.electricCyan
-                                            : OrbitalColors.mutedBlue,
-                                      ),
-                                    ),
-                                    if (index == 0 && unreadCount > 0)
-                                      PositionedDirectional(
-                                        top: -1,
-                                        end: 0,
-                                        child: Container(
-                                          constraints: const BoxConstraints(
-                                            minWidth: 15,
-                                            minHeight: 15,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 4),
-                                          decoration: BoxDecoration(
-                                            color: OrbitalColors.electricCyan,
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: Text(
-                                            unreadCount > 99
-                                                ? '99+'
-                                                : '$unreadCount',
-                                            style: const TextStyle(
-                                              color: OrbitalColors.voidBlack,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 1),
-                              Text(
-                                labels[index],
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: OrbitalTypography.dockLabel.copyWith(
-                                  color: selectedIndex == index
-                                      ? OrbitalColors.stellarWhite
-                                      : OrbitalColors.mutedBlue,
-                                  fontWeight: selectedIndex == index
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                ),
-                              ),
-                            ],
+                _tab(context, 0, reduceMotion),
+                _tab(context, 1, reduceMotion),
+                SizedBox(
+                  width: 52,
+                  height: 54,
+                  child: Semantics(
+                    button: true,
+                    label: labels[0],
+                    hint: 'Go to chats',
+                    child: InkWell(
+                      onTap: onHome,
+                      customBorder: const CircleBorder(),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: OrbitalColors.primaryOrbit,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0xAA477BFF),
+                              blurRadius: 18,
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: Color(0x8835D9F4),
+                              blurRadius: 13,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/safari-logo-transparent.png',
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
                     ),
                   ),
+                ),
+                _tab(context, 2, reduceMotion),
+                _tab(context, 3, reduceMotion),
               ],
             ),
           ),
@@ -163,47 +101,118 @@ class OrbitDock extends StatelessWidget {
       ),
     );
   }
-}
 
-class _OrbitArcPainter extends CustomPainter {
-  const _OrbitArcPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2),
-      width: size.width * 0.94,
-      height: size.height * 0.62,
+  Widget _tab(BuildContext context, int index, bool reduceMotion) {
+    final selected = selectedIndex == index;
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: labels[index],
+        child: InkWell(
+          onTap: () => onSelected(index),
+          borderRadius: BorderRadius.circular(18),
+          child: AnimatedContainer(
+            duration: reduceMotion
+                ? Duration.zero
+                : const Duration(milliseconds: 170),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 52),
+            margin: const EdgeInsets.symmetric(horizontal: 1),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: selected
+                  ? OrbitalColors.plasmaBlue.withOpacity(0.13)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(17),
+              border: Border.all(
+                color: selected
+                    ? OrbitalColors.nebulaViolet.withOpacity(0.95)
+                    : Colors.transparent,
+                width: 1.4,
+              ),
+              boxShadow: selected
+                  ? const [
+                      BoxShadow(
+                        color: Color(0x667B61FF),
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Color(0x4435D9F4),
+                        blurRadius: 10,
+                      ),
+                    ]
+                  : const [],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 34,
+                  height: 28,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedScale(
+                        duration: reduceMotion
+                            ? Duration.zero
+                            : const Duration(milliseconds: 160),
+                        scale: selected ? 1.08 : 1,
+                        child: Icon(
+                          selected ? _icons[index].$2 : _icons[index].$1,
+                          size: 20,
+                          color: selected
+                              ? OrbitalColors.electricCyan
+                              : OrbitalColors.moonlight,
+                        ),
+                      ),
+                      if (index == 0 && unreadCount > 0)
+                        PositionedDirectional(
+                          top: -1,
+                          end: -1,
+                          child: Container(
+                            constraints: const BoxConstraints(
+                              minWidth: 15,
+                              minHeight: 15,
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              color: OrbitalColors.electricCyan,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              unreadCount > 99 ? '99+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: OrbitalColors.voidBlack,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Text(
+                  labels[index],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: OrbitalTypography.dockLabel.copyWith(
+                    color: selected
+                        ? OrbitalColors.stellarWhite
+                        : OrbitalColors.moonlight,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
-    // A soft glowing ellipse BEHIND the active icon — the dedicated
-    // orbital indicator for the active tab — then the crisp orbit arc
-    // around it. The active tab must read as a glowing orbit, not a
-    // hairline.
-    final haloPaint = Paint()
-      ..color = OrbitalColors.electricCyan.withOpacity(0.20)
-      ..style = PaintingStyle.fill;
-    canvas.drawOval(rect, haloPaint);
-    final glowPaint = Paint()
-      ..color = OrbitalColors.electricCyan.withOpacity(0.28)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -0.5, 5.3, false, glowPaint);
-    final paint = Paint()
-      // NOTE: createShader needs an explicit TextDirection here — paint()
-      // has no Directionality, and primaryOrbit uses AlignmentDirectional
-      // begin/end, which throws "Cannot resolve AlignmentDirectional
-      // without a TextDirection" when resolved with a null direction.
-      ..shader = OrbitalColors.primaryOrbit.createShader(
-        rect,
-        textDirection: TextDirection.ltr,
-      )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -0.5, 5.3, false, paint);
   }
-
-  @override
-  bool shouldRepaint(_OrbitArcPainter oldDelegate) => false;
 }

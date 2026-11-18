@@ -146,7 +146,7 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await binding.takeScreenshot('stories');
     // Scroll to the bottom: the last item must clear the nav bar fully.
-    await tester.drag(find.text('CHANNELS'), const Offset(0, -320));
+    await tester.drag(find.text('Channels'), const Offset(0, -320));
     await tester.pump(const Duration(seconds: 1));
     await binding.takeScreenshot('stories-bottom');
 
