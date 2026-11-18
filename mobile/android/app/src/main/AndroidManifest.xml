@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <!-- Bluetooth headsets on Android 12+: WebRTC call audio routing
+         needs BLUETOOTH_CONNECT; the legacy BLUETOOTH permission (capped
+         at API 30 by the WebRTC plugin) no longer covers it. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>

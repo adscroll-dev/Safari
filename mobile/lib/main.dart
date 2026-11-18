@@ -25,6 +25,9 @@ import 'e2ee_chat_state.dart';
 import 'fcm_push.dart';
 import 'link_preview.dart';
 import 'local_ai.dart';
+import 'orbit_avatar.dart';
+import 'orbit_dock.dart';
+import 'orbit_shimmer.dart';
 import 'recording_bytes.dart';
 import 'share_file.dart';
 import 'theme.dart';
@@ -71,9 +74,8 @@ class _VyroAppState extends State<VyroApp> {
   Future<void> _loadLocale() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getString('vyro_lang');
-    if (mounted && (saved == 'fa' || saved == 'en')) {
-      final code = saved == 'fa' ? 'fa' : 'en';
-      setState(() => _locale = Locale(code));
+    if (mounted && ['fa', 'en', 'ar'].contains(saved)) {
+      setState(() => _locale = Locale(saved!));
     }
   }
 
@@ -92,7 +94,7 @@ class _VyroAppState extends State<VyroApp> {
       theme: vyroLightTheme(),
       darkTheme: vyroDarkTheme(),
       locale: _locale,
-      supportedLocales: const [Locale('en'), Locale('fa')],
+      supportedLocales: const [Locale('en'), Locale('fa'), Locale('ar')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -101,9 +103,11 @@ class _VyroAppState extends State<VyroApp> {
       home: HomePage(
         onToggleTheme: () => setState(() =>
             _mode = _mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark),
-        onToggleLang: () => _setLocale(_locale.languageCode == 'en'
-            ? const Locale('fa')
-            : const Locale('en')),
+        onToggleLang: () => _setLocale(switch (_locale.languageCode) {
+          'en' => const Locale('fa'),
+          'fa' => const Locale('ar'),
+          _ => const Locale('en'),
+        }),
       ),
     );
   }
@@ -209,8 +213,11 @@ class _HomePageState extends State<HomePage>
   final _password = TextEditingController();
   final _draft = TextEditingController();
   final _searchCtrl = TextEditingController();
+  final _chatListSearchCtrl = TextEditingController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
+  bool _chatsLoaded = false;
+  String? _chatLoadError;
   // Stage 7: the user IDs I blocked (loaded at login).
   final Set<String> _blockedUserIds = {};
   // Stage 8: whole-app lock (PIN + fingerprint) and notification
@@ -919,6 +926,7 @@ class _HomePageState extends State<HomePage>
     _password.dispose();
     _draft.dispose();
     _searchCtrl.dispose();
+    _chatListSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -1042,13 +1050,21 @@ class _HomePageState extends State<HomePage>
       }
       await prefs.setString('vyro_session_user', jsonEncode(u));
     }
-    setState(() => _user = u);
+    _chatListSearchCtrl.clear();
+    setState(() {
+      _user = u;
+      _chatsLoaded = false;
+      _chatLoadError = null;
+    });
     // E2EE setup: generate/load the device identity and publish
     // public keys. Private keys never leave the device.
     _e2ee = E2eeClient(_api, _deviceId);
     _e2ee!.setOwnUserId(userId);
     try {
-      await _e2ee!.ensureSetup(userId);
+      // Bound E2EE setup so a hung secure-storage/crypto call can never
+      // block the chat list: on timeout, login still proceeds and chats
+      // load; E2EE stays unavailable until setup works.
+      await _e2ee!.ensureSetup(userId).timeout(const Duration(seconds: 10));
     } catch (e) {
       // Offline: no error — the chats still open from the cache.
       if (!_isNetworkError(e)) {
@@ -1126,7 +1142,13 @@ class _HomePageState extends State<HomePage>
       } catch (_) {}
     }
 
-    _connectWs();
+    // _connectWs must never abort login: on web, dart:io WebSocket is
+    // unsupported and IOWebSocketChannel.connect can throw, which would
+    // kill _finishLogin before _refreshChats ever runs. Live updates are
+    // best-effort here; the list still loads over HTTP.
+    try {
+      _connectWs();
+    } catch (_) {}
     // FCM is best-effort and must not hold up the signed-in screen.
     unawaited(FcmPush.init(
       api: _api,
@@ -1316,7 +1338,8 @@ class _HomePageState extends State<HomePage>
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              "You're offline — showing saved chats. Messages will send when you're back online.",
+              _orbitText(
+                  'You are offline. Saved chats are shown; messages will send when you reconnect.'),
               style: TextStyle(
                   fontSize: 12, color: dark ? const Color(0xFFFDE68A) : null),
             ),
@@ -1340,7 +1363,10 @@ class _HomePageState extends State<HomePage>
       if (raw == null) return;
       final decoded = jsonDecode(raw) as List;
       if (mounted) {
-        setState(() => _chats = List<dynamic>.from(decoded));
+        setState(() {
+          _chats = List<dynamic>.from(decoded);
+          _chatsLoaded = true;
+        });
       }
     } catch (_) {}
   }
@@ -1460,6 +1486,8 @@ class _HomePageState extends State<HomePage>
       setState(() {
         _chats = chats;
         _offline = false;
+        _chatsLoaded = true;
+        _chatLoadError = null;
       });
       await _saveCachedChats();
       await _flushOutbox();
@@ -1468,8 +1496,20 @@ class _HomePageState extends State<HomePage>
         // Offline: keep the cached chats on screen, no scary error.
         if (mounted) setState(() => _offline = true);
         if (_chats.isEmpty) await _loadCachedChats();
+        if (mounted) {
+          setState(() {
+            _chatsLoaded = true;
+            _chatLoadError = _chats.isEmpty ? 'offline' : null;
+          });
+        }
       } else {
-        setState(() => _error = e.toString());
+        if (mounted) {
+          setState(() {
+            _error = e.toString();
+            _chatsLoaded = true;
+            _chatLoadError = 'error';
+          });
+        }
       }
     }
     // Best-effort user directory for DM titles (never blocks the list).
@@ -3831,15 +3871,134 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  /// Safari app bar, three modes: chat header (avatar + name +
-  /// status, call icons, ⋮ menu), Settings (back + title), or the
-  /// main bar ("Safari" + search + camera + ⋮ menu).
+  String _orbitText(String key) {
+    const text = <String, List<String>>{
+      'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
+      'Updates': ['Updates', 'به‌روزرسانی‌ها', 'التحديثات'],
+      'Communities': ['Communities', 'انجمن‌ها', 'المجتمعات'],
+      'Calls': ['Calls', 'تماس‌ها', 'المكالمات'],
+      'Yesterday': ['Yesterday', 'دیروز', 'أمس'],
+      'Mon': ['Mon', 'دوشنبه', 'الاثنين'],
+      'Tue': ['Tue', 'سه‌شنبه', 'الثلاثاء'],
+      'Wed': ['Wed', 'چهارشنبه', 'الأربعاء'],
+      'Thu': ['Thu', 'پنجشنبه', 'الخميس'],
+      'Fri': ['Fri', 'جمعه', 'الجمعة'],
+      'Sat': ['Sat', 'شنبه', 'السبت'],
+      'Sun': ['Sun', 'یکشنبه', 'الأحد'],
+      'You': ['You', 'شما', 'أنت'],
+      'Encrypted message': [
+        'Encrypted message',
+        'پیام رمزگذاری‌شده',
+        'رسالة مشفرة'
+      ],
+      'Photo': ['Photo', 'عکس', 'صورة'],
+      'Video': ['Video', 'ویدیو', 'فيديو'],
+      'Voice message': ['Voice message', 'پیام صوتی', 'رسالة صوتية'],
+      'File': ['File', 'فایل', 'ملف'],
+      'Location': ['Location', 'موقعیت مکانی', 'الموقع'],
+      'Sticker': ['Sticker', 'استیکر', 'ملصق'],
+      'Contact': ['Contact', 'مخاطب', 'جهة اتصال'],
+      'Search': ['Search', 'جست‌وجو', 'بحث'],
+      'Search chats': [
+        'Search chats',
+        'جست‌وجوی گفت‌وگوها',
+        'البحث في المحادثات'
+      ],
+      'Search messages and contacts…': [
+        'Search messages and contacts…',
+        'جست‌وجوی پیام‌ها و مخاطبان…',
+        'البحث في الرسائل وجهات الاتصال…'
+      ],
+      'Clear search': ['Clear search', 'پاک‌کردن جست‌وجو', 'مسح البحث'],
+      'New chat': ['New chat', 'گفت‌وگوی جدید', 'محادثة جديدة'],
+      'New group or channel': [
+        'New group or channel',
+        'گروه یا کانال جدید',
+        'مجموعة أو قناة جديدة'
+      ],
+      'All': ['All', 'همه', 'الكل'],
+      'Unread': ['Unread', 'خوانده‌نشده', 'غير مقروءة'],
+      'Personal': ['Personal', 'شخصی', 'شخصية'],
+      'Groups': ['Groups', 'گروه‌ها', 'المجموعات'],
+      'Archived': ['Archived', 'بایگانی‌شده', 'المؤرشفة'],
+      'No archived chats': [
+        'No archived chats',
+        'گفت‌وگوی بایگانی‌شده‌ای نیست',
+        'لا توجد محادثات مؤرشفة'
+      ],
+      'There are no archived conversations.': [
+        'There are no archived conversations.',
+        'گفت‌وگوی بایگانی‌شده‌ای وجود ندارد.',
+        'لا توجد محادثات مؤرشفة.'
+      ],
+      'Add folder': ['+ Folder', '+ پوشه', '+ مجلد'],
+      'No chats yet': [
+        'No chats yet',
+        'هنوز گفت‌وگویی ندارید',
+        'لا توجد محادثات بعد'
+      ],
+      'Start a conversation and your chats will appear here.': [
+        'Start a conversation and your chats will appear here.',
+        'گفت‌وگویی را آغاز کنید تا اینجا نمایش داده شود.',
+        'ابدأ محادثة لتظهر هنا.'
+      ],
+      'New conversation': ['New conversation', 'شروع گفت‌وگو', 'ابدأ محادثة'],
+      'No matching chats': [
+        'No matching chats',
+        'گفت‌وگوی منطبقی نیست',
+        'لا توجد محادثات مطابقة'
+      ],
+      'Try another filter to see your chats.': [
+        'Try another filter to see your chats.',
+        'برای دیدن گفت‌وگوها فیلتر دیگری را امتحان کنید.',
+        'جرّب عامل تصفية آخر لعرض محادثاتك.'
+      ],
+      'Network unavailable': [
+        'Network unavailable',
+        'شبکه در دسترس نیست',
+        'الشبكة غير متاحة'
+      ],
+      'Try again when you are connected.': [
+        'Try again when you are connected.',
+        'پس از اتصال دوباره تلاش کنید.',
+        'حاول مجددًا عند الاتصال.'
+      ],
+      'Could not load chats': [
+        'Could not load chats',
+        'گفت‌وگوها بارگیری نشدند',
+        'تعذر تحميل المحادثات'
+      ],
+      'Retry': ['Retry', 'تلاش دوباره', 'إعادة المحاولة'],
+      'You are offline. Saved chats are shown; messages will send when you reconnect.':
+          [
+        'You are offline. Saved chats are shown; messages will send when you reconnect.',
+        'آفلاین هستید. گفت‌وگوهای ذخیره‌شده نمایش داده می‌شوند و پیام‌ها پس از اتصال ارسال خواهند شد.',
+        'أنت غير متصل. تُعرض المحادثات المحفوظة وستُرسل الرسائل عند إعادة الاتصال.'
+      ],
+      'Settings': ['Settings', 'تنظیمات', 'الإعدادات'],
+      'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
+      'Dark mode': ['Dark mode', 'حالت تاریک', 'الوضع الداكن'],
+      'Language': ['Language', 'زبان', 'اللغة'],
+      'Camera': ['Camera', 'دوربین', 'الكاميرا'],
+      'Create update': ['Create update', 'ساخت به‌روزرسانی', 'إنشاء تحديث'],
+      'Start a call': ['Start a call', 'شروع تماس', 'بدء مكالمة'],
+    };
+    final language = Localizations.localeOf(context).languageCode;
+    final index = switch (language) {
+      'fa' => 1,
+      'ar' => 2,
+      _ => 0,
+    };
+    return text[key]?[index] ?? key;
+  }
+
+  /// Section header for the shell; chat controls remain on this route.
   PreferredSizeWidget _buildAppBar() {
     if (_activeChat != null) return _buildChatAppBar();
     if (_showSettings) {
       return vyroAppBar(
         context,
-        title: 'Settings',
+        title: _orbitText('Settings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => setState(() => _showSettings = false),
@@ -3847,65 +4006,100 @@ class _HomePageState extends State<HomePage>
         actions: const [],
       );
     }
+    final section = switch (_tabIndex) {
+      1 => 'Updates',
+      2 => 'Communities',
+      3 => 'Calls',
+      _ => 'Chats',
+    };
+    final actions = <Widget>[
+      IconButton(
+        icon: const Icon(Icons.search),
+        tooltip: _orbitText('Search'),
+        onPressed: _showSearchSheet,
+      ),
+      if (_tabIndex == 0)
+        IconButton(
+          icon: const Icon(Icons.add_comment_outlined),
+          tooltip: _orbitText('New chat'),
+          onPressed: _showNewChatSheet,
+        )
+      else if (_tabIndex == 1)
+        IconButton(
+          icon: const Icon(Icons.add_circle_outline),
+          tooltip: _orbitText('Create update'),
+          onPressed: _postStory,
+        )
+      else if (_tabIndex == 3)
+        IconButton(
+          icon: const Icon(Icons.add_call),
+          tooltip: _orbitText('Start a call'),
+          onPressed: () => _startNewCall(video: false),
+        ),
+      PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert),
+        onSelected: (v) {
+          switch (v) {
+            case 'new_group':
+              _showNewChatSheet();
+              break;
+            case 'settings':
+              setState(() => _showSettings = true);
+              break;
+            case 'theme':
+              widget.onToggleTheme();
+              break;
+            case 'lang':
+              widget.onToggleLang();
+              break;
+            case 'assistant':
+              _showAssistant();
+              break;
+          }
+        },
+        itemBuilder: (context) => [
+          PopupMenuItem(
+              value: 'new_group',
+              child: Text(_orbitText('New group or channel'))),
+          PopupMenuItem(value: 'settings', child: Text(_orbitText('Settings'))),
+          PopupMenuItem(
+              value: 'assistant', child: Text(_orbitText('Safari assistant'))),
+          PopupMenuItem(value: 'theme', child: Text(_orbitText('Dark mode'))),
+          PopupMenuItem(value: 'lang', child: Text(_orbitText('Language'))),
+        ],
+      ),
+    ];
     return vyroAppBar(
       context,
       titleWidget: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: Image.asset(
-              'assets/safari-logo-transparent.png',
-              width: 32,
-              height: 32,
-              fit: BoxFit.cover,
+          if (_tabIndex == 0) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: Image.asset(
+                'assets/safari-logo-transparent.png',
+                width: 30,
+                height: 30,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
+          Flexible(
+            child: Text(
+              _orbitText(section),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: OrbitalTypography.pageTitle.copyWith(
+                color: OrbitalColors.stellarWhite,
+                letterSpacing: -0.5,
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          const Text('Safari'),
         ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.search),
-          tooltip: 'Search',
-          onPressed: _showSearchSheet,
-        ),
-        IconButton(
-          icon: const Icon(Icons.camera_alt_outlined),
-          tooltip: 'Camera',
-          onPressed: _postStory,
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (v) {
-            switch (v) {
-              case 'new_group':
-                _showNewChatSheet();
-                break;
-              case 'settings':
-                setState(() => _showSettings = true);
-                break;
-              case 'theme':
-                widget.onToggleTheme();
-                break;
-              case 'lang':
-                widget.onToggleLang();
-                break;
-              case 'assistant':
-                _showAssistant();
-                break;
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(value: 'new_group', child: Text('New group')),
-            PopupMenuItem(value: 'settings', child: Text('Settings')),
-            PopupMenuItem(value: 'assistant', child: Text('Safari assistant')),
-            PopupMenuItem(value: 'theme', child: Text('Dark mode')),
-            PopupMenuItem(value: 'lang', child: Text('فارسی / English')),
-          ],
-        ),
-      ],
+      actions: actions,
     );
   }
 
@@ -4120,180 +4314,21 @@ class _HomePageState extends State<HomePage>
     return '';
   }
 
-  /// Safari's floating glass bottom navigation: a rounded
-  /// translucent bar with a cyan-gradient pill on the active tab.
-  /// Tab order matches the old NavigationBar (Chats, Updates,
-  /// Communities, Calls); Flutter mirrors the Row automatically
-  /// in RTL, so the visual order follows the device direction.
+  /// Custom ORBIT DOCK. The badge is derived exclusively from chat data.
   Widget _buildSafariNavBar() {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final isPersian = Localizations.localeOf(context).languageCode == 'fa';
-    const items = [
-      (Icons.chat_bubble_outline, Icons.chat_bubble, 'Chats', 'گفت‌وگوها', 0),
-      (Icons.circle_outlined, Icons.circle, 'Updates', 'به‌روزرسانی‌ها', 1),
-      (Icons.group_outlined, Icons.group, 'Communities', 'انجمن‌ها', 2),
-      (Icons.call_outlined, Icons.call, 'Calls', 'تماس‌ها', 3),
-    ];
-    final inactive =
-        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: dark
-                ? const [
-                    Color(0xF7243B58),
-                    Color(0xF4142035),
-                    Color(0xF20B1729),
-                  ]
-                : const [
-                    Color(0xFCFFFFFF),
-                    Color(0xF8F9FCFF),
-                    Color(0xF0EAF1F8),
-                  ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: dark ? const Color(0x8841CDE7) : const Color(0x7741AFCB),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(dark ? 0.50 : 0.14),
-              blurRadius: 28,
-              offset: const Offset(0, 11),
-            ),
-            BoxShadow(
-              color: VyroColors.glowCyan.withOpacity(dark ? 0.22 : 0.12),
-              blurRadius: 26,
-              offset: const Offset(0, 2),
-            ),
-            BoxShadow(
-              color: VyroColors.glowPurple.withOpacity(dark ? 0.12 : 0.06),
-              blurRadius: 30,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Row(
-              children: [
-                for (final (icon, activeIcon, label, faLabel, i) in items)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _tabIndex = i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOut,
-                        padding: const EdgeInsets.symmetric(vertical: 7),
-                        decoration: BoxDecoration(
-                          gradient:
-                              _tabIndex == i ? VyroColors.brandGradient : null,
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(
-                            color: _tabIndex == i
-                                ? const Color(0x66FFFFFF)
-                                : Colors.transparent,
-                          ),
-                          boxShadow: _tabIndex == i
-                              ? [
-                                  const BoxShadow(
-                                    color: Color(0x5522D3EE),
-                                    blurRadius: 16,
-                                    offset: Offset(0, 5),
-                                  ),
-                                  const BoxShadow(
-                                    color: Color(0x338B5CF6),
-                                    blurRadius: 20,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            if (_tabIndex == i)
-                              Positioned(
-                                top: 1,
-                                left: 10,
-                                right: 10,
-                                height: 24,
-                                child: IgnorePointer(
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(18),
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0x55FFFFFF),
-                                          Color(0x00FFFFFF),
-                                        ],
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _tabIndex == i ? activeIcon : icon,
-                                  size: 22,
-                                  color:
-                                      _tabIndex == i ? Colors.white : inactive,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  isPersian ? faLabel : label,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: _tabIndex == i
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    letterSpacing:
-                                        _tabIndex == i && !isPersian ? 0.1 : 0,
-                                    color: _tabIndex == i
-                                        ? Colors.white
-                                        : inactive,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            Positioned(
-              top: 0,
-              left: 18,
-              right: 18,
-              height: 1,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.transparent,
-                      Colors.white.withOpacity(dark ? 0.22 : 0.8),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    return OrbitDock(
+      selectedIndex: _tabIndex,
+      labels: [
+        _orbitText('Chats'),
+        _orbitText('Updates'),
+        _orbitText('Communities'),
+        _orbitText('Calls'),
+      ],
+      unreadCount: _chats.fold<int>(
+        0,
+        (sum, chat) => sum + _unreadCount(chat as Map<String, dynamic>),
       ),
+      onSelected: (index) => setState(() => _tabIndex = index),
     );
   }
 
@@ -4387,6 +4422,8 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHomeBody() {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final tab = switch (_tabIndex) {
       1 => _buildUpdatesBody(),
       2 => _buildCommunitiesBody(),
@@ -4394,14 +4431,36 @@ class _HomePageState extends State<HomePage>
       _ => _buildChatsBody(),
     };
     return SafariAuroraBackdrop(
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 240),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeOut,
+      child: SizedBox.expand(
+        child: AnimatedSwitcher(
+        duration: reduceMotion
+            ? const Duration(milliseconds: 80)
+            : const Duration(milliseconds: 260),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeOutCubic,
+        transitionBuilder: (child, animation) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: reduceMotion
+                ? child
+                : SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.025),
+                      end: Offset.zero,
+                    ).animate(curved),
+                    child: child,
+                  ),
+          );
+        },
         child: KeyedSubtree(
           key: ValueKey<int>(_tabIndex),
           child: tab,
         ),
+      ),
       ),
     );
   }
@@ -4417,7 +4476,7 @@ class _HomePageState extends State<HomePage>
     final folderChats = _showArchived
         ? archived
         : _visibleChats.where((c) => (c as Map)['archived'] != true).toList();
-    final shown = folderChats.where((chat) {
+    final filtered = folderChats.where((chat) {
       final c = chat as Map<String, dynamic>;
       switch (_chatTypeFilter) {
         case 'Personal':
@@ -4430,72 +4489,209 @@ class _HomePageState extends State<HomePage>
           return true;
       }
     }).toList();
+    final query = _chatListSearchCtrl.text.trim().toLowerCase();
+    final shown = query.isEmpty
+        ? filtered
+        : filtered.where((chat) {
+            final c = chat as Map<String, dynamic>;
+            return _chatTitle(c).toLowerCase().contains(query) ||
+                _chatPreview(c).toLowerCase().contains(query) ||
+                _peerUsername(c).toLowerCase().contains(query);
+          }).toList();
     return Column(
       children: [
         _offlineBanner(),
+        _chatSearchCapsule(),
         if (_showArchived)
           ListTile(
             leading: const Icon(Icons.arrow_back),
-            title: const Text('Archived'),
-            subtitle: Text('${archived.length} chat(s)'),
+            title: Text(_orbitText('Archived')),
+            subtitle: Text('${archived.length}'),
             onTap: () => setState(() => _showArchived = false),
           )
         else ...[
           _chatFilterChips(),
         ],
         Expanded(
-          child: shown.isEmpty && !_showArchived
-              ? SafariEmptyState(
-                  icon: Icons.chat_bubble_outline,
-                  title: _chats.isEmpty ? 'No chats yet' : 'No matching chats',
-                  subtitle: _chats.isEmpty
-                      ? 'Start a conversation and your chats will appear here.'
-                      : 'Try another filter to see your chats.',
-                  buttonLabel: _chats.isEmpty ? 'New chat' : null,
-                  onPressed: _chats.isEmpty ? _showNewChatSheet : null,
-                  emblem: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [Color(0x3322D3EE), Color(0x00000000)],
-                      ),
-                    ),
-                    child: Image.asset(
-                      'assets/safari-logo-transparent.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: shown.length +
-                      (!_showArchived &&
-                              archived.isNotEmpty &&
-                              _chatTypeFilter == 'All' &&
-                              _folderFilter.isEmpty
-                          ? 1
-                          : 0),
-                  itemBuilder: (context, i) {
-                    if (i == shown.length &&
-                        !_showArchived &&
-                        archived.isNotEmpty &&
-                        _chatTypeFilter == 'All' &&
-                        _folderFilter.isEmpty) {
-                      return ListTile(
-                        leading: const CircleAvatar(
-                          child: Icon(Icons.archive_outlined, size: 20),
+          child: !_chatsLoaded
+              ? _buildChatsSkeleton()
+              : _chatLoadError != null && _chats.isEmpty
+                  ? SafariEmptyState(
+                      icon: Icons.wifi_off_outlined,
+                      title: _orbitText(_chatLoadError == 'offline'
+                          ? 'Network unavailable'
+                          : 'Could not load chats'),
+                      subtitle: _orbitText('Try again when you are connected.'),
+                      buttonLabel: _orbitText('Retry'),
+                      onPressed: _refreshChats,
+                      emblem: const NexusEmptyOrbit(),
+                    )
+                  : shown.isEmpty
+                      ? SafariEmptyState(
+                          icon: Icons.chat_bubble_outline,
+                          title: _showArchived
+                              ? _orbitText('No archived chats')
+                              : _chats.isEmpty
+                                  ? _orbitText('No chats yet')
+                                  : _orbitText('No matching chats'),
+                          subtitle: _showArchived
+                              ? _orbitText(
+                                  'There are no archived conversations.')
+                              : _chats.isEmpty
+                                  ? _orbitText(
+                                      'Start a conversation and your chats will appear here.')
+                                  : _orbitText(
+                                      'Try another filter to see your chats.'),
+                          buttonLabel: _chats.isEmpty
+                              ? _orbitText('New conversation')
+                              : null,
+                          onPressed: _chats.isEmpty ? _showNewChatSheet : null,
+                          emblem: const NexusEmptyOrbit(),
+                        )
+                      : ListView.builder(
+                          itemCount: shown.length +
+                              (!_showArchived &&
+                                      archived.isNotEmpty &&
+                                      _chatTypeFilter == 'All' &&
+                                      _folderFilter.isEmpty
+                                  ? 1
+                                  : 0),
+                          itemBuilder: (context, i) {
+                            if (i == shown.length &&
+                                !_showArchived &&
+                                archived.isNotEmpty &&
+                                _chatTypeFilter == 'All' &&
+                                _folderFilter.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                    20, 5, 20, 5),
+                                child: ListTile(
+                                  leading: const CircleAvatar(
+                                    child:
+                                        Icon(Icons.archive_outlined, size: 20),
+                                  ),
+                                  title: Text(_orbitText('Archived')),
+                                  trailing: Text('${archived.length}'),
+                                  onTap: () =>
+                                      setState(() => _showArchived = true),
+                                ),
+                              );
+                            }
+                            return _chatRow(shown[i] as Map<String, dynamic>);
+                          },
                         ),
-                        title: const Text('Archived'),
-                        trailing: Text('${archived.length}'),
-                        onTap: () => setState(() => _showArchived = true),
-                      );
-                    }
-                    return _chatRow(shown[i] as Map<String, dynamic>);
-                  },
-                ),
         ),
       ],
+    );
+  }
+
+  Widget _chatSearchCapsule() {
+    return Container(
+      height: 52,
+      margin: const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 8),
+      decoration: BoxDecoration(
+        color: OrbitalColors.nebulaNavy.withOpacity(0.94),
+        // A true pill: radius well past half the height, with a faint
+        // cyan outline so the capsule reads as one rounded unit.
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+            color: OrbitalColors.electricCyan.withOpacity(0.16)),
+      ),
+      child: TextField(
+        controller: _chatListSearchCtrl,
+        textInputAction: TextInputAction.search,
+        onChanged: (_) => setState(() {}),
+        style: OrbitalTypography.body.copyWith(
+          color: OrbitalColors.stellarWhite,
+        ),
+        cursorColor: OrbitalColors.electricCyan,
+        decoration: InputDecoration(
+          hintText: _orbitText('Search chats'),
+          hintStyle: const TextStyle(
+            color: OrbitalColors.mutedBlue,
+            fontSize: 15,
+          ),
+          prefixIcon: const Icon(
+            Icons.search,
+            color: OrbitalColors.mutedBlue,
+            size: 21,
+          ),
+          suffixIcon: _chatListSearchCtrl.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: _orbitText('Clear search'),
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () {
+                    _chatListSearchCtrl.clear();
+                    setState(() {});
+                  },
+                ),
+          contentPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 14, 0),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatsSkeleton() {
+    return OrbitShimmer(
+      child: ListView.builder(
+        padding: const EdgeInsetsDirectional.fromSTEB(20, 2, 20, 8),
+        itemCount: 6,
+        itemBuilder: (context, index) => Container(
+          margin: const EdgeInsetsDirectional.only(bottom: 10),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: OrbitalColors.nebulaNavy.withOpacity(0.82),
+            borderRadius: BorderRadius.circular(OrbitalRadii.card),
+            border: Border.all(color: Colors.white.withOpacity(0.04)),
+          ),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                radius: 26,
+                backgroundColor: OrbitalColors.orbitalSurface,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 12,
+                      width: index.isEven ? 128 : 96,
+                      decoration: BoxDecoration(
+                        color: OrbitalColors.orbitalSurface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      height: 9,
+                      width: index.isEven ? 182 : 142,
+                      decoration: BoxDecoration(
+                        color: OrbitalColors.orbitalSurface.withOpacity(0.72),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                height: 9,
+                width: 34,
+                decoration: BoxDecoration(
+                  color: OrbitalColors.orbitalSurface.withOpacity(0.72),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -4504,123 +4700,138 @@ class _HomePageState extends State<HomePage>
     final unread = _unreadCount(c);
     final timeLabel = _chatTimeLabel(c);
     final pinned = c['pinned'] == true;
-    // Stage 1: muted chats show a bell-off icon and a grey (not
-    // cyan) unread badge, like WhatsApp.
     final muted = c['muted'] == true;
     final locked = _chatLock?.isLocked(c['id'] as String) == true;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final secondary =
-        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
-    final green = dark ? WaColors.accentDark : WaColors.accent;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-      child: SafariGlassCard(
-        padding: EdgeInsets.zero,
-        radius: 18,
-        child: ListTile(
-          minVerticalPadding: 10,
-          horizontalTitleGap: 12,
-          leading: WaAvatar(label: title, radius: 26),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: 0.05,
-                  ),
-                ),
-              ),
-              if (pinned)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: Icon(Icons.push_pin, size: 15, color: secondary),
-                ),
-              if (muted)
-                Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child:
-                      Icon(Icons.notifications_off, size: 15, color: secondary),
-                ),
-              if (timeLabel.isNotEmpty)
-                Text(
-                  timeLabel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: unread > 0 ? green : secondary,
-                    fontWeight:
-                        unread > 0 ? FontWeight.w600 : FontWeight.normal,
-                    letterSpacing: 0.1,
-                  ),
-                ),
-            ],
-          ),
-          subtitle: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _chatPreview(c),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: unread > 0
-                        ? Theme.of(context).colorScheme.onSurface
-                        : secondary,
-                  ),
-                ),
-              ),
-              if (locked)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4),
-                  child: Icon(Icons.lock, size: 14, color: secondary),
-                ),
-              if (unread > 0) ...[
-                const SizedBox(width: 6),
-                Container(
-                  constraints:
-                      const BoxConstraints(minWidth: 20, minHeight: 20),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    gradient: muted
-                        ? null
-                        : const LinearGradient(
-                            colors: [Color(0xFF22D3EE), Color(0xFF2563EB)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 5, 20, 5),
+      child: Material(
+        color: OrbitalColors.deepSpace.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(OrbitalRadii.card),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => _openChat(c),
+          onLongPress: () => _showChatActions(c),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(OrbitalRadii.card),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
+            ),
+            child: Row(
+              children: [
+                OrbitAvatar(label: title, radius: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: OrbitalTypography.cardTitle.copyWith(
+                                color: OrbitalColors.stellarWhite,
+                                fontWeight: unread > 0
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                              ),
+                            ),
                           ),
-                    color: muted ? secondary : null,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: muted
-                        ? null
-                        : const [
-                            BoxShadow(
-                              color: Color(0x5522D3EE),
-                              blurRadius: 6,
-                              offset: Offset(0, 2),
+                          if (pinned)
+                            const Padding(
+                              padding: EdgeInsetsDirectional.only(start: 5),
+                              child: Icon(
+                                Icons.push_pin_outlined,
+                                size: 15,
+                                color: OrbitalColors.mutedBlue,
+                              ),
+                            ),
+                          if (muted)
+                            const Padding(
+                              padding: EdgeInsetsDirectional.only(start: 5),
+                              child: Icon(
+                                Icons.notifications_off_outlined,
+                                size: 15,
+                                color: OrbitalColors.mutedBlue,
+                              ),
+                            ),
+                          if (timeLabel.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Text(
+                              timeLabel,
+                              style: OrbitalTypography.caption.copyWith(
+                                color: unread > 0
+                                    ? OrbitalColors.electricCyan
+                                    : OrbitalColors.mutedBlue,
+                                fontWeight: unread > 0
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
                             ),
                           ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    unread > 99 ? '99+' : '$unread',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _chatPreview(c),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: OrbitalTypography.secondary.copyWith(
+                                color: unread > 0
+                                    ? OrbitalColors.moonlight
+                                    : OrbitalColors.mutedBlue,
+                              ),
+                            ),
+                          ),
+                          if (locked)
+                            const Padding(
+                              padding: EdgeInsetsDirectional.only(start: 6),
+                              child: Icon(
+                                Icons.lock_outline,
+                                size: 14,
+                                color: OrbitalColors.mutedBlue,
+                              ),
+                            ),
+                          if (unread > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              constraints: const BoxConstraints(
+                                minWidth: 20,
+                                minHeight: 20,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: muted
+                                    ? OrbitalColors.disabled
+                                    : OrbitalColors.electricCyan,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                unread > 99 ? '99+' : '$unread',
+                                style: const TextStyle(
+                                  color: OrbitalColors.voidBlack,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
-            ],
+            ),
           ),
-          onTap: () => _openChat(c),
-          onLongPress: () => _showChatActions(c),
         ),
       ),
     );
@@ -4650,15 +4861,30 @@ class _HomePageState extends State<HomePage>
     final day = DateTime(t.year, t.month, t.day);
     final hhmm =
         '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-    if (day == today) return hhmm;
+    if (day == today) return _localizedDigits(hhmm);
     if (day == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
+      return _orbitText('Yesterday');
     }
     if (today.difference(day).inDays < 7) {
       const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      return weekdays[t.weekday - 1];
+      return _orbitText(weekdays[t.weekday - 1]);
     }
-    return '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}';
+    return _localizedDigits(
+      '${t.day.toString().padLeft(2, '0')}/${t.month.toString().padLeft(2, '0')}/${t.year}',
+    );
+  }
+
+  String _localizedDigits(String value) {
+    final language = Localizations.localeOf(context).languageCode;
+    final digits = switch (language) {
+      'fa' => '۰۱۲۳۴۵۶۷۸۹',
+      'ar' => '٠١٢٣٤٥٦٧٨٩',
+      _ => '0123456789',
+    };
+    return value.replaceAllMapped(
+      RegExp(r'\d'),
+      (match) => digits[int.parse(match[0]!)],
+    );
   }
 
   /// Last-message preview for the chat list. E2EE messages never show
@@ -4670,28 +4896,28 @@ class _HomePageState extends State<HomePage>
     String body;
     switch (kind) {
       case 'e2ee':
-        body = 'Encrypted message';
+        body = _orbitText('Encrypted message');
         break;
       case 'image':
-        body = 'Photo';
+        body = _orbitText('Photo');
         break;
       case 'video':
-        body = 'Video';
+        body = _orbitText('Video');
         break;
       case 'voice':
-        body = 'Voice message';
+        body = _orbitText('Voice message');
         break;
       case 'file':
-        body = 'File';
+        body = _orbitText('File');
         break;
       case 'location':
-        body = 'Location';
+        body = _orbitText('Location');
         break;
       case 'sticker':
-        body = 'Sticker';
+        body = _orbitText('Sticker');
         break;
       case 'contact':
-        body = 'Contact';
+        body = _orbitText('Contact');
         break;
       case 'poll':
         body = _pollPreviewText(lm['content'] as String?);
@@ -4710,7 +4936,7 @@ class _HomePageState extends State<HomePage>
           : status == 'sent'
               ? '✓ '
               : '';
-      return '${ticks}You: $body';
+      return '$ticks${_orbitText('You')}: $body';
     }
     final type = c['type'] as String? ?? 'dm';
     if (type == 'group' || type == 'channel') {
@@ -6632,12 +6858,11 @@ class _HomePageState extends State<HomePage>
   /// Type and folder filters share one row. Long-press a folder chip
   /// to rename or delete it.
   Widget _chatFilterChips() {
-    final isPersian = Localizations.localeOf(context).languageCode == 'fa';
     const filters = [
-      ('All', 'همه'),
-      ('Personal', 'شخصی'),
-      ('Groups', 'گروه‌ها'),
-      ('Unread', 'خوانده‌نشده'),
+      'All',
+      'Unread',
+      'Personal',
+      'Groups',
     ];
     Widget chip(String label, bool selected, VoidCallback onTap,
         {VoidCallback? onLongPress}) {
@@ -6651,12 +6876,12 @@ class _HomePageState extends State<HomePage>
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 20, 10),
       child: Row(
         children: [
-          for (final (filter, faLabel) in filters) ...[
+          for (final filter in filters) ...[
             chip(
-              isPersian ? faLabel : filter,
+              _orbitText(filter),
               _chatTypeFilter == filter && _folderFilter.isEmpty,
               () => setState(() {
                 if (filter == 'All' ||
@@ -6687,7 +6912,7 @@ class _HomePageState extends State<HomePage>
             const SizedBox(width: 6),
           ],
           chip(
-            '+ Folder',
+            _orbitText('Add folder'),
             false,
             _createFolder,
           ),
@@ -7282,7 +7507,7 @@ class _HomePageState extends State<HomePage>
         header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Safari 0.6 (mobile)'),
+          title: Text('Safari 0.7.7 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
@@ -7740,9 +7965,21 @@ class _HomePageState extends State<HomePage>
                 Expanded(
                   child: TextField(
                     controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                        hintText: 'Search messages and contacts…',
-                        prefixIcon: Icon(Icons.search)),
+                    decoration: InputDecoration(
+                      hintText: _orbitText('Search messages and contacts…'),
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _searchCtrl.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: _orbitText('Clear search'),
+                              icon: const Icon(Icons.close),
+                              onPressed: () {
+                                _searchCtrl.clear();
+                                _searchResults = [];
+                                setSheetState(() {});
+                              },
+                            ),
+                    ),
                     onChanged: (_) => setSheetState(() {}),
                     onSubmitted: (_) async {
                       await _search();

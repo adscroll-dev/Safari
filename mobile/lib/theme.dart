@@ -8,40 +8,139 @@
 // and shapes are Safari's own — not a WhatsApp clone.
 import 'package:flutter/material.dart';
 
+class OrbitalColors {
+  static const voidBlack = Color(0xFF050812);
+  static const deepSpace = Color(0xFF080F20);
+  static const nebulaNavy = Color(0xFF101B32);
+  static const orbitalSurface = Color(0xFF14223B);
+  static const elevatedSurface = Color(0xFF1A2C49);
+  static const electricCyan = Color(0xFF35D9F4);
+  static const plasmaBlue = Color(0xFF477BFF);
+  static const nebulaViolet = Color(0xFF9877FF);
+  static const auroraMint = Color(0xFF55E6BC);
+  static const solarAmber = Color(0xFFFFBF69);
+  static const signalCoral = Color(0xFFFF637D);
+  static const stellarWhite = Color(0xFFF3F7FF);
+  static const moonlight = Color(0xFFB8C5D9);
+  static const mutedBlue = Color(0xFF7889A5);
+  static const disabled = Color(0xFF52617A);
+
+  static const primaryOrbit = LinearGradient(
+    colors: [electricCyan, plasmaBlue],
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
+  );
+  static const nebulaFlow = LinearGradient(
+    colors: [plasmaBlue, nebulaViolet],
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
+  );
+  static const auroraGlow = LinearGradient(
+    colors: [electricCyan, auroraMint],
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
+  );
+}
+
+class OrbitalSpacing {
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 20.0;
+  static const xxl = 24.0;
+  static const section = 32.0;
+  static const largeSection = 40.0;
+}
+
+class OrbitalRadii {
+  static const smallButton = 14.0;
+  static const mainButton = 18.0;
+  static const card = 22.0;
+  static const floatingPanel = 26.0;
+  static const dock = 30.0;
+  static const bottomSheet = 28.0;
+}
+
+class OrbitalTypography {
+  static const pageTitle = TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    height: 1.25,
+  );
+  static const sectionTitle = TextStyle(
+    fontSize: 21,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+  );
+  static const cardTitle = TextStyle(
+    fontSize: 17,
+    fontWeight: FontWeight.w600,
+    height: 1.35,
+  );
+  static const body = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+    height: 1.45,
+  );
+  static const button = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+  );
+  static const secondary = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+  static const caption = TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    height: 1.35,
+  );
+  static const dockLabel = TextStyle(
+    fontSize: 10,
+    fontWeight: FontWeight.w400,
+    height: 1.3,
+  );
+
+  static const textTheme = TextTheme(
+    titleLarge: pageTitle,
+    titleMedium: sectionTitle,
+    titleSmall: cardTitle,
+    bodyLarge: body,
+    bodyMedium: body,
+    bodySmall: secondary,
+    labelSmall: caption,
+  );
+}
+
 class VyroColors {
   // Brand accents (kept under the old names so existing widgets
   // keep working — they now render in Safari cyan/purple).
-  static const Color blue = Color(0xFF22D3EE); // electric cyan
-  static const Color purple = Color(0xFF8B5CF6); // violet highlight
-  static const Color blueDeep = Color(0xFF0E7490);
-  static const Color purpleDeep = Color(0xFF7C3AED);
-  static const Color electricBlue = Color(0xFF3B82F6);
-  static const Color midnight = Color(0xFF071226);
+  static const Color blue = OrbitalColors.electricCyan;
+  static const Color purple = OrbitalColors.nebulaViolet;
+  static const Color blueDeep = OrbitalColors.plasmaBlue;
+  static const Color purpleDeep = Color(0xFF7056D8);
+  static const Color electricBlue = OrbitalColors.plasmaBlue;
+  static const Color midnight = OrbitalColors.voidBlack;
 
-  static const Color teal = Color(0xFF2DD4BF); // turquoise
-  static const Color tealDeep = Color(0xFF0D9488);
-  static const Color green = Color(0xFF22D3EE); // cyan (was green)
-  static const Color greenDark = Color(0xFF06B6D4);
-  static const Color readBlue = Color(0xFF38BDF8);
+  static const Color teal = OrbitalColors.auroraMint;
+  static const Color tealDeep = Color(0xFF2EBB98);
+  static const Color green = OrbitalColors.auroraMint;
+  static const Color greenDark = OrbitalColors.auroraMint;
+  static const Color readBlue = OrbitalColors.electricCyan;
 
   /// Cyan -> blue -> purple: the Safari brand gradient.
   static const LinearGradient brandGradient = LinearGradient(
-    colors: [
-      Color(0xFF2DD4BF),
-      Color(0xFF22D3EE),
-      Color(0xFF3B82F6),
-      Color(0xFF8B5CF6),
-    ],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
+    colors: [OrbitalColors.electricCyan, OrbitalColors.plasmaBlue],
+    begin: AlignmentDirectional.centerStart,
+    end: AlignmentDirectional.centerEnd,
   );
 
   static const LinearGradient brandGradientDark = LinearGradient(
     colors: [
-      Color(0xFF0D9488),
-      Color(0xFF06B6D4),
-      Color(0xFF2563EB),
-      Color(0xFF7C3AED),
+      OrbitalColors.electricCyan,
+      OrbitalColors.plasmaBlue,
     ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
@@ -50,17 +149,21 @@ class VyroColors {
   /// Story ring: cyan -> purple, used as a border around avatars
   /// with unviewed status updates.
   static const LinearGradient storyRing = LinearGradient(
-    colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+    colors: [OrbitalColors.electricCyan, OrbitalColors.nebulaViolet],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   /// Soft neon glow used behind hero icons and empty states.
-  static const Color glowCyan = Color(0x5522D3EE);
-  static const Color glowPurple = Color(0x448B5CF6);
+  static const Color glowCyan = Color(0x3335D9F4);
+  static const Color glowPurple = Color(0x229877FF);
 
   static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xCC0D1D38), Color(0xCC151B40), Color(0xCC25164B)],
+    colors: [
+      Color(0xEE101B32),
+      Color(0xEE14223B),
+      Color(0xEE1A2C49),
+    ],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -80,27 +183,27 @@ class WaColors {
   static const Color lightInputBackground = Colors.white;
   static const Color lightIcon = Color(0xFF5B6B85);
   // Dark — midnight navy (never pure black).
-  static const Color darkHeader = Color(0xFF0A1322);
-  static const Color darkBackground = Color(0xFF060B18);
-  static const Color darkChatBackground = Color(0xFF060B18);
-  static const Color darkBubbleOut = Color(0xFF0C3D55);
-  static const Color darkBubbleIn = Color(0xFF131F38);
-  static const Color darkText = Color(0xFFEAF2FF);
-  static const Color darkTextSecondary = Color(0xFF8B9CC4);
-  static const Color darkDivider = Color(0xFF1C2A44);
-  static const Color darkInputBackground = Color(0xFF111E36);
-  static const Color darkIcon = Color(0xFF8B9CC4);
+  static const Color darkHeader = OrbitalColors.deepSpace;
+  static const Color darkBackground = OrbitalColors.voidBlack;
+  static const Color darkChatBackground = OrbitalColors.voidBlack;
+  static const Color darkBubbleOut = Color(0xFF17335A);
+  static const Color darkBubbleIn = OrbitalColors.orbitalSurface;
+  static const Color darkText = OrbitalColors.stellarWhite;
+  static const Color darkTextSecondary = OrbitalColors.moonlight;
+  static const Color darkDivider = Color(0x1FFFFFFF);
+  static const Color darkInputBackground = OrbitalColors.nebulaNavy;
+  static const Color darkIcon = OrbitalColors.moonlight;
   // Shared.
-  static const Color accent = Color(0xFF22D3EE);
-  static const Color accentDark = Color(0xFF06B6D4);
-  static const Color readBlue = Color(0xFF38BDF8);
-  static const Color unreadBadge = Color(0xFF22D3EE);
-  static const Color fabLight = Color(0xFF22D3EE);
-  static const Color fabDark = Color(0xFF06B6D4);
+  static const Color accent = OrbitalColors.electricCyan;
+  static const Color accentDark = OrbitalColors.plasmaBlue;
+  static const Color readBlue = OrbitalColors.electricCyan;
+  static const Color unreadBadge = OrbitalColors.electricCyan;
+  static const Color fabLight = OrbitalColors.plasmaBlue;
+  static const Color fabDark = OrbitalColors.plasmaBlue;
   // Extra surfaces for glass cards.
-  static const Color darkSurface = Color(0xFF0C1526);
-  static const Color darkSurface2 = Color(0xFF111E36);
-  static const Color darkBorder = Color(0xFF1C2A44);
+  static const Color darkSurface = OrbitalColors.nebulaNavy;
+  static const Color darkSurface2 = OrbitalColors.orbitalSurface;
+  static const Color darkBorder = Color(0x1FFFFFFF);
   static const Color lightSurface = Colors.white;
   static const Color lightBorder = Color(0xFFE2E8F0);
 }
@@ -114,8 +217,12 @@ ThemeData vyroLightTheme() {
     colorScheme: scheme,
     useMaterial3: true,
     scaffoldBackgroundColor: WaColors.lightBackground,
-    fontFamily: 'Inter',
+    fontFamily: 'Manrope',
     fontFamilyFallback: const ['Vazirmatn', 'Roboto'],
+    textTheme: OrbitalTypography.textTheme.apply(
+      bodyColor: WaColors.lightText,
+      displayColor: WaColors.lightText,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: WaColors.lightHeader,
       foregroundColor: Colors.white,
@@ -124,7 +231,7 @@ ThemeData vyroLightTheme() {
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontSize: 21,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         color: Colors.white,
         letterSpacing: 0.4,
       ),
@@ -141,15 +248,15 @@ ThemeData vyroLightTheme() {
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: Color(0xFF0891B2), width: 1.6),
       ),
     ),
@@ -157,7 +264,7 @@ ThemeData vyroLightTheme() {
       elevation: 0,
       color: WaColors.lightSurface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(OrbitalRadii.card),
         side: const BorderSide(color: WaColors.lightBorder),
       ),
     ),
@@ -166,10 +273,11 @@ ThemeData vyroLightTheme() {
         backgroundColor: const Color(0xFF0891B2),
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        minimumSize: const Size(0, 52),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         ),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: OrbitalTypography.button,
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -186,15 +294,28 @@ ThemeData vyroLightTheme() {
 
 ThemeData vyroDarkTheme() {
   final scheme = ColorScheme.fromSeed(
-    seedColor: WaColors.darkHeader,
+    seedColor: OrbitalColors.electricCyan,
     brightness: Brightness.dark,
+  ).copyWith(
+    primary: OrbitalColors.electricCyan,
+    secondary: OrbitalColors.nebulaViolet,
+    surface: OrbitalColors.nebulaNavy,
+    error: OrbitalColors.signalCoral,
+    onPrimary: OrbitalColors.voidBlack,
+    onSecondary: OrbitalColors.stellarWhite,
+    onSurface: OrbitalColors.stellarWhite,
+    onError: OrbitalColors.voidBlack,
   );
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
     scaffoldBackgroundColor: WaColors.darkBackground,
-    fontFamily: 'Inter',
+    fontFamily: 'Manrope',
     fontFamilyFallback: const ['Vazirmatn', 'Roboto'],
+    textTheme: OrbitalTypography.textTheme.apply(
+      bodyColor: OrbitalColors.stellarWhite,
+      displayColor: OrbitalColors.stellarWhite,
+    ),
     appBarTheme: const AppBarTheme(
       backgroundColor: WaColors.darkHeader,
       foregroundColor: Colors.white,
@@ -203,7 +324,7 @@ ThemeData vyroDarkTheme() {
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontSize: 21,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w600,
         color: Colors.white,
         letterSpacing: 0.4,
       ),
@@ -220,15 +341,15 @@ ThemeData vyroDarkTheme() {
       fillColor: WaColors.darkInputBackground,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: Color(0xFF1C2A44)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: Color(0xFF1C2A44)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         borderSide: const BorderSide(color: WaColors.accent, width: 1.6),
       ),
     ),
@@ -236,7 +357,7 @@ ThemeData vyroDarkTheme() {
       elevation: 0,
       color: WaColors.darkSurface,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(OrbitalRadii.card),
         side: const BorderSide(color: WaColors.darkBorder),
       ),
     ),
@@ -245,10 +366,11 @@ ThemeData vyroDarkTheme() {
         backgroundColor: WaColors.accentDark,
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        minimumSize: const Size(0, 52),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(OrbitalRadii.mainButton),
         ),
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        textStyle: OrbitalTypography.button,
       ),
     ),
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -644,19 +766,18 @@ class SafariFilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOut,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
       decoration: BoxDecoration(
-        gradient: selected ? VyroColors.brandGradient : null,
         color: selected
-            ? null
+            ? OrbitalColors.elevatedSurface
             : dark
-                ? WaColors.darkSurface2.withOpacity(0.88)
+                ? OrbitalColors.nebulaNavy.withOpacity(0.88)
                 : Colors.white.withOpacity(0.94),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: selected
-              ? Colors.transparent
+              ? OrbitalColors.electricCyan.withOpacity(0.45)
               : dark
                   ? WaColors.darkBorder
                   : WaColors.lightBorder,
@@ -664,14 +785,9 @@ class SafariFilterChip extends StatelessWidget {
         boxShadow: selected
             ? const [
                 BoxShadow(
-                  color: Color(0x5522D3EE),
-                  blurRadius: 15,
-                  offset: Offset(0, 5),
-                ),
-                BoxShadow(
-                  color: Color(0x338B5CF6),
-                  blurRadius: 20,
-                  offset: Offset(0, 3),
+                  color: Color(0x2235D9F4),
+                  blurRadius: 10,
+                  offset: Offset(0, 2),
                 ),
               ]
             : null,
@@ -690,7 +806,7 @@ class SafariFilterChip extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: selected
-                    ? Colors.white
+                    ? OrbitalColors.stellarWhite
                     : dark
                         ? WaColors.darkText
                         : WaColors.lightText,
@@ -1018,7 +1134,67 @@ class SafariEmptyState extends StatelessWidget {
   }
 }
 
-/// Soft cyan and violet light fields behind the tab content.
+class NexusEmptyOrbit extends StatelessWidget {
+  const NexusEmptyOrbit({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: 132,
+        height: 104,
+        child: CustomPaint(
+          painter: _OpenOrbitPainter(
+            OrbitalColors.electricCyan.withOpacity(0.52),
+          ),
+          child: Center(
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: OrbitalColors.primaryOrbit,
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x4435D9F4),
+                    blurRadius: 14,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OpenOrbitPainter extends CustomPainter {
+  const _OpenOrbitPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round;
+    final rect = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 2),
+      width: size.width * 0.82,
+      height: size.height * 0.55,
+    );
+    canvas.drawArc(rect, -0.18, 5.18, false, paint);
+  }
+
+  @override
+  bool shouldRepaint(_OpenOrbitPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// A restrained spatial field behind independently scrolling sections.
 class SafariAuroraBackdrop extends StatelessWidget {
   const SafariAuroraBackdrop({super.key, required this.child});
 
@@ -1032,91 +1208,73 @@ class SafariAuroraBackdrop extends StatelessWidget {
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOut,
+          curve: Curves.easeOutCubic,
           color: Theme.of(context).scaffoldBackgroundColor,
         ),
         IgnorePointer(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: dark
-                          ? const [
-                              Color(0x0C22D3EE),
-                              Color(0x00060B18),
-                              Color(0x148B5CF6),
-                            ]
-                          : const [
-                              Color(0x0822D3EE),
-                              Color(0x00F4F8FC),
-                              Color(0x108B5CF6),
-                            ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: -105,
-                left: -95,
-                width: 280,
-                height: 280,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        VyroColors.glowCyan.withOpacity(dark ? 0.50 : 0.24),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 100,
-                right: -120,
-                width: 300,
-                height: 300,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        VyroColors.glowPurple.withOpacity(dark ? 0.54 : 0.24),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -180,
-                left: 20,
-                width: 320,
-                height: 320,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        VyroColors.glowCyan.withOpacity(dark ? 0.2 : 0.1),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          child: CustomPaint(
+            painter: _OrbitalBackgroundPainter(
+              // Visible orbit lines — the ORBITAL signature. Strong enough
+              // to read at a glance, light enough not to fight the list.
+              // In light mode the rings are calmer so the content stays
+              // primary (per the ChatGPT design review).
+              dark
+                  ? OrbitalColors.electricCyan.withOpacity(0.13)
+                  : OrbitalColors.plasmaBlue.withOpacity(0.10),
+              dark
+                  ? OrbitalColors.nebulaViolet.withOpacity(0.11)
+                  : OrbitalColors.nebulaViolet.withOpacity(0.08),
+            ),
           ),
         ),
         child,
       ],
     );
   }
+}
+
+class _OrbitalBackgroundPainter extends CustomPainter {
+  const _OrbitalBackgroundPainter(this.color, this.accent);
+
+  final Color color;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final center = Offset(size.width * 0.78, size.height * 0.2);
+    for (final scale in [1.0, 1.34, 1.7]) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: center,
+          width: size.width * 0.78 * scale,
+          height: size.width * 0.32 * scale,
+        ),
+        paint,
+      );
+    }
+    // A second, violet orbit crossing from the lower-left, so the
+    // background reads as a real orbital field, not a plain tint.
+    final accentPaint = Paint()
+      ..color = accent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(size.width * 0.12, size.height * 0.86),
+        width: size.width * 0.9,
+        height: size.width * 0.38,
+      ),
+      accentPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_OrbitalBackgroundPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.accent != accent;
 }
 
 /// Safari app bar: midnight navy (dark) / deep navy (light),
