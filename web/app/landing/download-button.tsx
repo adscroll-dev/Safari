@@ -11,38 +11,40 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-17 with aapt2 (package app.vyro, version 0.7.5, label
+// 2026-11-19 with aapt2 (package app.vyro, version 0.7.7, label
 // "Safari"; live API https://vyro-api-wf4b.onrender.com present in
-// each APK's own libapp.so, no dev URL; CAMERA permission present;
+// each APK's own libapp.so, no dev URL; CAMERA + RECORD_AUDIO present;
 // release-signed with the Safari Release cert, SHA-256
 // 9368f4db62b68230946883a146dabd06a2437cf25e01a85206b5be70087ab077).
-// Rebuilt 2026-11-17 20:42 +0430 — v0.7.5: stage 3 UI polish + speed
-// fixes + ChatGPT stage 1 (CAMERA permission, E2EE keys in OS
-// keystore, release signing).
+// Rebuilt 2026-11-19 00:33 +0430 — v0.7.7: ORBITAL NEXUS redesign
+// (stages 1+2, matches the user's neon reference) + ChatGPT 0.7.6
+// fixes (E2EE fail-closed, persistent E2EE state, group device-ID
+// fix, target SDK 36, AGP 8.9.1) + ChatGPT 0.7.7 fixes (device_*
+// backup domains, BLUETOOTH_CONNECT).
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.7.5-arm64-v8a.apk",
-    size: "35.1 MB",
-    bytes: "35,086,287 bytes",
+    href: "/downloads/safari-0.7.7-arm64-v8a.apk",
+    size: "35.3 MB",
+    bytes: "35,274,854 bytes",
     sha256:
-      "b444a9d216a2601065a6f589008184780744bfbccf94a414e9c2e60f3e0164d4",
+      "4b676eb1e0ec2cee129ac92fdc716890fb80b7b661308e88aebc8420aa5d7533",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.7.5-armeabi-v7a.apk",
-    size: "28.2 MB",
-    bytes: "28,213,679 bytes",
+    href: "/downloads/safari-0.7.7-armeabi-v7a.apk",
+    size: "28.4 MB",
+    bytes: "28,402,255 bytes",
     sha256:
-      "f86702abdf5c9b4070d99303d922b8b8463130cb3aed2be0dd99fa1291b1588a",
+      "2daee501ee205ab85beccd39e803a0da011073d972905cfc3045262e8bcebd48",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.7.5-x86_64.apk",
-    size: "37.6 MB",
-    bytes: "37,556,939 bytes",
+    href: "/downloads/safari-0.7.7-x86_64.apk",
+    size: "37.8 MB",
+    bytes: "37,819,231 bytes",
     sha256:
-      "e282f0efea61af0f02f995d91bfe5bb76ddd4201ea87f17c619d0aee83cc6e29",
+      "429bc90c86d4ffe24082b30813526fd178f6cc58014c1b9dc8471ac5736bf7d9",
   },
 ];
 

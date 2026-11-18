@@ -742,7 +742,7 @@ export default function LandingContent() {
               </a>
             </div>
             <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 18 }}>
-              {t.free} · {t.requires} · 0.7.5 (Beta)
+              {t.free} · {t.requires} · 0.7.7 (Beta)
             </p>
           </div>
 
@@ -953,6 +953,16 @@ export default function LandingContent() {
                 alt="Safari Stories"
                 caption={t.shotStories}
               />
+              <ShotFrame
+                src="/screenshots/calls.png"
+                alt="Safari calls"
+                caption={t.shotCalls}
+              />
+              <ShotFrame
+                src="/screenshots/communities.png"
+                alt="Safari communities"
+                caption={t.shotCommunities}
+              />
             </div>
           </Reveal>
         </section>
@@ -1141,8 +1151,8 @@ export default function LandingContent() {
             style={{ overflow: "hidden" }}
           >
             {[
-              [t.versionLabel, "0.7.5 (Beta)"],
-              [t.sizeLabel, "35.1 MB · 28.2 MB · 37.6 MB"],
+              [t.versionLabel, "0.7.7 (Beta)"],
+              [t.sizeLabel, "35.3 MB · 28.4 MB · 37.8 MB"],
               [t.updated, "Nov 16, 2026"],
               [t.requires, "Android 6.0+"],
               [t.offeredBy, "Safari Team"],
