@@ -8,9 +8,15 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
+    <!-- ChatGPT 0.7.6 review: auto-backup OFF. The app holds E2EE private
+         keys (Keystore), the session token and per-chat E2EE state in
+         private storage; Android's default (allowBackup=true) would copy
+         that into the system backup. Safari has its own backup in
+         Settings instead. -->
     <application
         android:label="Safari"
         android:name="${applicationName}"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
