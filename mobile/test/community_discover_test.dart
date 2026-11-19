@@ -81,4 +81,42 @@ void main() {
     final textButton = tester.widget<TextButton>(find.byType(TextButton));
     expect(textButton.onPressed, isNull);
   });
+
+  testWidgets('CommunityJoinRequests reviews requests and removes them',
+      (tester) async {
+    final requests = <http.Request>[];
+    final client = MockClient((request) async {
+      requests.add(request);
+      if (request.url.path.endsWith('/join-requests')) {
+        return http.Response(jsonEncode([
+          {'user_id': 'user-1', 'display_name': 'Requester One'},
+          {'user_id': 'user-2', 'display_name': 'Requester Two'},
+        ]), 200);
+      }
+      return http.Response(jsonEncode({'status': 'ok'}), 200);
+    });
+    final api = ApiClient(baseUrl: 'http://test', client: client);
+
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: CommunityJoinRequests(api: api, communityId: 'community-1'),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Requester One'), findsOneWidget);
+    expect(find.text('Requester Two'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Approve').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Requester One'), findsNothing);
+    expect(requests.last.method, 'POST');
+    expect(requests.last.url.path,
+        '/api/communities/community-1/join-requests/user-1/approve');
+
+    await tester.tap(find.byTooltip('Reject').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Requester Two'), findsNothing);
+    expect(requests.last.url.path,
+        '/api/communities/community-1/join-requests/user-2/reject');
+  });
 }

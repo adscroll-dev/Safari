@@ -219,6 +219,92 @@ func (h *Handler) JoinCommunity(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func communityJoinRequestUserID(r *http.Request) string {
+	rest := strings.TrimPrefix(r.URL.Path, "/api/communities/")
+	parts := strings.Split(rest, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+	return parts[2]
+}
+
+// ListJoinRequests lists pending requests for community owners and admins.
+func (h *Handler) ListJoinRequests(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	id := communityIDFromPath(r)
+	if h.Store.CommunityByID(id) == nil {
+		middleware.WriteError(w, http.StatusNotFound, "community not found")
+		return
+	}
+	if !h.communityAdminOrOwner(w, r, id) {
+		return
+	}
+	requests := h.Store.ListPendingJoinRequests(id)
+	if requests == nil {
+		requests = []*models.CommunityJoinRequest{}
+	}
+	middleware.WriteJSON(w, http.StatusOK, requests)
+}
+
+// ApproveJoinRequest approves a pending request and mirrors membership in
+// the announcement group. Approving a rejected request returns 409.
+func (h *Handler) ApproveJoinRequest(w http.ResponseWriter, r *http.Request) {
+	h.reviewJoinRequest(w, r, "approved")
+}
+
+// RejectJoinRequest rejects an existing join request.
+func (h *Handler) RejectJoinRequest(w http.ResponseWriter, r *http.Request) {
+	h.reviewJoinRequest(w, r, "rejected")
+}
+
+func (h *Handler) reviewJoinRequest(w http.ResponseWriter, r *http.Request, status string) {
+	if r.Method != http.MethodPost {
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	id := communityIDFromPath(r)
+	c := h.Store.CommunityByID(id)
+	if c == nil {
+		middleware.WriteError(w, http.StatusNotFound, "community not found")
+		return
+	}
+	if !h.communityAdminOrOwner(w, r, id) {
+		return
+	}
+	userID := communityJoinRequestUserID(r)
+	current := h.Store.JoinRequestStatus(id, userID)
+	if current == "" {
+		middleware.WriteError(w, http.StatusNotFound, "join request not found")
+		return
+	}
+	if current == "rejected" && status == "approved" {
+		middleware.WriteError(w, http.StatusConflict, "a rejected request must be submitted again")
+		return
+	}
+	if current == status {
+		middleware.WriteJSON(w, http.StatusOK, map[string]string{"status": status})
+		return
+	}
+	if err := h.Store.SetJoinRequestStatus(id, userID, status); err != nil {
+		middleware.WriteError(w, http.StatusNotFound, "join request not found")
+		return
+	}
+	if status == "approved" {
+		if err := h.Store.AddCommunityMember(id, userID, "member"); err != nil &&
+			err != store.ErrAlreadyExists {
+			middleware.WriteError(w, http.StatusInternalServerError, "could not approve join request")
+			return
+		}
+		if c.AnnouncementChatID != "" {
+			_ = h.Store.AddMember(c.AnnouncementChatID, userID, "member")
+		}
+	}
+	middleware.WriteJSON(w, http.StatusOK, map[string]string{"status": status})
+}
+
 // GetCommunity returns one community with its subgroups attached
 // (subgroups are full chats, so the client can open them).
 func (h *Handler) GetCommunity(w http.ResponseWriter, r *http.Request) {

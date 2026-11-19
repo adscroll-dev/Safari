@@ -566,6 +566,12 @@ func main() {
 		switch {
 		case path == "/api/communities/discover":
 			h.DiscoverCommunities(w, r)
+		case strings.HasSuffix(path, "/join-requests"):
+			h.ListJoinRequests(w, r)
+		case strings.Contains(path, "/join-requests/") && strings.HasSuffix(path, "/approve"):
+			h.ApproveJoinRequest(w, r)
+		case strings.Contains(path, "/join-requests/") && strings.HasSuffix(path, "/reject"):
+			h.RejectJoinRequest(w, r)
 		case strings.HasSuffix(path, "/join"):
 			h.JoinCommunity(w, r)
 		case strings.HasSuffix(path, "/leave"):

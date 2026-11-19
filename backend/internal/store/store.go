@@ -147,6 +147,8 @@ type StoreIface interface {
 	ListDiscoverCommunities(userID string, limit, offset int) []*models.Community
 	CreateJoinRequest(communityID, userID string) error
 	JoinRequestStatus(communityID, userID string) string
+	ListPendingJoinRequests(communityID string) []*models.CommunityJoinRequest
+	SetJoinRequestStatus(communityID, userID, status string) error
 	RemoveCommunityMember(communityID, userID string) error
 	SetCommunityMemberRole(communityID, userID, role string) error
 	AddSubgroup(communityID, chatID string) error
@@ -304,7 +306,7 @@ type MemoryStore struct {
 	communities           map[string]*models.Community
 	communityMembers      map[string]map[string]*models.CommunityMember
 	communitySubgroups    map[string]map[string]bool
-	communityJoinRequests map[string]map[string]string
+	communityJoinRequests map[string]map[string]communityJoinRequest
 	// Stage 11: Settings parity — read receipts (user id -> enabled,
 	// default true when absent) and profile-photo / about / groups
 	// privacy (user id -> "everyone" | "nobody", default "everyone").
@@ -316,6 +318,11 @@ type MemoryStore struct {
 
 type storyReaction struct {
 	emoji     string
+	createdAt time.Time
+}
+
+type communityJoinRequest struct {
+	status    string
 	createdAt time.Time
 }
 
@@ -367,7 +374,7 @@ func NewMemoryStore() *MemoryStore {
 		communities:           map[string]*models.Community{},
 		communityMembers:      map[string]map[string]*models.CommunityMember{},
 		communitySubgroups:    map[string]map[string]bool{},
-		communityJoinRequests: map[string]map[string]string{},
+		communityJoinRequests: map[string]map[string]communityJoinRequest{},
 		readReceipts:          map[string]bool{},
 		avatarPrivacy:         map[string]string{},
 		aboutPrivacy:          map[string]string{},

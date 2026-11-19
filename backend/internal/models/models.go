@@ -423,6 +423,13 @@ type CommunityMember struct {
 	JoinedAt time.Time `json:"joined_at"`
 }
 
+// CommunityJoinRequest is a pending request to join a community.
+type CommunityJoinRequest struct {
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // CallRecord is one finished (or missed) call, written by the caller
 // when the call ends (Stage 3). Group calls have CalleeID == "" —
 // the chat is then the group.

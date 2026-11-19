@@ -267,6 +267,16 @@ class ApiClient {
       _getList('/api/communities/discover?limit=$limit&offset=$offset');
   Future<Map<String, dynamic>> joinCommunity(String id) =>
       _req('POST', '/api/communities/$id/join');
+  Future<List<dynamic>> listJoinRequests(String id) =>
+      _getList('/api/communities/$id/join-requests');
+  Future<void> approveJoinRequest(String communityId, String userId) async {
+    await _req(
+        'POST', '/api/communities/$communityId/join-requests/$userId/approve');
+  }
+  Future<void> rejectJoinRequest(String communityId, String userId) async {
+    await _req(
+        'POST', '/api/communities/$communityId/join-requests/$userId/reject');
+  }
   Future<Map<String, dynamic>> createCommunity(String name,
           {String description = ''}) =>
       _req('POST', '/api/communities',

@@ -115,6 +115,116 @@ class DiscoverCommunityCard extends StatelessWidget {
   }
 }
 
+class CommunityJoinRequests extends StatefulWidget {
+  const CommunityJoinRequests({
+    super.key,
+    required this.api,
+    required this.communityId,
+    this.onChanged,
+  });
+
+  final ApiClient api;
+  final String communityId;
+  final VoidCallback? onChanged;
+
+  @override
+  State<CommunityJoinRequests> createState() => _CommunityJoinRequestsState();
+}
+
+class _CommunityJoinRequestsState extends State<CommunityJoinRequests> {
+  List<dynamic> _requests = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final requests = await widget.api.listJoinRequests(widget.communityId);
+      if (mounted) {
+        setState(() {
+          _requests = requests;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _review(Map<String, dynamic> request, bool approve) async {
+    final userId = request['user_id'] as String?;
+    if (userId == null) return;
+    try {
+      if (approve) {
+        await widget.api.approveJoinRequest(widget.communityId, userId);
+      } else {
+        await widget.api.rejectJoinRequest(widget.communityId, userId);
+      }
+      if (!mounted) return;
+      setState(() {
+        _requests.removeWhere((item) => item['user_id'] == userId);
+      });
+      widget.onChanged?.call();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_error != null) {
+      return Text(_error!, style: const TextStyle(color: Colors.red));
+    }
+    if (_requests.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Pending requests',
+            style: Theme.of(context).textTheme.titleMedium),
+        for (final item in _requests)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(item['display_name'] as String? ?? 'Unknown user'),
+            subtitle: const Text('Wants to join this community'),
+            trailing: Wrap(
+              spacing: 4,
+              children: [
+                IconButton(
+                  tooltip: 'Approve',
+                  icon: const Icon(Icons.check, color: Colors.green),
+                  onPressed: () =>
+                      _review(item as Map<String, dynamic>, true),
+                ),
+                IconButton(
+                  tooltip: 'Reject',
+                  icon: const Icon(Icons.close, color: Colors.red),
+                  onPressed: () =>
+                      _review(item as Map<String, dynamic>, false),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Register FCM's background handler before the app starts. Failures
@@ -5872,6 +5982,15 @@ class _HomePageState extends State<HomePage>
                 '${c['member_count'] ?? 0} members · ${subgroups.length} groups',
                 style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
+            if (myRole == 'owner')
+              CommunityJoinRequests(
+                api: _api,
+                communityId: id,
+                onChanged: () async {
+                  await _refreshCommunities();
+                  await _refreshChats();
+                },
+              ),
             if (announcement != null)
               ListTile(
                 contentPadding: EdgeInsets.zero,

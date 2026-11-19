@@ -124,3 +124,84 @@ func TestCommunityDiscoveryAndJoin(t *testing.T) {
 		t.Fatalf("nonexistent join: %d", rec.Code)
 	}
 }
+
+func TestCommunityJoinRequestReview(t *testing.T) {
+	h := newTestHandler()
+	ownerToken, _ := register(t, h, "review-owner@example.com", "reviewowner")
+	requesterToken, requesterID := register(t, h, "review-requester@example.com", "reviewrequester")
+	otherToken, otherID := register(t, h, "review-other@example.com", "reviewother")
+	community := createCommunityForDiscover(t, h, ownerToken, "Review Community", "public", "approval")
+
+	if rec := doJSON(t, h, http.MethodGet,
+		"/api/communities/"+community.ID+"/join-requests", nil, requesterToken); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner list: %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodGet,
+		"/api/communities/00000000-0000-0000-0000-000000000000/join-requests", nil, ownerToken); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown community list: %d", rec.Code)
+	}
+	if rec := doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join", nil, requesterToken); rec.Code != http.StatusOK {
+		t.Fatalf("request join: %d", rec.Code)
+	}
+	rec := doJSON(t, h, http.MethodGet,
+		"/api/communities/"+community.ID+"/join-requests", nil, ownerToken)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("list requests: %d %s", rec.Code, rec.Body.String())
+	}
+	var requests []models.CommunityJoinRequest
+	mustDecode(t, rec, &requests)
+	if len(requests) != 1 || requests[0].UserID != requesterID ||
+		requests[0].DisplayName != "reviewrequester" || requests[0].CreatedAt.IsZero() {
+		t.Fatalf("unexpected requests: %+v", requests)
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+requesterID+"/approve",
+		nil, requesterToken); rec.Code != http.StatusForbidden {
+		t.Fatalf("non-owner approve: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+requesterID+"/approve",
+		nil, ownerToken); rec.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", rec.Code, rec.Body.String())
+	}
+	if h.Store.CommunityRole(community.ID, requesterID) != "member" ||
+		!h.Store.IsMember(community.AnnouncementChatID, requesterID) {
+		t.Fatal("approval did not mirror membership")
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+requesterID+"/approve",
+		nil, ownerToken); rec.Code != http.StatusOK {
+		t.Fatalf("idempotent approve: %d", rec.Code)
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+otherID+"/approve",
+		nil, ownerToken); rec.Code != http.StatusNotFound {
+		t.Fatalf("unknown request approve: %d", rec.Code)
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join", nil, otherToken); rec.Code != http.StatusOK {
+		t.Fatalf("second request join: %d", rec.Code)
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+otherID+"/reject",
+		nil, ownerToken); rec.Code != http.StatusOK {
+		t.Fatalf("reject: %d", rec.Code)
+	}
+	// Rejected requests require a fresh request before approval.
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join-requests/"+otherID+"/approve",
+		nil, ownerToken); rec.Code != http.StatusConflict {
+		t.Fatalf("approve rejected request: %d", rec.Code)
+	}
+	if rec = doJSON(t, h, http.MethodPost,
+		"/api/communities/"+community.ID+"/join", nil, otherToken); rec.Code != http.StatusOK {
+		t.Fatalf("re-request after reject: %d", rec.Code)
+	}
+	rec = doJSON(t, h, http.MethodGet,
+		"/api/communities/"+community.ID+"/join-requests", nil, ownerToken)
+	mustDecode(t, rec, &requests)
+	if len(requests) != 1 || requests[0].UserID != otherID {
+		t.Fatalf("re-request not pending: %+v", requests)
+	}
+}

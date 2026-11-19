@@ -180,13 +180,15 @@ func (s *MemoryStore) CreateJoinRequest(communityID, userID string) error {
 		return ErrNotFound
 	}
 	if s.communityJoinRequests[communityID] == nil {
-		s.communityJoinRequests[communityID] = map[string]string{}
+		s.communityJoinRequests[communityID] = map[string]communityJoinRequest{}
 	}
-	status := s.communityJoinRequests[communityID][userID]
-	if status == "pending" {
+	request := s.communityJoinRequests[communityID][userID]
+	if request.status == "pending" {
 		return nil
 	}
-	s.communityJoinRequests[communityID][userID] = "pending"
+	s.communityJoinRequests[communityID][userID] = communityJoinRequest{
+		status: "pending", createdAt: time.Now().UTC(),
+	}
 	return nil
 }
 
@@ -196,7 +198,41 @@ func (s *MemoryStore) JoinRequestStatus(communityID, userID string) string {
 	if s.communityJoinRequests[communityID] == nil {
 		return ""
 	}
-	return s.communityJoinRequests[communityID][userID]
+	return s.communityJoinRequests[communityID][userID].status
+}
+
+func (s *MemoryStore) ListPendingJoinRequests(communityID string) []*models.CommunityJoinRequest {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []*models.CommunityJoinRequest{}
+	for userID, request := range s.communityJoinRequests[communityID] {
+		if request.status != "pending" {
+			continue
+		}
+		user, ok := s.users[userID]
+		if !ok {
+			continue
+		}
+		out = append(out, &models.CommunityJoinRequest{
+			UserID: userID, DisplayName: user.DisplayName, CreatedAt: request.createdAt,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out
+}
+
+func (s *MemoryStore) SetJoinRequestStatus(communityID, userID, status string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	request, ok := s.communityJoinRequests[communityID][userID]
+	if !ok {
+		return ErrNotFound
+	}
+	request.status = status
+	s.communityJoinRequests[communityID][userID] = request
+	return nil
 }
 
 func (s *MemoryStore) RemoveCommunityMember(communityID, userID string) error {

@@ -306,6 +306,52 @@ func (s *PostgresStore) JoinRequestStatus(communityID, userID string) string {
 	return status
 }
 
+func (s *PostgresStore) ListPendingJoinRequests(communityID string) []*models.CommunityJoinRequest {
+	if !isUUID(communityID) {
+		return []*models.CommunityJoinRequest{}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.pool.Query(ctx,
+		`SELECT user_id::text, created_at FROM community_join_requests
+		 WHERE community_id = $1 AND status = 'pending'
+		 ORDER BY created_at ASC`, communityID)
+	if err != nil {
+		return []*models.CommunityJoinRequest{}
+	}
+	defer rows.Close()
+	out := []*models.CommunityJoinRequest{}
+	for rows.Next() {
+		var request models.CommunityJoinRequest
+		if err := rows.Scan(&request.UserID, &request.CreatedAt); err != nil {
+			continue
+		}
+		if user, err := s.UserByID(request.UserID); err == nil {
+			request.DisplayName = user.DisplayName
+		}
+		out = append(out, &request)
+	}
+	return out
+}
+
+func (s *PostgresStore) SetJoinRequestStatus(communityID, userID, status string) error {
+	if !isUUID(communityID) || !isUUID(userID) {
+		return ErrNotFound
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd, err := s.pool.Exec(ctx,
+		`UPDATE community_join_requests SET status = $3
+		 WHERE community_id = $1 AND user_id = $2`, communityID, userID, status)
+	if err != nil {
+		return mapStoreErr(err)
+	}
+	if cmd.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (s *PostgresStore) RemoveCommunityMember(communityID, userID string) error {
 	if !isUUID(communityID) || !isUUID(userID) {
 		return ErrNotFound
