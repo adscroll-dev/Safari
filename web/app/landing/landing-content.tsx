@@ -10,9 +10,11 @@ function isLangCode(value: string): value is LangCode {
   return languages.some((l) => l.code === value);
 }
 
-// Reveal-on-scroll: fades + lifts a block in when it enters the
-// viewport. Pure IntersectionObserver, no libraries. Reduced-motion
-// users see the content immediately (CSS forces .safari-reveal visible).
+// Reveal-on-scroll: lifts a block in when it enters the viewport.
+// TRANSFORM-ONLY — content is never hidden with opacity: 0, so a
+// section can never get stuck invisible if the observer fails.
+// Pure IntersectionObserver, no libraries. Reduced-motion users see
+// the content immediately (CSS forces .safari-reveal visible).
 function Reveal({
   children,
   style,
@@ -656,7 +658,7 @@ export default function LandingContent() {
             </select>
             <a
               href="#download"
-              className="safari-btn-primary"
+              className="safari-btn-primary safari-nav-download"
               style={{ padding: "9px 18px", fontSize: 14 }}
             >
               {t.navDownload}
@@ -736,7 +738,7 @@ export default function LandingContent() {
               <a
                 href="#features"
                 className="safari-btn-ghost"
-                style={{ padding: "16px 28px", fontSize: 16 }}
+                style={{ padding: "12px 20px", fontSize: 14 }}
               >
                 {t.exploreCta}
               </a>

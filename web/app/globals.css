@@ -228,13 +228,13 @@ section[id] { scroll-margin-top: 88px; }
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-/* Scroll reveal — content is VISIBLE by default. Only when JS is
-   confirmed running (html.safari-js, added by the inline script in
-   layout.tsx before first paint) do sections start hidden and fade
-   in via .safari-in. Without JS, or if the reveal script ever fails,
-   nothing is ever invisible. */
+/* Scroll reveal — TRANSFORM-ONLY. Content is always fully visible
+   (opacity: 1); the reveal only lifts a block up 18px as it enters
+   the viewport. Nothing is ever hidden, even if JavaScript or the
+   IntersectionObserver fails — a tall section below the fold can
+   never get stuck invisible. */
 .safari-reveal { opacity: 1; transform: none; }
-html.safari-js .safari-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
+html.safari-js .safari-reveal { opacity: 1; transform: translateY(18px); transition: transform 0.7s ease; }
 html.safari-js .safari-reveal.safari-in { opacity: 1; transform: none; }
 
 /* Floating motion */
@@ -262,6 +262,13 @@ html.safari-js .safari-reveal.safari-in { opacity: 1; transform: none; }
 /* Hide the nav language label on small phones (the select stays) */
 @media (max-width: 640px) {
   .safari-nav-label { display: none; }
+}
+
+/* On very narrow phones (<=360px) hide the header Download button —
+   the hero's big Download button is right below it, so nothing is
+   lost, and the header no longer overflows. */
+@media (max-width: 360px) {
+  .safari-nav-download { display: none; }
 }
 
 /* Hero layout order: text (badge, headline, download button) FIRST
