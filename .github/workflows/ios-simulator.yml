@@ -1,0 +1,27 @@
+name: iOS Simulator Build
+
+on:
+  push:
+    branches:
+      - copilot/ios-build
+  workflow_dispatch:
+
+jobs:
+  ios-simulator:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+      - name: Get packages
+        run: cd mobile && flutter pub get
+      - name: Analyze
+        run: cd mobile && flutter analyze
+      - name: Build iOS simulator app
+        run: cd mobile && flutter build ios --simulator --no-codesign
+      - name: Upload simulator app
+        uses: actions/upload-artifact@v4
+        with:
+          name: vyro-ios-simulator
+          path: mobile/build/ios/iphonesimulator/Runner.app

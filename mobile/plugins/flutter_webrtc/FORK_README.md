@@ -1,12 +1,13 @@
-# flutter_webrtc — VYRO fork (Android only)
+# flutter_webrtc — VYRO fork
 
 Upstream: `flutter_webrtc` 0.12.12+hotfix.1
 (https://github.com/cloudwebrtc/flutter-webrtc), copied from the pub
-cache. Only the Android native code (`android/`), the Dart API
-(`lib/`), and `assets/` are vendored; the iOS/macOS/Windows/Linux
-native code and the 97 MB `third_party/` prebuilt binaries were left
-out because VYRO's mobile build target right now is the Android APK
-(iOS needs a Mac with Xcode anyway).
+cache. The Android native code (`android/`), Dart API (`lib/`), and
+`assets/` are vendored. The stock iOS native code was restored from
+`flutter_webrtc` 0.12.12+hotfix.1, including its
+`flutter_webrtc.podspec`, so the fork can also build for iOS.
+macOS/Windows/Linux native code and the 97 MB `third_party/` prebuilt
+binaries remain outside the fork.
 
 ## Why a fork exists
 
