@@ -42,6 +42,21 @@ final List<_Rule> _rules = [
     "پیام صوتی: دکمه 🎤 کنار کادر پیام را بزنید، به میکروفون اجازه دهید، دوباره بزنید تا ضبط متوقف شود، بعد ارسال کنید. پیام صوتی از طریق آپلود معمولی ارسال می‌شود — توجه: حتی در گفت‌وگوی رمزگذاری‌شده هم سرتاسری رمزگذاری نمی‌شود.",
   ),
   _Rule(
+    RegExp(r'group|گروه', caseSensitive: false),
+    "To create a group, open the New chat menu and choose “New group / channel”; Safari opens the group creation flow.",
+    "برای ساخت گروه، منوی گفت‌وگوی جدید را باز کنید و «ایجاد گروه یا کانال» را بزنید تا روند ساخت گروه باز شود.",
+  ),
+  _Rule(
+    RegExp(r'invite|دعوت|لینک\s*دعوت', caseSensitive: false),
+    "To join with an invite, open the New chat menu, choose “Join via invite link”, then paste the invite link or code.",
+    "برای پیوستن با دعوت، منوی گفت‌وگوی جدید را باز کنید، «پیوستن با لینک دعوت» را بزنید و لینک یا کد دعوت را وارد کنید.",
+  ),
+  _Rule(
+    RegExp(r'video|تصویری|ویدیویی', caseSensitive: false),
+    "To make a video call, open a direct message and tap the video-call button in the header.",
+    "برای تماس تصویری، یک گفت‌وگوی دونفره را باز کنید و دکمه تماس تصویری را در سربرگ بزنید.",
+  ),
+  _Rule(
     RegExp(r'help|راهنما|کمک|چه کار|چی کار|چطور|چگونه|how (do|can|to)',
         caseSensitive: false),
     "I can help with Safari: send text, photos, files, voice messages (🎤 button), stories, voice calls, disappearing messages, scheduled messages, search, and end-to-end encrypted DMs (🔒 button). What would you like to do?",

@@ -24,6 +24,30 @@ void main() {
     expect(other.text, contains('only know how Safari works'));
   });
 
+  test('Assistant gives specific group, invite and video-call guidance', () {
+    final groupEn = assistantReply('How do I create a group?');
+    expect(groupEn.text, contains('New group / channel'));
+    final groupFa = assistantReply('چطور گروه بسازم؟');
+    expect(groupFa.text, contains('ایجاد گروه یا کانال'));
+
+    final inviteEn =
+        assistantReply('How do I invite someone with an invite link?');
+    expect(inviteEn.text, contains('Join via invite link'));
+    expect(inviteEn.text, contains('paste the invite link or code'));
+    final inviteFa = assistantReply('چطور کسی را با لینک دعوت کنم؟');
+    expect(inviteFa.text, contains('پیوستن با لینک دعوت'));
+    expect(inviteFa.text, contains('لینک یا کد دعوت'));
+
+    final videoEn = assistantReply('How do I make a video call?');
+    expect(videoEn.text, contains('open a direct message'));
+    expect(videoEn.text, contains('video-call button'));
+    final videoFa = assistantReply('چطور تماس تصویری برقرار کنم؟');
+    expect(videoFa.text, contains('گفت‌وگوی دونفره'));
+    expect(videoFa.text, contains('دکمه تماس تصویری'));
+
+    expect(assistantReply('چطور؟').text, contains('می‌توانم در استفاده'));
+  });
+
   test('Dictionary translation EN->FA with coverage', () {
     final tr = translateLocal('hello friend, how are you', AiLang.fa);
     expect(tr.text, contains('سلام'));

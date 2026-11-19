@@ -205,6 +205,37 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+class AssistantStarterSuggestions extends StatelessWidget {
+  const AssistantStarterSuggestions({
+    super.key,
+    required this.controller,
+    required this.onSend,
+    required this.prompts,
+  });
+
+  final TextEditingController controller;
+  final Future<void> Function() onSend;
+  final List<String> prompts;
+
+  @override
+  Widget build(BuildContext context) => Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: prompts
+            .map(
+              (prompt) => ActionChip(
+                label: Text(prompt),
+                onPressed: () {
+                  controller.text = prompt;
+                  unawaited(onSend());
+                },
+              ),
+            )
+            .toList(),
+      );
+}
+
 class _HomePageState extends State<HomePage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late final Future<void> _prefsInitialization;
@@ -3387,6 +3418,17 @@ class _HomePageState extends State<HomePage>
                               fontSize: 12,
                             ),
                           ),
+                          const SizedBox(height: 16),
+                          AssistantStarterSuggestions(
+                            controller: _assistantInputCtrl,
+                            onSend: _sendAssistantMessage,
+                            prompts: [
+                              _orbitText('How do I create a group?'),
+                              _orbitText(
+                                  'How do I invite someone with an invite link?'),
+                              _orbitText('How do I make a video call?'),
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -4410,6 +4452,21 @@ class _HomePageState extends State<HomePage>
       ],
       'Settings': ['Settings', 'تنظیمات', 'الإعدادات'],
       'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
+      'How do I create a group?': [
+        'How do I create a group?',
+        'چطور گروه بسازم؟',
+        'كيف أنشئ مجموعة؟'
+      ],
+      'How do I invite someone with an invite link?': [
+        'How do I invite someone with an invite link?',
+        'چطور کسی را با لینک دعوت کنم؟',
+        'كيف أدعو شخصًا برابط دعوة؟'
+      ],
+      'How do I make a video call?': [
+        'How do I make a video call?',
+        'چطور تماس تصویری برقرار کنم؟',
+        'كيف أجري مكالمة فيديو؟'
+      ],
       'Dark mode': ['Dark mode', 'حالت تاریک', 'الوضع الداكن'],
       'Language': ['Language', 'زبان', 'اللغة'],
       'Camera': ['Camera', 'دوربین', 'الكاميرا'],
@@ -4441,11 +4498,12 @@ class _HomePageState extends State<HomePage>
       );
     }
     final actions = <Widget>[
-      IconButton(
-        icon: const Icon(Icons.search),
-        tooltip: _orbitText('Search'),
-        onPressed: _tabIndex == 0 ? _toggleChatSearch : _showSearchSheet,
-      ),
+      if (!(_tabIndex == 0 && _chatSearchOpen))
+        IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: _orbitText('Search'),
+          onPressed: _tabIndex == 0 ? _toggleChatSearch : _showSearchSheet,
+        ),
       if (_tabIndex == 0) ...[
         IconButton(
           icon: const Icon(Icons.smart_toy_outlined),
@@ -8216,7 +8274,7 @@ class _HomePageState extends State<HomePage>
         header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Safari 0.7.9 (mobile)'),
+          title: Text('Safari 0.7.10 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
@@ -8572,11 +8630,32 @@ class _HomePageState extends State<HomePage>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, bottom: 8),
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: OrbitalColors.mutedBlue,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
                   ListTile(
                     dense: true,
                     minVerticalPadding: 8,
-                    leading: const Icon(Icons.person_add_outlined),
-                    title: Text(_orbitText('New direct message')),
+                    leading: const Icon(
+                      Icons.person_add_outlined,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('New direct message'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     onTap: () async {
                       Navigator.pop(sheetContext);
                       final users = await _api.listUsers();
@@ -8661,8 +8740,18 @@ class _HomePageState extends State<HomePage>
                   ListTile(
                     dense: true,
                     minVerticalPadding: 8,
-                    leading: const Icon(Icons.group_add_outlined),
-                    title: Text(_orbitText('New group / channel')),
+                    leading: const Icon(
+                      Icons.group_add_outlined,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('New group / channel'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _createGroupOrChannel();
@@ -8671,8 +8760,18 @@ class _HomePageState extends State<HomePage>
                   ListTile(
                     dense: true,
                     minVerticalPadding: 8,
-                    leading: const Icon(Icons.link),
-                    title: Text(_orbitText('Join via invite link')),
+                    leading: const Icon(
+                      Icons.link,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('Join via invite link'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     onTap: () {
                       Navigator.pop(sheetContext);
                       _joinViaInvite();
