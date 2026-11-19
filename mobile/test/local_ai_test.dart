@@ -28,22 +28,23 @@ void main() {
     final groupEn = assistantReply('How do I create a group?');
     expect(groupEn.text, contains('New group / channel'));
     final groupFa = assistantReply('چطور گروه بسازم؟');
-    expect(groupFa.text, contains('ایجاد گروه یا کانال'));
+    expect(groupFa.text,
+        'برای ساخت گروه، منوی گفت‌وگوی جدید را باز کنید و «ایجاد گروه یا کانال» را بزنید تا روند ساخت گروه باز شود.');
 
     final inviteEn =
         assistantReply('How do I invite someone with an invite link?');
     expect(inviteEn.text, contains('Join via invite link'));
     expect(inviteEn.text, contains('paste the invite link or code'));
     final inviteFa = assistantReply('چطور کسی را با لینک دعوت کنم؟');
-    expect(inviteFa.text, contains('پیوستن با لینک دعوت'));
-    expect(inviteFa.text, contains('لینک یا کد دعوت'));
+    expect(inviteFa.text,
+        'برای پیوستن با دعوت، منوی گفت‌وگوی جدید را باز کنید، «پیوستن با لینک دعوت» را بزنید و لینک یا کد دعوت را وارد کنید.');
 
     final videoEn = assistantReply('How do I make a video call?');
     expect(videoEn.text, contains('open a direct message'));
     expect(videoEn.text, contains('video-call button'));
     final videoFa = assistantReply('چطور تماس تصویری برقرار کنم؟');
-    expect(videoFa.text, contains('گفت‌وگوی دونفره'));
-    expect(videoFa.text, contains('دکمه تماس تصویری'));
+    expect(videoFa.text,
+        'برای تماس تصویری، یک گفت‌وگوی دونفره را باز کنید و دکمه تماس تصویری را در سربرگ بزنید.');
 
     expect(assistantReply('چطور؟').text, contains('می‌توانم در استفاده'));
   });

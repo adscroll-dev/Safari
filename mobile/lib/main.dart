@@ -205,6 +205,107 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+const _assistantTranslations = <String, List<String>>{
+  'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
+  'Ask me about using Safari': [
+    'Ask me about using Safari',
+    'دربارهٔ استفاده از سافاری از من بپرسید',
+    'اسألني عن كيفية استخدام سفاري'
+  ],
+  'Runs on this device — rule-based, not cloud AI.': [
+    'Runs on this device — rule-based, not cloud AI.',
+    'روی دستگاه شما و بر پایهٔ قوانین اجرا می‌شود، نه هوش مصنوعی ابری.',
+    'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
+  ],
+  'How do I create a group?': [
+    'How do I create a group?',
+    'چطور گروه بسازم؟',
+    'كيف أنشئ مجموعة؟'
+  ],
+  'How do I invite someone with an invite link?': [
+    'How do I invite someone with an invite link?',
+    'چطور کسی را با لینک دعوت کنم؟',
+    'كيف أدعو شخصًا برابط دعوة؟'
+  ],
+  'How do I make a video call?': [
+    'How do I make a video call?',
+    'چطور تماس تصویری برقرار کنم؟',
+    'كيف أجري مكالمة فيديو؟'
+  ],
+};
+
+String assistantLocalizedText(BuildContext context, String key) {
+  final language = Localizations.localeOf(context).languageCode;
+  final index = switch (language) {
+    'fa' => 1,
+    'ar' => 2,
+    _ => 0,
+  };
+  return _assistantTranslations[key]?[index] ?? key;
+}
+
+class AssistantWelcomeContent extends StatelessWidget {
+  const AssistantWelcomeContent({
+    super.key,
+    required this.controller,
+    required this.onSend,
+    required this.avatar,
+  });
+
+  final TextEditingController controller;
+  final Future<void> Function() onSend;
+  final Widget avatar;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            const SizedBox(height: 16),
+            Text(
+              assistantLocalizedText(context, 'Ask me about using Safari'),
+              textAlign: TextAlign.center,
+              style: OrbitalTypography.secondary.copyWith(
+                color: dark
+                    ? OrbitalColors.moonlight
+                    : WaColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              assistantLocalizedText(
+                  context, 'Runs on this device — rule-based, not cloud AI.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: dark
+                    ? OrbitalColors.mutedBlue
+                    : WaColors.lightTextSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            AssistantStarterSuggestions(
+              controller: controller,
+              onSend: onSend,
+              prompts: [
+                assistantLocalizedText(context, 'How do I create a group?'),
+                assistantLocalizedText(
+                    context, 'How do I invite someone with an invite link?'),
+                assistantLocalizedText(context, 'How do I make a video call?'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class AssistantStarterSuggestions extends StatelessWidget {
   const AssistantStarterSuggestions({
     super.key,
@@ -218,21 +319,104 @@ class AssistantStarterSuggestions extends StatelessWidget {
   final List<String> prompts;
 
   @override
-  Widget build(BuildContext context) => Wrap(
-        alignment: WrapAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
-        children: prompts
-            .map(
-              (prompt) => ActionChip(
-                label: Text(prompt),
-                onPressed: () {
-                  controller.text = prompt;
-                  unawaited(onSend());
-                },
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final chipBackground = Color.alphaBlend(
+      OrbitalColors.electricCyan.withOpacity(dark ? 0.18 : 0.14),
+      dark ? OrbitalColors.nebulaNavy : Colors.white,
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: prompts
+          .map(
+            (prompt) => ActionChip(
+              backgroundColor: chipBackground,
+              side: BorderSide(
+                color: OrbitalColors.electricCyan.withOpacity(0.56),
               ),
-            )
-            .toList(),
+              labelStyle: TextStyle(
+                color: dark
+                    ? OrbitalColors.stellarWhite
+                    : OrbitalColors.nebulaNavy,
+                fontWeight: FontWeight.w600,
+              ),
+              label: Text(prompt),
+              onPressed: () {
+                controller.text = prompt;
+                unawaited(onSend());
+              },
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class ChatSearchCapsule extends StatelessWidget {
+  const ChatSearchCapsule({
+    super.key,
+    required this.controller,
+    required this.focusNode,
+    required this.hintText,
+    required this.clearTooltip,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hintText;
+  final String clearTooltip;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: OrbitalColors.nebulaNavy.withOpacity(0.94),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: OrbitalColors.electricCyan.withOpacity(0.16),
+          ),
+        ),
+        child: TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textInputAction: TextInputAction.search,
+          onChanged: onChanged,
+          style: OrbitalTypography.body.copyWith(
+            color: OrbitalColors.stellarWhite,
+          ),
+          cursorColor: OrbitalColors.electricCyan,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(
+              color: OrbitalColors.mutedBlue,
+              fontSize: 15,
+            ),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: OrbitalColors.mutedBlue,
+              size: 21,
+            ),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: clearTooltip,
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: onClear,
+                  ),
+            contentPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 14, 0),
+            filled: false,
+            fillColor: Colors.transparent,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
+        ),
       );
 }
 
@@ -3389,49 +3573,10 @@ class _HomePageState extends State<HomePage>
         children: [
           Expanded(
             child: _assistantMessages.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _assistantAvatar(size: 76),
-                          const SizedBox(height: 16),
-                          Text(
-                            _orbitText('Ask me about using Safari'),
-                            textAlign: TextAlign.center,
-                            style: OrbitalTypography.secondary.copyWith(
-                              color: dark
-                                  ? OrbitalColors.moonlight
-                                  : WaColors.lightTextSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _orbitText(
-                                'Runs on this device — rule-based, not cloud AI.'),
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: dark
-                                  ? OrbitalColors.mutedBlue
-                                  : WaColors.lightTextSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          AssistantStarterSuggestions(
-                            controller: _assistantInputCtrl,
-                            onSend: _sendAssistantMessage,
-                            prompts: [
-                              _orbitText('How do I create a group?'),
-                              _orbitText(
-                                  'How do I invite someone with an invite link?'),
-                              _orbitText('How do I make a video call?'),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                ? AssistantWelcomeContent(
+                    controller: _assistantInputCtrl,
+                    onSend: _sendAssistantMessage,
+                    avatar: _assistantAvatar(size: 76),
                   )
                 : ListView.builder(
                     controller: _assistantScrollController,
@@ -3482,6 +3627,19 @@ class _HomePageState extends State<HomePage>
                     },
                   ),
           ),
+          if (_assistantMessages.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: AssistantStarterSuggestions(
+                controller: _assistantInputCtrl,
+                onSend: _sendAssistantMessage,
+                prompts: [
+                  _orbitText('How do I create a group?'),
+                  _orbitText('How do I invite someone with an invite link?'),
+                  _orbitText('How do I make a video call?'),
+                ],
+              ),
+            ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -4314,6 +4472,9 @@ class _HomePageState extends State<HomePage>
   }
 
   String _orbitText(String key) {
+    if (_assistantTranslations.containsKey(key)) {
+      return assistantLocalizedText(context, key);
+    }
     const text = <String, List<String>>{
       'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
       'Updates': ['Updates', 'به‌روزرسانی‌ها', 'التحديثات'],
@@ -4365,16 +4526,6 @@ class _HomePageState extends State<HomePage>
         'Ask how to use Safari…',
         'دربارهٔ استفاده از سافاری بپرسید…',
         'اسأل عن كيفية استخدام سفاري…'
-      ],
-      'Ask me about using Safari': [
-        'Ask me about using Safari',
-        'دربارهٔ استفاده از سافاری از من بپرسید',
-        'اسألني عن كيفية استخدام سفاري'
-      ],
-      'Runs on this device — rule-based, not cloud AI.': [
-        'Runs on this device — rule-based, not cloud AI.',
-        'روی دستگاه شما و بر پایهٔ قوانین اجرا می‌شود، نه هوش مصنوعی ابری.',
-        'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
       ],
       'Back': ['Back', 'بازگشت', 'رجوع'],
       'Close search': ['Close search', 'بستن جست‌وجو', 'إغلاق البحث'],
@@ -4451,22 +4602,6 @@ class _HomePageState extends State<HomePage>
         'أنت غير متصل. تُعرض المحادثات المحفوظة وستُرسل الرسائل عند إعادة الاتصال.'
       ],
       'Settings': ['Settings', 'تنظیمات', 'الإعدادات'],
-      'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
-      'How do I create a group?': [
-        'How do I create a group?',
-        'چطور گروه بسازم؟',
-        'كيف أنشئ مجموعة؟'
-      ],
-      'How do I invite someone with an invite link?': [
-        'How do I invite someone with an invite link?',
-        'چطور کسی را با لینک دعوت کنم؟',
-        'كيف أدعو شخصًا برابط دعوة؟'
-      ],
-      'How do I make a video call?': [
-        'How do I make a video call?',
-        'چطور تماس تصویری برقرار کنم؟',
-        'كيف أجري مكالمة فيديو؟'
-      ],
       'Dark mode': ['Dark mode', 'حالت تاریک', 'الوضع الداكن'],
       'Language': ['Language', 'زبان', 'اللغة'],
       'Camera': ['Camera', 'دوربین', 'الكاميرا'],
@@ -5149,51 +5284,16 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _chatSearchCapsule() {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: OrbitalColors.nebulaNavy.withOpacity(0.94),
-        // A true pill: radius well past half the height, with a faint
-        // cyan outline so the capsule reads as one rounded unit.
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: OrbitalColors.electricCyan.withOpacity(0.16)),
-      ),
-      child: TextField(
-        controller: _chatListSearchCtrl,
-        focusNode: _chatListSearchFocus,
-        textInputAction: TextInputAction.search,
-        onChanged: (_) => setState(() {}),
-        style: OrbitalTypography.body.copyWith(
-          color: OrbitalColors.stellarWhite,
-        ),
-        cursorColor: OrbitalColors.electricCyan,
-        decoration: InputDecoration(
-          hintText: _orbitText('Search chats'),
-          hintStyle: const TextStyle(
-            color: OrbitalColors.mutedBlue,
-            fontSize: 15,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            color: OrbitalColors.mutedBlue,
-            size: 21,
-          ),
-          suffixIcon: _chatListSearchCtrl.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: _orbitText('Clear search'),
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () {
-                    _chatListSearchCtrl.clear();
-                    setState(() {});
-                  },
-                ),
-          contentPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 14, 0),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-        ),
-      ),
+    return ChatSearchCapsule(
+      controller: _chatListSearchCtrl,
+      focusNode: _chatListSearchFocus,
+      hintText: _orbitText('Search chats'),
+      clearTooltip: _orbitText('Clear search'),
+      onChanged: (_) => setState(() {}),
+      onClear: () {
+        _chatListSearchCtrl.clear();
+        setState(() {});
+      },
     );
   }
 
@@ -8274,7 +8374,7 @@ class _HomePageState extends State<HomePage>
         header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Safari 0.7.10 (mobile)'),
+          title: Text('Safari 0.7.11 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
