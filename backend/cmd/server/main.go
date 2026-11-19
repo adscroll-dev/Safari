@@ -542,6 +542,7 @@ func main() {
 			middleware.WriteError(w, http.StatusNotFound, "not found")
 		}
 	})))
+	mux.Handle("/api/calls/start", authMW(http.HandlerFunc(h.StartCallCheck)))
 	mux.Handle("/api/calls", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:

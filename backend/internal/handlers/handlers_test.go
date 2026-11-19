@@ -289,6 +289,8 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.ListCallRecords(w, r)
 				}
+			case path == "/api/calls/start":
+				h.StartCallCheck(w, r)
 			case path == "/api/bots":
 				if method == http.MethodPost {
 					h.CreateBot(w, r)

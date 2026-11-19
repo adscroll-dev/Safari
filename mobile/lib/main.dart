@@ -92,13 +92,9 @@ class DiscoverCommunityCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             if (state == 'pending')
-              const TextButton(
-                  onPressed: null,
-                  child: Text('Request sent'))
+              const TextButton(onPressed: null, child: Text('Request sent'))
             else if (state == 'joined')
-              const TextButton(
-                  onPressed: null,
-                  child: Text('Joined'))
+              const TextButton(onPressed: null, child: Text('Joined'))
             else
               FilledButton(
                 onPressed: inFlight ? null : onJoin,
@@ -208,14 +204,12 @@ class _CommunityJoinRequestsState extends State<CommunityJoinRequests> {
                 IconButton(
                   tooltip: 'Approve',
                   icon: const Icon(Icons.check, color: Colors.green),
-                  onPressed: () =>
-                      _review(item as Map<String, dynamic>, true),
+                  onPressed: () => _review(item as Map<String, dynamic>, true),
                 ),
                 IconButton(
                   tooltip: 'Reject',
                   icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () =>
-                      _review(item as Map<String, dynamic>, false),
+                  onPressed: () => _review(item as Map<String, dynamic>, false),
                 ),
               ],
             ),
@@ -1572,7 +1566,7 @@ class _HomePageState extends State<HomePage>
       Uri.parse('$wsUrl/ws'),
       headers: {'Authorization': 'Bearer $token'},
     );
-    _ws!.stream.listen((raw) {
+    _ws!.stream.listen((raw) async {
       final ev = jsonDecode(raw) as Map<String, dynamic>;
       final type = ev['type'] as String? ?? '';
       if (type == 'message' && ev['message'] != null) {
@@ -1624,6 +1618,19 @@ class _HomePageState extends State<HomePage>
             ? _call?.handleGroupOffer(ev['chat_id'] as String, peerId, payload)
             : _call?.handleOffer(ev['chat_id'] as String, peerId, payload);
         if (call != null) setState(() => _incomingCall = call);
+      } else if (type == 'call-busy') {
+        final chatId = ev['chat_id'] as String? ?? '';
+        if (_call?.state == CallState.outgoing &&
+            (chatId.isEmpty || chatId == _call?.chatId)) {
+          await _call!.handleRemoteEnd();
+          setState(() {
+            _incomingCall = null;
+            _error = _activeChat == null
+                ? 'User is busy'
+                : '${_chatTitle(_activeChat!)} is busy';
+          });
+          _callInitiatedByMe = false;
+        }
       } else if (type == 'call-answer' && ev['payload'] != null) {
         final payload = ev['payload'] as Map<String, dynamic>;
         final peerId = ev['user_id'] as String? ?? '';
@@ -6149,8 +6156,7 @@ class _HomePageState extends State<HomePage>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                      '$memberCount members · ${subgroups.length} groups',
+                  Text('$memberCount members · ${subgroups.length} groups',
                       style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 12),
                   if (myRole == 'owner')
@@ -6165,8 +6171,7 @@ class _HomePageState extends State<HomePage>
                               ? refreshedCommunity['member_count']
                               : null;
                           if (sheetOpen && refreshedCount is int) {
-                            setSheetState(
-                                () => memberCount = refreshedCount);
+                            setSheetState(() => memberCount = refreshedCount);
                           }
                         } catch (_) {
                           // Keep the displayed count if the header refresh fails.
@@ -9012,6 +9017,16 @@ class _HomePageState extends State<HomePage>
         final peerId = await _peerUserId();
         if (peerId.isEmpty) {
           setState(() => _error = 'Cannot call: peer user not found');
+          return;
+        }
+        try {
+          await _api.startCallCheck(
+            chatId: _activeChat!['id'] as String,
+            calleeId: peerId,
+            callType: video ? 'video' : 'voice',
+          );
+        } on BusyException {
+          setState(() => _error = '${_chatTitle(_activeChat!)} is busy');
           return;
         }
         _callInitiatedByMe = true;

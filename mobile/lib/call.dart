@@ -312,8 +312,9 @@ class CallController {
 
   /// Handle an incoming call-offer (called from the WS event loop).
   /// Returns the incoming call for the UI to accept/decline.
-  IncomingCall handleOffer(
+  IncomingCall? handleOffer(
       String chatId, String peerId, Map<String, dynamic> offer) {
+    if (state != CallState.idle) return null;
     _pendingDirectIce.clear();
     _directRemoteDescriptionSet = false;
     this.chatId = chatId;
@@ -423,8 +424,9 @@ class CallController {
 
   /// Handle an incoming group-call offer. The offer is parked until
   /// the user accepts; media starts in acceptGroupCall.
-  IncomingCall handleGroupOffer(
+  IncomingCall? handleGroupOffer(
       String chatId, String peerId, Map<String, dynamic> offer) {
+    if (state != CallState.idle) return null;
     this.chatId = chatId;
     isGroup = true;
     video = offer['video'] == true;

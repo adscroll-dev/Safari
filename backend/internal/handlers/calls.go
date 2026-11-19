@@ -105,6 +105,66 @@ func (h *Handler) CreateCallRecord(w http.ResponseWriter, r *http.Request) {
 	middleware.WriteJSON(w, http.StatusCreated, rec)
 }
 
+// StartCallCheck validates and reserves a private call slot atomically.
+func (h *Handler) StartCallCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	me := middleware.UserID(r)
+	var req struct {
+		ChatID   string `json:"chat_id"`
+		CalleeID string `json:"callee_id"`
+		CallType string `json:"call_type"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	if req.ChatID == "" {
+		middleware.WriteError(w, http.StatusBadRequest, "chat_id is required")
+		return
+	}
+	if req.CalleeID == "" {
+		middleware.WriteError(w, http.StatusBadRequest, "callee_id is required")
+		return
+	}
+	if req.CallType != "voice" && req.CallType != "video" {
+		middleware.WriteError(w, http.StatusBadRequest, "call_type must be voice or video")
+		return
+	}
+	if req.CalleeID == me {
+		middleware.WriteError(w, http.StatusBadRequest, "cannot call yourself")
+		return
+	}
+	chat, err := h.Store.ChatByID(req.ChatID)
+	if err != nil {
+		middleware.WriteError(w, http.StatusNotFound, "chat not found")
+		return
+	}
+	if chat.Type != models.ChatDM {
+		middleware.WriteError(w, http.StatusBadRequest, "callee_id is only for private calls")
+		return
+	}
+	if !h.Store.IsMember(req.ChatID, me) {
+		middleware.WriteError(w, http.StatusForbidden, "not a member of this chat")
+		return
+	}
+	if !h.Store.IsMember(req.ChatID, req.CalleeID) {
+		middleware.WriteError(w, http.StatusBadRequest, "callee is not a member of this chat")
+		return
+	}
+	if _, err := h.Store.UserByID(req.CalleeID); err != nil {
+		middleware.WriteError(w, http.StatusBadRequest, "callee not found")
+		return
+	}
+	busyUser, ok := h.Hub.ReserveCall(me, req.CalleeID, req.ChatID)
+	if !ok {
+		middleware.WriteError(w, http.StatusConflict, "user is busy: "+busyUser)
+		return
+	}
+	middleware.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
 // ListCallRecords returns my call history, newest first, enriched
 // with direction, peer name and the group flag.
 func (h *Handler) ListCallRecords(w http.ResponseWriter, r *http.Request) {

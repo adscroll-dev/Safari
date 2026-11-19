@@ -35,6 +35,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/vyro/backend/internal/models"
@@ -49,6 +50,10 @@ type Hub struct {
 	mu      sync.Mutex
 	clients map[*websocket.Conn]*client // conn -> client
 	rooms   map[string]map[*websocket.Conn]bool
+
+	callMu      sync.Mutex
+	activeCalls map[string]*activeCall
+	now         func() time.Time
 }
 
 type client struct {
@@ -56,16 +61,160 @@ type client struct {
 	chats  map[string]bool // chat ids this connection joined
 }
 
+type activeCall struct {
+	CallerID   string
+	CalleeID   string
+	ChatID     string
+	Answered   bool
+	OfferedAt  time.Time
+	AnsweredAt time.Time
+}
+
 func NewHub() *Hub {
 	return &Hub{
-		clients: map[*websocket.Conn]*client{},
-		rooms:   map[string]map[*websocket.Conn]bool{},
+		clients:     map[*websocket.Conn]*client{},
+		rooms:       map[string]map[*websocket.Conn]bool{},
+		activeCalls: map[string]*activeCall{},
+		now:         time.Now,
+	}
+}
+
+const (
+	ringingCallExpiry  = 60 * time.Second
+	answeredCallExpiry = 4 * time.Hour
+)
+
+// expireLocked removes stale call slots. It must be called with callMu held.
+func (h *Hub) expireLocked() {
+	now := h.now()
+	seen := map[*activeCall]bool{}
+	for _, call := range h.activeCalls {
+		if call == nil || seen[call] {
+			continue
+		}
+		seen[call] = true
+		expired := !call.Answered && now.Sub(call.OfferedAt) >= ringingCallExpiry
+		if call.Answered && now.Sub(call.AnsweredAt) >= answeredCallExpiry {
+			expired = true
+		}
+		if expired {
+			delete(h.activeCalls, call.CallerID)
+			delete(h.activeCalls, call.CalleeID)
+		}
+	}
+}
+
+// ReserveCall atomically checks and reserves a 1:1 call slot.
+// It returns (busyUserID, false) when either participant is busy.
+func (h *Hub) ReserveCall(callerID, calleeID, chatID string) (string, bool) {
+	h.callMu.Lock()
+	defer h.callMu.Unlock()
+	h.expireLocked()
+	if call := h.activeCalls[callerID]; call != nil {
+		return callerID, false
+	}
+	if call := h.activeCalls[calleeID]; call != nil {
+		return calleeID, false
+	}
+	call := &activeCall{
+		CallerID: callerID, CalleeID: calleeID, ChatID: chatID,
+		OfferedAt: h.now(),
+	}
+	h.activeCalls[callerID] = call
+	h.activeCalls[calleeID] = call
+	return "", true
+}
+
+// HandleCallOffer checks and reserves both sides before a WebRTC offer is relayed.
+// The returned busy user ID is empty when the offer may proceed.
+func (h *Hub) HandleCallOffer(senderID, targetID, chatID string) string {
+	return h.handleCallOffer(senderID, targetID, chatID, false)
+}
+
+func (h *Hub) handleCallOffer(senderID, targetID, chatID string, group bool) string {
+	h.callMu.Lock()
+	defer h.callMu.Unlock()
+	h.expireLocked()
+	call := h.activeCalls[senderID]
+	if call != nil {
+		if call.ChatID != chatID || call.CallerID != senderID {
+			return senderID
+		}
+		if !group && call.CalleeID != targetID {
+			return senderID
+		}
+	}
+	if targetID != "" {
+		call = h.activeCalls[targetID]
+		if call != nil {
+			if call.ChatID == chatID &&
+				call.CallerID == senderID &&
+				call.CalleeID == targetID {
+				// Pre-check reserved this exact pair.
+			} else if group && call.CallerID == senderID {
+				// A mesh peer is already part of this sender's group call.
+			} else {
+				return targetID
+			}
+		}
+	}
+	now := h.now()
+	call = &activeCall{
+		CallerID: senderID, CalleeID: targetID, ChatID: chatID, OfferedAt: now,
+	}
+	h.activeCalls[senderID] = call
+	if targetID != "" {
+		h.activeCalls[targetID] = call
+	}
+	return ""
+}
+
+// MarkCallAnswered marks an existing or relayed slot as in-call.
+func (h *Hub) MarkCallAnswered(callerID, calleeID, chatID string) {
+	h.callMu.Lock()
+	defer h.callMu.Unlock()
+	h.expireLocked()
+	call := h.activeCalls[calleeID]
+	if call != nil && call.ChatID == chatID &&
+		call.CallerID == callerID && call.CalleeID == calleeID {
+		call.Answered = true
+		call.AnsweredAt = h.now()
+	}
+}
+
+// ReleaseCall removes every active slot for a 1:1 pair or for a user.
+func (h *Hub) ReleaseCall(userID, peerID, chatID string) {
+	h.callMu.Lock()
+	defer h.callMu.Unlock()
+	h.expireLocked()
+	if peerID != "" {
+		call := h.activeCalls[userID]
+		if call != nil && call.ChatID == chatID &&
+			((call.CallerID == userID && call.CalleeID == peerID) ||
+				(call.CallerID == peerID && call.CalleeID == userID)) {
+			delete(h.activeCalls, call.CallerID)
+			delete(h.activeCalls, call.CalleeID)
+		}
+		return
+	}
+	seen := map[*activeCall]bool{}
+	for _, call := range h.activeCalls {
+		if call == nil || seen[call] {
+			continue
+		}
+		seen[call] = true
+		if chatID == "" || call.ChatID == chatID {
+			if call.CallerID == userID || call.CalleeID == userID {
+				delete(h.activeCalls, call.CallerID)
+				delete(h.activeCalls, call.CalleeID)
+			}
+		}
 	}
 }
 
 // Event is the JSON envelope sent over the socket.
 type Event struct {
-	Type      string          `json:"type"` // message | message_sync | message_edited | message_deleted | presence | typing | message_read | message_delivered | call-offer | call-answer | call-ice | call-end
+	Type      string          `json:"type"` // message | message_sync | message_edited | message_deleted | presence | typing | message_read | message_delivered | call-offer | call-answer | call-ice | call-end | call-busy
 	ChatID    string          `json:"chat_id,omitempty"`
 	Message   *models.Message `json:"message,omitempty"`
 	MessageID string          `json:"message_id,omitempty"`
@@ -230,6 +379,7 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatI
 		h.mu.Lock()
 		h.removeLocked(conn)
 		h.mu.Unlock()
+		h.ReleaseCall(userID, "", "")
 		if onPresence != nil {
 			onPresence(userID, false)
 		}
@@ -278,6 +428,32 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, userID string, chatI
 			data, err := json.Marshal(ev)
 			if err != nil {
 				continue
+			}
+			if frame.Type == "call-offer" {
+				group := false
+				var payload struct {
+					Group bool `json:"group"`
+				}
+				if json.Unmarshal(frame.Payload, &payload) == nil {
+					group = payload.Group
+				}
+				busyUser := h.handleCallOffer(userID, frame.ToUserID, frame.ChatID, group)
+				if busyUser != "" {
+					busyData, marshalErr := json.Marshal(Event{
+						Type: "call-busy", ChatID: frame.ChatID, UserID: busyUser,
+						Payload: json.RawMessage(`{"reason":"busy"}`),
+					})
+					if marshalErr == nil {
+						h.mu.Lock()
+						_ = conn.WriteMessage(websocket.TextMessage, busyData)
+						h.mu.Unlock()
+					}
+					continue
+				}
+			} else if frame.Type == "call-answer" {
+				h.MarkCallAnswered(frame.ToUserID, userID, frame.ChatID)
+			} else if frame.Type == "call-end" {
+				h.ReleaseCall(userID, frame.ToUserID, frame.ChatID)
 			}
 			h.mu.Lock()
 			h.relayToRoomLocked(frame.ChatID, conn, frame.ToUserID, data)

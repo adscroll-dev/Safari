@@ -7,6 +7,13 @@ import 'package:http/http.dart' as http;
 
 import 'data_saver.dart';
 
+class BusyException implements Exception {
+  BusyException([this.busyUserId]);
+  final String? busyUserId;
+  @override
+  String toString() => 'User is busy';
+}
+
 /// Minimal typed client for the VYRO Go backend.
 /// Android emulator reaches the host at 10.0.2.2; everywhere else localhost.
 /// (Uses defaultTargetPlatform instead of dart:io so the web build works.)
@@ -73,6 +80,9 @@ class ApiClient {
     usage?.add(UsageCategory.chat, reqBytes + res.bodyBytes.length);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode >= 400) {
+      if (res.statusCode == 409) {
+        throw BusyException(data['error'] as String?);
+      }
       throw Exception(data['error'] ?? 'Request failed: ${res.statusCode}');
     }
     return data;
@@ -273,10 +283,12 @@ class ApiClient {
     await _req(
         'POST', '/api/communities/$communityId/join-requests/$userId/approve');
   }
+
   Future<void> rejectJoinRequest(String communityId, String userId) async {
     await _req(
         'POST', '/api/communities/$communityId/join-requests/$userId/reject');
   }
+
   Future<Map<String, dynamic>> createCommunity(String name,
           {String description = ''}) =>
       _req('POST', '/api/communities',
@@ -446,6 +458,16 @@ class ApiClient {
         'call_type': callType,
         'status': status,
         'duration_seconds': durationSeconds,
+      });
+  Future<Map<String, dynamic>> startCallCheck({
+    required String chatId,
+    required String calleeId,
+    required String callType,
+  }) =>
+      _req('POST', '/api/calls/start', {
+        'chat_id': chatId,
+        'callee_id': calleeId,
+        'call_type': callType,
       });
   Future<List<dynamic>> listCalls() => _getList('/api/calls');
 

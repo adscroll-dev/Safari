@@ -2,10 +2,58 @@ package handlers
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/vyro/backend/internal/models"
 )
+
+func TestBusyCallStartChecks(t *testing.T) {
+	h := newTestHandler()
+	aliceTok, aliceID := register(t, h, "busy-alice@example.com", "alice")
+	bobTok, bobID := register(t, h, "busy-bob@example.com", "bob")
+	carolTok, _ := register(t, h, "busy-carol@example.com", "carol")
+	dm := makeDM(t, h, aliceTok, bobID)
+	dmCarolBob := makeDM(t, h, carolTok, bobID)
+
+	check := func(tok string, callee string) *httptest.ResponseRecorder {
+		t.Helper()
+		return doJSON(t, h, http.MethodPost, "/api/calls/start", map[string]interface{}{
+			"chat_id": dm, "callee_id": callee, "call_type": "voice",
+		}, tok)
+	}
+
+	first := check(aliceTok, bobID)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first check: want 200, got %d %s", first.Code, first.Body.String())
+	}
+	racing := check(aliceTok, bobID)
+	if racing.Code != http.StatusConflict {
+		t.Fatalf("racing check: want 409, got %d %s", racing.Code, racing.Body.String())
+	}
+	secondCaller := doJSON(t, h, http.MethodPost, "/api/calls/start", map[string]interface{}{
+		"chat_id": dmCarolBob, "callee_id": bobID, "call_type": "voice",
+	}, carolTok)
+	if secondCaller.Code != http.StatusConflict {
+		t.Fatalf("busy callee check: want 409, got %d %s", secondCaller.Code, secondCaller.Body.String())
+	}
+	callerBusy := check(aliceTok, bobID)
+	if callerBusy.Code != http.StatusConflict {
+		t.Fatalf("busy caller check: want 409, got %d %s", callerBusy.Code, callerBusy.Body.String())
+	}
+	self := check(aliceTok, aliceID)
+	if self.Code != http.StatusBadRequest {
+		t.Fatalf("self call: want 400, got %d %s", self.Code, self.Body.String())
+	}
+
+	h.Hub.ReleaseCall(aliceID, bobID, dm)
+	afterEnd := check(aliceTok, bobID)
+	if afterEnd.Code != http.StatusOK {
+		t.Fatalf("check after end: want 200, got %d %s", afterEnd.Code, afterEnd.Body.String())
+	}
+	_ = bobTok
+	_ = carolTok
+}
 
 // Stage 3 calls (WhatsApp parity): call history — the caller records
 // a finished/missed call; the callee (and, for group calls, every
@@ -133,7 +181,7 @@ func TestStage3Calls(t *testing.T) {
 	}
 	// Unknown chat -> 404; non-member -> 403; no token -> 401.
 	rec := doJSON(t, h, http.MethodPost, "/api/calls", map[string]interface{}{
-		"chat_id": "00000000-0000-0000-0000-000000000000",
+		"chat_id":   "00000000-0000-0000-0000-000000000000",
 		"call_type": "voice", "status": "missed",
 	}, aliceTok)
 	if rec.Code != http.StatusNotFound {

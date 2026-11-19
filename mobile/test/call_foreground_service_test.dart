@@ -52,8 +52,9 @@ void main() {
       'sdp': 'offer',
       'type': 'offer',
     });
+    expect(incoming, isNotNull);
 
-    await controller.declineCall(incoming);
+    await controller.declineCall(incoming!);
 
     expect(calls.map((call) => call.method), ['stopCall']);
     controller.dispose();
