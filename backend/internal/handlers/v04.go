@@ -281,7 +281,7 @@ func (h *Handler) ScheduleMessage(w http.ResponseWriter, r *http.Request) {
 	if kind == "" {
 		kind = "text"
 	}
-	if kind != "text" && kind != "image" && kind != "video" && kind != "file" && kind != "voice" && kind != "sticker" {
+	if kind != "text" && kind != "image" && kind != "video" && kind != "file" && kind != "voice" && kind != "sticker" && kind != "gif" {
 		middleware.WriteError(w, http.StatusBadRequest, "kind '"+kind+"' cannot be scheduled")
 		return
 	}
@@ -295,8 +295,8 @@ func (h *Handler) ScheduleMessage(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusBadRequest, "content is required")
 		return
 	}
-	if kind != "text" && (!strings.HasPrefix(req.FileURL, "/uploads/") || strings.Contains(req.FileURL, "..")) {
-		middleware.WriteError(w, http.StatusBadRequest, "file_url from /api/uploads is required")
+	if kind != "text" && !validMediaFileURL(req.FileURL) {
+		middleware.WriteError(w, http.StatusBadRequest, "file_url must point to an upload or catalog media file")
 		return
 	}
 	sm := &models.ScheduledMessage{

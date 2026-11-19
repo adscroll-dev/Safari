@@ -38,6 +38,8 @@ class ApiClient {
   final String baseUrl;
   final http.Client client;
   String? token;
+  final Map<String, Future<List<dynamic>>> _catalogLists = {};
+  final Map<String, Future<Map<String, dynamic>>> _stickerPackDetails = {};
 
   /// Optional usage tracker (Data Saver meter). When set, every
   /// request's real byte counts are recorded per category.
@@ -146,6 +148,57 @@ class ApiClient {
   Future<List<dynamic>> listChats() => _getList('/api/chats');
   Future<List<dynamic>> listMessages(String chatId) =>
       _getList('/api/chats/$chatId/messages?limit=50');
+
+  Future<List<dynamic>> _cachedCatalogList(String key, String path) {
+    final cached = _catalogLists[key];
+    if (cached != null) return cached;
+    final request = _getList(path);
+    _catalogLists[key] = request;
+    return request.catchError((Object error) {
+      _catalogLists.remove(key);
+      throw error;
+    });
+  }
+
+  Future<List<dynamic>> listStickerPacks() =>
+      _cachedCatalogList('sticker-packs', '/api/stickers/packs');
+
+  Future<Map<String, dynamic>> getStickerPack(String id) async {
+    final cached = _stickerPackDetails[id];
+    if (cached != null) return cached;
+    final request = _req('GET', '/api/stickers/packs/$id');
+    _stickerPackDetails[id] = request;
+    try {
+      return await request;
+    } catch (_) {
+      _stickerPackDetails.remove(id);
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> listGifs([String query = '']) {
+    final normalized = query.trim();
+    final path = normalized.isEmpty
+        ? '/api/gifs'
+        : '/api/gifs?q=${Uri.encodeQueryComponent(normalized)}';
+    return _cachedCatalogList('gifs:$normalized', path);
+  }
+
+  Future<Map<String, dynamic>> sendCatalogMediaMessage(
+      String chatId, Map<String, dynamic> item,
+      {required String kind}) {
+    if (kind != 'sticker' && kind != 'gif') {
+      throw ArgumentError.value(kind, 'kind', 'Expected sticker or gif');
+    }
+    return _req('POST', '/api/chats/$chatId/messages', {
+      'content': '',
+      'kind': kind,
+      'file_url': item['file_url'],
+      'file_name': '${item['id']}.${kind == 'gif' ? 'gif' : 'webp'}',
+      'file_size': item['size'],
+      'mime_type': kind == 'gif' ? 'image/gif' : 'image/webp',
+    });
+  }
 
   /// v0.4: [ttlSeconds] sends a disappearing message (60..604800).
   /// v0.7: [forwardedFrom]/[forwardedFromId] mark a forwarded message.
@@ -622,7 +675,7 @@ class ApiClient {
   /// is off). Returns the raw bytes; the caller records usage.
   Future<Uint8List> downloadFile(String fileUrl) async {
     final res = await _withTimeoutRetry(
-        () => http.get(Uri.parse('$baseUrl$fileUrl'), headers: _headers));
+        () => client.get(Uri.parse('$baseUrl$fileUrl'), headers: _headers));
     if (res.statusCode >= 400) {
       throw Exception('Download failed: ${res.statusCode}');
     }

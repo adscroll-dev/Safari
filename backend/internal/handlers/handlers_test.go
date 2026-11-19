@@ -164,6 +164,14 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.CreateChat(w, r)
 			case path == "/api/chats" && method == http.MethodGet:
 				h.ListChats(w, r)
+			case path == "/api/stickers/packs":
+				h.ListStickerPacks(w, r)
+			case strings.HasPrefix(path, "/api/stickers/packs/"):
+				h.GetStickerPack(w, r)
+			case path == "/api/gifs":
+				h.ListGIFs(w, r)
+			case strings.HasPrefix(path, "/stickers/") || strings.HasPrefix(path, "/gifs/"):
+				h.ServeCatalogFile(w, r)
 			case strings.HasPrefix(path, "/api/chats/") && strings.HasSuffix(path, "/messages"):
 				if method == http.MethodPost {
 					h.SendMessage(w, r)

@@ -32,6 +32,7 @@ import 'orbit_dock.dart';
 import 'orbit_shimmer.dart';
 import 'recording_bytes.dart';
 import 'share_file.dart';
+import 'stickers_gifs_picker.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
 
@@ -5416,6 +5417,9 @@ class _HomePageState extends State<HomePage>
       case 'sticker':
         body = _orbitText('Sticker');
         break;
+      case 'gif':
+        body = _orbitText('GIF');
+        break;
       case 'contact':
         body = _orbitText('Contact');
         break;
@@ -9509,32 +9513,35 @@ class _HomePageState extends State<HomePage>
   void _showComposerEmojiPicker() {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Wrap(
-            alignment: WrapAlignment.spaceEvenly,
-            children: [
-              for (final emoji in _reactionEmojis)
-                IconButton(
-                  iconSize: 30,
-                  onPressed: () {
-                    final text = _draft.text;
-                    final selection = _draft.selection;
-                    final start =
-                        selection.isValid ? selection.start : text.length;
-                    final end = selection.isValid ? selection.end : text.length;
-                    _draft.value = TextEditingValue(
-                      text: text.replaceRange(start, end, emoji),
-                      selection: TextSelection.collapsed(
-                        offset: start + emoji.length,
-                      ),
-                    );
-                    Navigator.pop(context);
-                  },
-                  icon: Text(emoji, style: const TextStyle(fontSize: 27)),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.55,
+          child: StickersGifsPicker(
+            api: _api,
+            chatId: _activeChat!['id'] as String,
+            dataSaver: _dataSaver,
+            emojis: _reactionEmojis,
+            onEmoji: (emoji) {
+              final text = _draft.text;
+              final selection = _draft.selection;
+              final start = selection.isValid ? selection.start : text.length;
+              final end = selection.isValid ? selection.end : text.length;
+              _draft.value = TextEditingValue(
+                text: text.replaceRange(start, end, emoji),
+                selection: TextSelection.collapsed(
+                  offset: start + emoji.length,
                 ),
-            ],
+              );
+            },
+            onSent: (message) {
+              setState(() => _messages = [..._messages, message]);
+            },
+            onDownloaded: (fileUrl, bytes) {
+              if (mounted) {
+                setState(() => _downloaded[fileUrl] = bytes);
+              }
+            },
           ),
         ),
       ),
@@ -10422,7 +10429,8 @@ class _HomePageState extends State<HomePage>
     if (kind == 'image' ||
         kind == 'video' ||
         kind == 'file' ||
-        kind == 'sticker') {
+        kind == 'sticker' ||
+        kind == 'gif') {
       final fileUrl = m['file_url'] as String?;
       if (fileUrl == null) return Text(content);
       final bytes = _downloaded[fileUrl];
@@ -10436,12 +10444,41 @@ class _HomePageState extends State<HomePage>
                 ? '🖼️ Photo'
                 : kind == 'video'
                     ? '🎬 Video'
-                    : '📎 File',
+                    : kind == 'sticker'
+                        ? 'Sticker'
+                        : kind == 'gif'
+                            ? 'GIF'
+                            : '📎 File',
             m['file_size'] as int?,
             fileUrl);
       }
-      if (kind == 'image' || kind == 'sticker') {
-        return Image.memory(bytes, width: 220);
+      if (kind == 'image' || kind == 'sticker' || kind == 'gif') {
+        return GestureDetector(
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => Dialog.fullscreen(
+              child: Stack(
+                children: [
+                  Center(
+                    child: InteractiveViewer(
+                      child: Image.memory(bytes, fit: BoxFit.contain),
+                    ),
+                  ),
+                  SafeArea(
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          child: Image.memory(bytes, width: 220),
+        );
       }
       if (kind == 'video') {
         return _VideoPlayer(bytes: bytes);

@@ -16,7 +16,7 @@
 //	POST /api/uploads           multipart "file" -> {url, file_name, file_size, mime_type, kind}
 //	GET  /uploads/{name}         download a file uploaded above (auth required)
 //	POST /api/chats/{id}/messages  {content, kind?, reply_to_id?, file_url?, file_name?, file_size?, mime_type?}
-//	                               kind: text | image | video | file | voice | location | sticker | contact (file kinds need file_url from /api/uploads; contact content is JSON {"user_id"})
+//	                               kind: text | image | video | file | voice | location | sticker | gif | contact (media kinds need a valid file_url; contact content is JSON {"user_id"})
 //	PUT  /api/messages/{id}   {content}            (sender only)
 //	DELETE /api/messages/{id}                       (sender only, delete-for-everyone)
 //	POST /api/messages/{id}/delete-for-me           (any member, hides it only for the caller)
@@ -594,7 +594,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		kind = "text"
 	}
 	switch kind {
-	case "text", "image", "video", "file", "voice", "location", "sticker", "contact", "e2ee":
+	case "text", "image", "video", "file", "voice", "location", "sticker", "gif", "contact", "e2ee":
 	default:
 		middleware.WriteError(w, http.StatusBadRequest, "kind '"+kind+"' is not implemented yet")
 		return
@@ -665,8 +665,8 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		}
 	} else if kind != "location" && kind != "contact" {
 		// A media message must point at a file this server stored.
-		if !strings.HasPrefix(req.FileURL, "/uploads/") || strings.Contains(req.FileURL, "..") {
-			middleware.WriteError(w, http.StatusBadRequest, "file_url from /api/uploads is required for kind '"+kind+"'")
+		if !validMediaFileURL(req.FileURL) {
+			middleware.WriteError(w, http.StatusBadRequest, "file_url must point to an upload or catalog media file for kind '"+kind+"'")
 			return
 		}
 		if req.FileSize < 0 || req.FileSize > h.maxUploadBytes() {

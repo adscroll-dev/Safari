@@ -174,6 +174,11 @@ func main() {
 	// Authenticated.
 	mux.Handle("/api/uploads", authMW(http.HandlerFunc(h.Upload)))
 	mux.Handle("/uploads/", authMW(http.HandlerFunc(h.ServeUpload)))
+	mux.Handle("/stickers/", authMW(http.HandlerFunc(h.ServeCatalogFile)))
+	mux.Handle("/gifs/", authMW(http.HandlerFunc(h.ServeCatalogFile)))
+	mux.Handle("/api/stickers/packs", authMW(http.HandlerFunc(h.ListStickerPacks)))
+	mux.Handle("/api/stickers/packs/", authMW(http.HandlerFunc(h.GetStickerPack)))
+	mux.Handle("/api/gifs", authMW(http.HandlerFunc(h.ListGIFs)))
 	mux.Handle("/api/users/me", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
