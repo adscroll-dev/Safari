@@ -89,7 +89,8 @@ Future<void> _finishCodeStep(WidgetTester tester, String email,
     throw Exception('Code field read-back mismatch for $email');
   }
   await tester.tap(find.text('Verify and continue'));
-  await _waitFor(tester, find.byIcon(Icons.smart_toy_outlined),
+  await _waitFor(tester,
+      find.widgetWithIcon(IconButton, Icons.smart_toy_outlined),
       label: 'signed-in app');
 }
 
@@ -176,7 +177,11 @@ Future<void> _openAssistant(
   WidgetTester tester, {
   bool persian = false,
 }) async {
-  await tester.tap(find.byIcon(Icons.smart_toy_outlined));
+  // The header robot button is an IconButton; the pinned Assistant row
+  // in the chat list also carries a small robot badge icon, so scope the
+  // finder to IconButton to stay unambiguous once history exists.
+  await tester.tap(find.widgetWithIcon(
+      IconButton, Icons.smart_toy_outlined));
   await tester.pump();
   await _waitFor(
       tester, find.text(persian ? 'دستیار سافاری' : 'Safari assistant'),
