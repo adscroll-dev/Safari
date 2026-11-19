@@ -405,6 +405,9 @@ type Community struct {
 	Description        string `json:"description,omitempty"`
 	OwnerID            string `json:"owner_id,omitempty"`
 	AnnouncementChatID string `json:"announcement_chat_id,omitempty"`
+	Visibility         string `json:"visibility"`
+	JoinPolicy         string `json:"join_policy"`
+	IsArchived         bool   `json:"is_archived"`
 	// Computed, populated by list/detail endpoints.
 	MemberCount   int       `json:"member_count,omitempty"`
 	SubgroupCount int       `json:"subgroup_count,omitempty"`

@@ -564,6 +564,10 @@ func main() {
 	mux.Handle("/api/communities/", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
+		case path == "/api/communities/discover":
+			h.DiscoverCommunities(w, r)
+		case strings.HasSuffix(path, "/join"):
+			h.JoinCommunity(w, r)
 		case strings.HasSuffix(path, "/leave"):
 			h.LeaveCommunity(w, r)
 		case strings.Contains(path, "/members/") && strings.HasSuffix(path, "/role"):

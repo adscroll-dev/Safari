@@ -19,7 +19,8 @@ func scanCommunity(row pgx.Row, memberCount, subgroupCount int) (*models.Communi
 	var c models.Community
 	var announcementID *string
 	err := row.Scan(&c.ID, &c.Name, &c.Description, &c.OwnerID,
-		&announcementID, &c.CreatedAt, &c.UpdatedAt)
+		&announcementID, &c.Visibility, &c.JoinPolicy, &c.IsArchived,
+		&c.CreatedAt, &c.UpdatedAt)
 	if err != nil {
 		return nil, mapStoreErr(err)
 	}
@@ -37,6 +38,12 @@ func (s *PostgresStore) CreateCommunity(c *models.Community) error {
 	if !isUUID(c.OwnerID) {
 		return ErrNotFound
 	}
+	if c.Visibility == "" {
+		c.Visibility = "public"
+	}
+	if c.JoinPolicy == "" {
+		c.JoinPolicy = "open"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	tx, err := s.pool.Begin(ctx)
@@ -52,16 +59,16 @@ func (s *PostgresStore) CreateCommunity(c *models.Community) error {
 	var createdAt, updatedAt time.Time
 	if isUUID(c.ID) {
 		err = tx.QueryRow(ctx,
-			`INSERT INTO communities (id, name, description, owner_id, announcement_chat_id)
-			 VALUES ($1, $2, $3, $4, $5)
+			`INSERT INTO communities (id, name, description, owner_id, announcement_chat_id, visibility, join_policy)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)
 			 RETURNING id::text, created_at, updated_at`,
-			c.ID, c.Name, c.Description, c.OwnerID, announcement).Scan(&id, &createdAt, &updatedAt)
+			c.ID, c.Name, c.Description, c.OwnerID, announcement, c.Visibility, c.JoinPolicy).Scan(&id, &createdAt, &updatedAt)
 	} else {
 		err = tx.QueryRow(ctx,
-			`INSERT INTO communities (name, description, owner_id, announcement_chat_id)
-			 VALUES ($1, $2, $3, $4)
+			`INSERT INTO communities (name, description, owner_id, announcement_chat_id, visibility, join_policy)
+			 VALUES ($1, $2, $3, $4, $5, $6)
 			 RETURNING id::text, created_at, updated_at`,
-			c.Name, c.Description, c.OwnerID, announcement).Scan(&id, &createdAt, &updatedAt)
+			c.Name, c.Description, c.OwnerID, announcement, c.Visibility, c.JoinPolicy).Scan(&id, &createdAt, &updatedAt)
 	}
 	if err != nil {
 		return mapStoreErr(err)
@@ -99,7 +106,7 @@ func (s *PostgresStore) CommunityByID(id string) *models.Community {
 	members, subgroups := s.communityCounts(ctx, id)
 	c, err := scanCommunity(s.pool.QueryRow(ctx,
 		`SELECT id::text, name, description, owner_id::text,
-			announcement_chat_id::text, created_at, updated_at
+			announcement_chat_id::text, visibility, join_policy, is_archived, created_at, updated_at
 		 FROM communities WHERE id = $1`, id), members, subgroups)
 	if err != nil {
 		return nil
@@ -115,7 +122,7 @@ func (s *PostgresStore) ListCommunitiesForUser(userID string) []*models.Communit
 	defer cancel()
 	rows, err := s.pool.Query(ctx,
 		`SELECT c.id::text, c.name, c.description, c.owner_id::text,
-			c.announcement_chat_id::text, c.created_at, c.updated_at
+			c.announcement_chat_id::text, c.visibility, c.join_policy, c.is_archived, c.created_at, c.updated_at
 		 FROM communities c JOIN community_members m ON m.community_id = c.id
 		 WHERE m.user_id = $1 ORDER BY c.created_at DESC`, userID)
 	if err != nil {
@@ -217,6 +224,86 @@ func (s *PostgresStore) AddCommunityMember(communityID, userID, role string) err
 		return ErrAlreadyExists
 	}
 	return nil
+}
+
+func (s *PostgresStore) ListDiscoverCommunities(userID string, limit, offset int) []*models.Community {
+	if !isUUID(userID) {
+		return []*models.Community{}
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.pool.Query(ctx,
+		`SELECT c.id::text, c.name, c.description, c.owner_id::text,
+			c.announcement_chat_id::text, c.visibility, c.join_policy, c.is_archived,
+			c.created_at, c.updated_at
+		 FROM communities c
+		 WHERE c.visibility = 'public' AND c.is_archived = FALSE
+		   AND NOT EXISTS (
+		       SELECT 1 FROM community_members m
+		       WHERE m.community_id = c.id AND m.user_id = $1
+		   )
+		 ORDER BY c.created_at DESC
+		 LIMIT $2 OFFSET $3`, userID, limit, offset)
+	if err != nil {
+		return []*models.Community{}
+	}
+	defer rows.Close()
+	out := []*models.Community{}
+	for rows.Next() {
+		c, err := scanCommunity(rows, 0, 0)
+		if err != nil {
+			continue
+		}
+		members, subgroups := s.communityCounts(ctx, c.ID)
+		c.MemberCount = members
+		c.SubgroupCount = subgroups
+		out = append(out, c)
+	}
+	return out
+}
+
+func (s *PostgresStore) CreateJoinRequest(communityID, userID string) error {
+	if !isUUID(communityID) || !isUUID(userID) {
+		return ErrNotFound
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO community_join_requests (community_id, user_id, status)
+		 VALUES ($1, $2, 'pending')
+		 ON CONFLICT (community_id, user_id) DO UPDATE
+		 SET status = 'pending'
+		 WHERE community_join_requests.status = 'rejected'`,
+		communityID, userID)
+	if err != nil {
+		return mapStoreErr(err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) JoinRequestStatus(communityID, userID string) string {
+	if !isUUID(communityID) || !isUUID(userID) {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var status string
+	if err := s.pool.QueryRow(ctx,
+		`SELECT status FROM community_join_requests
+		 WHERE community_id = $1 AND user_id = $2`,
+		communityID, userID).Scan(&status); err != nil {
+		return ""
+	}
+	return status
 }
 
 func (s *PostgresStore) RemoveCommunityMember(communityID, userID string) error {

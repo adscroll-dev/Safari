@@ -35,6 +35,86 @@ import 'share_file.dart';
 import 'theme.dart';
 import 'voice_recorder.dart';
 
+class DiscoverCommunityCard extends StatelessWidget {
+  const DiscoverCommunityCard({
+    super.key,
+    required this.community,
+    required this.joinState,
+    required this.inFlight,
+    required this.onJoin,
+  });
+
+  final Map<String, dynamic> community;
+  final String? joinState;
+  final bool inFlight;
+  final VoidCallback onJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final secondary =
+        dark ? WaColors.darkTextSecondary : WaColors.lightTextSecondary;
+    final name = community['name'] as String? ?? 'Community';
+    final description = community['description'] as String? ?? '';
+    final members = community['member_count'];
+    final count = members is num ? '$members members' : '';
+    final detail = description.isNotEmpty
+        ? (count.isNotEmpty ? '$description · $count' : description)
+        : count;
+    final state = joinState;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: SafariGlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            OrbitAvatar(label: name, radius: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600)),
+                  if (detail.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(detail,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: secondary)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (state == 'pending')
+              const TextButton(
+                  onPressed: null,
+                  child: Text('Request sent'))
+            else if (state == 'joined')
+              const TextButton(
+                  onPressed: null,
+                  child: Text('Joined'))
+            else
+              FilledButton(
+                onPressed: inFlight ? null : onJoin,
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                child: Text(inFlight ? 'Joining...' : 'Join'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Register FCM's background handler before the app starts. Failures
@@ -235,6 +315,10 @@ class _HomePageState extends State<HomePage>
   final _linkPreviews = LinkPreviewCache();
   // Stage 6: the communities I belong to (real model, not groups).
   List<dynamic> _communities = [];
+  List<dynamic> _discoverCommunities = [];
+  bool _discoverLoading = false;
+  final Set<String> _discoverJoining = {};
+  final Map<String, String> _discoverJoinStates = {};
   // Users by id, loaded with the chat list so a DM can show the other
   // person's name instead of the literal type ("dm").
   Map<String, Map<String, dynamic>> _usersById = {};
@@ -1199,6 +1283,7 @@ class _HomePageState extends State<HomePage>
       _refreshChats(),
       refreshBlocked(),
       _refreshCommunities(),
+      _refreshDiscoverCommunities(),
       _refreshCalls(),
       refreshPrivacy(),
       refreshStories(),
@@ -1564,6 +1649,51 @@ class _HomePageState extends State<HomePage>
       final communities = await _api.listCommunities();
       if (mounted) setState(() => _communities = communities);
     } catch (_) {}
+  }
+
+  Future<void> _refreshDiscoverCommunities() async {
+    if (mounted) {
+      setState(() => _discoverLoading = true);
+    }
+    try {
+      final communities = await _api.discoverCommunities();
+      if (mounted) {
+        setState(() {
+          _discoverCommunities = communities;
+          _discoverLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _discoverLoading = false);
+      }
+    }
+  }
+
+  Future<void> _joinDiscoveredCommunity(Map<String, dynamic> community) async {
+    final id = community['id'] as String?;
+    if (id == null || _discoverJoining.contains(id)) return;
+    setState(() => _discoverJoining.add(id));
+    try {
+      final result = await _api.joinCommunity(id);
+      if (!mounted) return;
+      final status = result['status'] as String?;
+      setState(() {
+        _discoverJoinStates[id] = status == 'pending' ? 'pending' : 'joined';
+        _discoverJoining.remove(id);
+      });
+      await _refreshCommunities();
+      if (status == 'joined') {
+        await _refreshDiscoverCommunities();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _discoverJoining.remove(id));
+      final message = error.toString().replaceFirst('Exception: ', '');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
   }
 
   /// Display title for a chat: its own title, else — for a DM — the
@@ -4376,7 +4506,13 @@ class _HomePageState extends State<HomePage>
         0,
         (sum, chat) => sum + _unreadCount(chat as Map<String, dynamic>),
       ),
-      onSelected: (index) => setState(() => _tabIndex = index),
+      onSelected: (index) {
+        setState(() => _tabIndex = index);
+        if (index == 2) {
+          _refreshCommunities();
+          _refreshDiscoverCommunities();
+        }
+      },
       onHome: () {
         if (_tabIndex != 0) {
           setState(() => _tabIndex = 0);
@@ -5582,22 +5718,26 @@ class _HomePageState extends State<HomePage>
             ),
         const SizedBox(height: 4),
         _sectionHeader('Discover'),
-        SafariGlassCard(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              const Icon(Icons.explore_outlined,
-                  color: OrbitalColors.electricCyan),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Community discovery is not available yet.',
-                  style: TextStyle(fontSize: 13, color: secondary),
-                ),
-              ),
-            ],
-          ),
-        ),
+        if (_discoverLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          )
+        else if (_discoverCommunities.isEmpty)
+          const SafariEmptyState(
+            icon: Icons.explore_outlined,
+            title: 'No public communities to discover yet.',
+            subtitle: '',
+            compact: true,
+          )
+        else
+          for (final c in _discoverCommunities)
+            DiscoverCommunityCard(
+              community: c,
+              joinState: _discoverJoinStates[c['id'] as String?],
+              inFlight: _discoverJoining.contains(c['id'] as String?),
+              onJoin: () => _joinDiscoveredCommunity(c),
+            ),
       ],
     );
   }

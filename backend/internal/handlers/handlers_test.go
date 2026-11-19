@@ -394,6 +394,10 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				h.CreateCommunity(w, r)
 			case path == "/api/communities" && method == http.MethodGet:
 				h.ListCommunities(w, r)
+			case path == "/api/communities/discover":
+				h.DiscoverCommunities(w, r)
+			case strings.HasPrefix(path, "/api/communities/") && strings.HasSuffix(path, "/join"):
+				h.JoinCommunity(w, r)
 			case strings.HasPrefix(path, "/api/communities/") && strings.HasSuffix(path, "/leave"):
 				h.LeaveCommunity(w, r)
 			case strings.HasPrefix(path, "/api/communities/") && strings.Contains(path, "/members/") && strings.HasSuffix(path, "/role"):

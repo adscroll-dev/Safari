@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -82,6 +83,8 @@ func (h *Handler) CreateCommunity(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
+		Visibility  string `json:"visibility"`
+		JoinPolicy  string `json:"join_policy"`
 	}
 	if !decode(w, r, &req) {
 		return
@@ -95,6 +98,20 @@ func (h *Handler) CreateCommunity(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusBadRequest, "description is too long (max 500 characters)")
 		return
 	}
+	if req.Visibility == "" {
+		req.Visibility = "public"
+	}
+	if req.JoinPolicy == "" {
+		req.JoinPolicy = "open"
+	}
+	if req.Visibility != "public" && req.Visibility != "private" {
+		middleware.WriteError(w, http.StatusBadRequest, "invalid visibility")
+		return
+	}
+	if req.JoinPolicy != "open" && req.JoinPolicy != "approval" && req.JoinPolicy != "invite_only" {
+		middleware.WriteError(w, http.StatusBadRequest, "invalid join policy")
+		return
+	}
 	announcement := &models.Chat{
 		Type: models.ChatGroup, Title: name, OwnerID: me, MemberIDs: []string{me},
 	}
@@ -105,6 +122,7 @@ func (h *Handler) CreateCommunity(w http.ResponseWriter, r *http.Request) {
 	community := &models.Community{
 		Name: name, Description: req.Description, OwnerID: me,
 		AnnouncementChatID: announcement.ID,
+		Visibility:         req.Visibility, JoinPolicy: req.JoinPolicy,
 	}
 	if err := h.Store.CreateCommunity(community); err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not create community")
@@ -126,6 +144,79 @@ func (h *Handler) ListCommunities(w http.ResponseWriter, r *http.Request) {
 		out = []*models.Community{}
 	}
 	middleware.WriteJSON(w, http.StatusOK, out)
+}
+
+// DiscoverCommunities lists public, active communities the caller has not joined.
+func (h *Handler) DiscoverCommunities(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	limit := 20
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	offset := 0
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
+			offset = n
+		}
+	}
+	out := h.Store.ListDiscoverCommunities(middleware.UserID(r), limit, offset)
+	if out == nil {
+		out = []*models.Community{}
+	}
+	middleware.WriteJSON(w, http.StatusOK, out)
+}
+
+// JoinCommunity applies the community's join policy to the caller.
+func (h *Handler) JoinCommunity(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	id := communityIDFromPath(r)
+	c := h.Store.CommunityByID(id)
+	if c == nil || c.IsArchived {
+		middleware.WriteError(w, http.StatusNotFound, "community not found")
+		return
+	}
+	me := middleware.UserID(r)
+	if h.Store.CommunityRole(id, me) != "" {
+		c.MemberCount = len(h.Store.CommunityMembers(id))
+		c.MyRole = h.Store.CommunityRole(id, me)
+		middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{"status": "joined", "community": c})
+		return
+	}
+	switch c.JoinPolicy {
+	case "invite_only":
+		middleware.WriteError(w, http.StatusForbidden, "this community requires an invitation")
+	case "approval":
+		if err := h.Store.CreateJoinRequest(id, me); err != nil {
+			middleware.WriteError(w, http.StatusInternalServerError, "could not create join request")
+			return
+		}
+		c.MemberCount = len(h.Store.CommunityMembers(id))
+		middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{"status": "pending", "community": c})
+	case "open":
+		if err := h.Store.AddCommunityMember(id, me, "member"); err != nil {
+			middleware.WriteError(w, http.StatusInternalServerError, "could not join community")
+			return
+		}
+		if c.AnnouncementChatID != "" {
+			_ = h.Store.AddMember(c.AnnouncementChatID, me, "member")
+		}
+		c.MemberCount = len(h.Store.CommunityMembers(id))
+		c.MyRole = "member"
+		middleware.WriteJSON(w, http.StatusOK, map[string]interface{}{"status": "joined", "community": c})
+	default:
+		middleware.WriteError(w, http.StatusInternalServerError, "invalid community join policy")
+	}
 }
 
 // GetCommunity returns one community with its subgroups attached

@@ -11,8 +11,9 @@ import 'data_saver.dart';
 /// Android emulator reaches the host at 10.0.2.2; everywhere else localhost.
 /// (Uses defaultTargetPlatform instead of dart:io so the web build works.)
 class ApiClient {
-  ApiClient({String? baseUrl, this.usage})
-      : baseUrl = baseUrl ?? _defaultBaseUrl();
+  ApiClient({String? baseUrl, this.usage, http.Client? client})
+      : client = client ?? http.Client(),
+        baseUrl = baseUrl ?? _defaultBaseUrl();
 
   static String _defaultBaseUrl() {
     // Release builds can bake in the public API URL, e.g.:
@@ -28,6 +29,7 @@ class ApiClient {
   }
 
   final String baseUrl;
+  final http.Client client;
   String? token;
 
   /// Optional usage tracker (Data Saver meter). When set, every
@@ -60,13 +62,13 @@ class ApiClient {
     final uri = Uri.parse('$baseUrl$path');
     final reqBytes = body == null ? 0 : utf8.encode(jsonEncode(body)).length;
     final res = await _withTimeoutRetry(() => method == 'GET'
-        ? http.get(uri, headers: _headers)
+        ? client.get(uri, headers: _headers)
         : method == 'PUT'
-            ? http.put(uri, headers: _headers, body: jsonEncode(body ?? {}))
+            ? client.put(uri, headers: _headers, body: jsonEncode(body ?? {}))
             : method == 'DELETE'
-                ? http.delete(uri,
+                ? client.delete(uri,
                     headers: _headers, body: jsonEncode(body ?? {}))
-                : http.post(uri,
+                : client.post(uri,
                     headers: _headers, body: jsonEncode(body ?? {})));
     usage?.add(UsageCategory.chat, reqBytes + res.bodyBytes.length);
     final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -78,7 +80,7 @@ class ApiClient {
 
   Future<List<dynamic>> _getList(String path) async {
     final res = await _withTimeoutRetry(
-        () => http.get(Uri.parse('$baseUrl$path'), headers: _headers));
+        () => client.get(Uri.parse('$baseUrl$path'), headers: _headers));
     usage?.add(UsageCategory.chat, res.bodyBytes.length);
     if (res.statusCode >= 400) {
       throw Exception('Request failed: ${res.statusCode}');
@@ -261,6 +263,10 @@ class ApiClient {
 
   // Stage 6 — Communities (WhatsApp parity).
   Future<List<dynamic>> listCommunities() => _getList('/api/communities');
+  Future<List<dynamic>> discoverCommunities({int limit = 20, int offset = 0}) =>
+      _getList('/api/communities/discover?limit=$limit&offset=$offset');
+  Future<Map<String, dynamic>> joinCommunity(String id) =>
+      _req('POST', '/api/communities/$id/join');
   Future<Map<String, dynamic>> createCommunity(String name,
           {String description = ''}) =>
       _req('POST', '/api/communities',

@@ -144,6 +144,9 @@ type StoreIface interface {
 	CommunityMembers(communityID string) []*models.CommunityMember
 	CommunityRole(communityID, userID string) string
 	AddCommunityMember(communityID, userID, role string) error
+	ListDiscoverCommunities(userID string, limit, offset int) []*models.Community
+	CreateJoinRequest(communityID, userID string) error
+	JoinRequestStatus(communityID, userID string) string
 	RemoveCommunityMember(communityID, userID string) error
 	SetCommunityMemberRole(communityID, userID, role string) error
 	AddSubgroup(communityID, chatID string) error
@@ -261,10 +264,10 @@ type MemoryStore struct {
 	// v0.6 state
 	groupSenderKeys map[string]*models.GroupSenderKey // distribution key, see v06.go
 	// Stage 7 state
-	reports []*models.Report
-	devices         map[string]*models.Device         // userID + "/" + deviceID
-	pushSubs        map[string][]push.Subscription    // userID -> subscriptions
-	fcmTokens       map[string][]push.FCMToken        // userID -> FCM tokens
+	reports   []*models.Report
+	devices   map[string]*models.Device      // userID + "/" + deviceID
+	pushSubs  map[string][]push.Subscription // userID -> subscriptions
+	fcmTokens map[string][]push.FCMToken     // userID -> FCM tokens
 	// v0.7 state: email verification codes and pending registrations.
 	emailCodes   map[string]*models.EmailCode   // lower(email) + "|" + purpose
 	pendingUsers map[string]*models.PendingUser // lower(email) -> pending registration
@@ -298,9 +301,10 @@ type MemoryStore struct {
 	// Stage 6: communities (community id -> community), membership
 	// (community id -> user id -> member) and subgroups
 	// (community id -> chat id set).
-	communities        map[string]*models.Community
-	communityMembers   map[string]map[string]*models.CommunityMember
-	communitySubgroups map[string]map[string]bool
+	communities           map[string]*models.Community
+	communityMembers      map[string]map[string]*models.CommunityMember
+	communitySubgroups    map[string]map[string]bool
+	communityJoinRequests map[string]map[string]string
 	// Stage 11: Settings parity — read receipts (user id -> enabled,
 	// default true when absent) and profile-photo / about / groups
 	// privacy (user id -> "everyone" | "nobody", default "everyone").
@@ -330,43 +334,44 @@ func NewMemoryStore() *MemoryStore {
 		users: map[string]*models.User{}, byEmail: map[string]string{},
 		byName: map[string]string{}, chats: map[string]*models.Chat{},
 		messages: map[string]*models.Message{}, chatMsgs: map[string][]string{},
-		blocks:             map[string]map[string]bool{},
-		memberRoles:        map[string]map[string]string{},
-		receipts:           map[string]map[string]*receipt{},
-		presence:           map[string]presenceInfo{},
-		stories:            map[string]*models.Story{},
-		scheduled:          map[string]*models.ScheduledMessage{},
-		bots:               map[string]*models.Bot{},
-		botsByToken:        map[string]string{},
-		identityKeys:       map[string]*models.IdentityKey{},
-		prekeys:            map[string][]*models.OneTimePreKey{},
-		chatSettings:       map[string]models.ChatSettings{},
-		groupSenderKeys:    map[string]*models.GroupSenderKey{},
-		devices:            map[string]*models.Device{},
-		pushSubs:           map[string][]push.Subscription{},
-		reports:            []*models.Report{},
-		fcmTokens:          map[string][]push.FCMToken{},
-		emailCodes:         map[string]*models.EmailCode{},
-		pendingUsers:       map[string]*models.PendingUser{},
-		invites:            map[string]*models.ChatInvite{},
-		lastSeenVisibility: map[string]string{},
-		pinnedMessages:     map[string]string{},
-		deletedForMe:       map[string]map[string]bool{},
-		storyViews:         map[string]map[string]time.Time{},
-		storyReactions:     map[string]map[string]storyReaction{},
-		storyReplies:       map[string][]*models.StoryReply{},
-		statusPrivacy:      map[string]string{},
-		callRecords:        []*models.CallRecord{},
-		polls:              map[string]*models.Poll{},
-		pollVotes:          map[string]map[string][]int{},
-		messageViews:       map[string]map[string]bool{},
-		communities:        map[string]*models.Community{},
-		communityMembers:   map[string]map[string]*models.CommunityMember{},
-		communitySubgroups: map[string]map[string]bool{},
-		readReceipts:       map[string]bool{},
-		avatarPrivacy:      map[string]string{},
-		aboutPrivacy:       map[string]string{},
-		groupsPrivacy:      map[string]string{},
+		blocks:                map[string]map[string]bool{},
+		memberRoles:           map[string]map[string]string{},
+		receipts:              map[string]map[string]*receipt{},
+		presence:              map[string]presenceInfo{},
+		stories:               map[string]*models.Story{},
+		scheduled:             map[string]*models.ScheduledMessage{},
+		bots:                  map[string]*models.Bot{},
+		botsByToken:           map[string]string{},
+		identityKeys:          map[string]*models.IdentityKey{},
+		prekeys:               map[string][]*models.OneTimePreKey{},
+		chatSettings:          map[string]models.ChatSettings{},
+		groupSenderKeys:       map[string]*models.GroupSenderKey{},
+		devices:               map[string]*models.Device{},
+		pushSubs:              map[string][]push.Subscription{},
+		reports:               []*models.Report{},
+		fcmTokens:             map[string][]push.FCMToken{},
+		emailCodes:            map[string]*models.EmailCode{},
+		pendingUsers:          map[string]*models.PendingUser{},
+		invites:               map[string]*models.ChatInvite{},
+		lastSeenVisibility:    map[string]string{},
+		pinnedMessages:        map[string]string{},
+		deletedForMe:          map[string]map[string]bool{},
+		storyViews:            map[string]map[string]time.Time{},
+		storyReactions:        map[string]map[string]storyReaction{},
+		storyReplies:          map[string][]*models.StoryReply{},
+		statusPrivacy:         map[string]string{},
+		callRecords:           []*models.CallRecord{},
+		polls:                 map[string]*models.Poll{},
+		pollVotes:             map[string]map[string][]int{},
+		messageViews:          map[string]map[string]bool{},
+		communities:           map[string]*models.Community{},
+		communityMembers:      map[string]map[string]*models.CommunityMember{},
+		communitySubgroups:    map[string]map[string]bool{},
+		communityJoinRequests: map[string]map[string]string{},
+		readReceipts:          map[string]bool{},
+		avatarPrivacy:         map[string]string{},
+		aboutPrivacy:          map[string]string{},
+		groupsPrivacy:         map[string]string{},
 	}
 }
 

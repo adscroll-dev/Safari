@@ -17,6 +17,12 @@ import (
 func (s *MemoryStore) CreateCommunity(c *models.Community) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if c.Visibility == "" {
+		c.Visibility = "public"
+	}
+	if c.JoinPolicy == "" {
+		c.JoinPolicy = "open"
+	}
 	if c.ID == "" {
 		c.ID = NewID()
 	}
@@ -131,6 +137,66 @@ func (s *MemoryStore) AddCommunityMember(communityID, userID, role string) error
 		UserID: userID, Role: role, JoinedAt: time.Now().UTC(),
 	}
 	return nil
+}
+
+func (s *MemoryStore) ListDiscoverCommunities(userID string, limit, offset int) []*models.Community {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []*models.Community{}
+	for _, c := range s.communities {
+		if c.Visibility != "public" || c.IsArchived {
+			continue
+		}
+		if _, joined := s.communityMembers[c.ID][userID]; joined {
+			continue
+		}
+		cp := *c
+		cp.MemberCount = len(s.communityMembers[c.ID])
+		out = append(out, &cp)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.After(out[j].CreatedAt)
+	})
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(out) {
+		return []*models.Community{}
+	}
+	end := offset + limit
+	if limit <= 0 || end > len(out) {
+		end = len(out)
+	}
+	return out[offset:end]
+}
+
+func (s *MemoryStore) CreateJoinRequest(communityID, userID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.communities[communityID]; !ok {
+		return ErrNotFound
+	}
+	if _, ok := s.users[userID]; !ok {
+		return ErrNotFound
+	}
+	if s.communityJoinRequests[communityID] == nil {
+		s.communityJoinRequests[communityID] = map[string]string{}
+	}
+	status := s.communityJoinRequests[communityID][userID]
+	if status == "pending" {
+		return nil
+	}
+	s.communityJoinRequests[communityID][userID] = "pending"
+	return nil
+}
+
+func (s *MemoryStore) JoinRequestStatus(communityID, userID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.communityJoinRequests[communityID] == nil {
+		return ""
+	}
+	return s.communityJoinRequests[communityID][userID]
 }
 
 func (s *MemoryStore) RemoveCommunityMember(communityID, userID string) error {
