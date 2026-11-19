@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Bluetooth headsets on Android 12+: WebRTC call audio routing
          needs BLUETOOTH_CONNECT; the legacy BLUETOOTH permission (capped
          at API 30 by the WebRTC plugin) no longer covers it. -->
@@ -15,6 +16,10 @@
          switching can silently fail on some devices. Normal permission,
          granted automatically at install. -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.front" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
@@ -51,6 +56,10 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <service
+            android:name=".CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

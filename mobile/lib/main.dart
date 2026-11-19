@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -18,6 +19,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'api.dart';
 import 'call.dart';
+import 'call_foreground_service.dart';
 import 'chat_extras.dart';
 import 'data_saver.dart';
 import 'e2ee_client.dart';
@@ -208,6 +210,7 @@ class _HomePageState extends State<HomePage>
   late final Future<void> _prefsInitialization;
   final _api = ApiClient();
   final _usage = DataUsageTracker();
+  final _callForegroundService = MethodChannelCallForegroundService();
   final _email = TextEditingController();
   final _displayName = TextEditingController();
   final _password = TextEditingController();
@@ -371,6 +374,12 @@ class _HomePageState extends State<HomePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _callForegroundService.setOpenCallHandler((chatId) {
+      if (mounted) unawaited(_consumePendingCallNavigation());
+    });
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(_consumePendingCallNavigation());
+    }
     _authAnim =
         AnimationController(vsync: this, duration: const Duration(seconds: 7))
           ..forward();
@@ -894,6 +903,10 @@ class _HomePageState extends State<HomePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        defaultTargetPlatform == TargetPlatform.android) {
+      unawaited(_consumePendingCallNavigation());
+    }
     // Stage 8: arm the app lock when the app leaves the foreground
     // (WhatsApp locks on background). Unlocking needs the PIN or a
     // fingerprint — the chats stay hidden until then.
@@ -906,9 +919,17 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _consumePendingCallNavigation() async {
+    final chatId = await _callForegroundService.consumePendingNavigation();
+    if (mounted && chatId != null && chatId.isNotEmpty) {
+      _openChatById(chatId);
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _callForegroundService.setOpenCallHandler(null);
     _authAnim.dispose();
     _ringAnim.dispose();
     _wsChatRefreshTimer?.cancel();
@@ -1085,6 +1106,7 @@ class _HomePageState extends State<HomePage>
         }));
       },
       usage: _usage,
+      foregroundService: _callForegroundService,
     );
     // Show the remote video through a renderer (RTCVideoView takes
     // a renderer, not a MediaStream): attach each new remote stream.
@@ -8431,15 +8453,28 @@ class _HomePageState extends State<HomePage>
     if (call.group) {
       final members = await _api.listMembers(call.chatId);
       final others = <String>[];
+      var groupName = 'Group call';
+      for (final chat in _chats) {
+        if (chat is Map<String, dynamic> && chat['id'] == call.chatId) {
+          groupName = _chatTitle(chat);
+          break;
+        }
+      }
       for (final m in members) {
         final uid = (m as Map)['user_id'] as String;
         if (uid != _user!['id'] && uid != call.peerId) {
           others.add(uid);
         }
       }
-      await _call?.acceptGroupCall(call, others);
+      await _call?.acceptGroupCall(
+        call,
+        others,
+        peerName: groupName,
+      );
     } else {
-      await _call?.acceptCall(call);
+      final peerName =
+          (_usersById[call.peerId]?['display_name'] as String?) ?? '';
+      await _call?.acceptCall(call, peerName: peerName);
     }
     if (mounted) setState(() {});
   }
@@ -8470,15 +8505,15 @@ class _HomePageState extends State<HomePage>
 
   /// Decline the ringing call (Stage 3). The caller records it as a
   /// missed call in their history.
-  void _declineIncomingCall() {
+  Future<void> _declineIncomingCall() async {
     final call = _incomingCall;
     if (call == null) return;
     if (call.group) {
-      _call?.declineGroupCall(call);
+      await _call?.declineGroupCall(call);
     } else {
-      _call?.declineCall(call);
+      await _call?.declineCall(call);
     }
-    setState(() => _incomingCall = null);
+    if (mounted) setState(() => _incomingCall = null);
   }
 
   String _callDurationLabel() {
@@ -8508,6 +8543,7 @@ class _HomePageState extends State<HomePage>
         await _call!.startGroupCall(
             chatId: _activeChat!['id'] as String,
             peerIds: peerIds,
+            peerName: _chatTitle(_activeChat!),
             video: video);
       } else {
         final peerId = await _peerUserId();
@@ -8517,7 +8553,10 @@ class _HomePageState extends State<HomePage>
         }
         _callInitiatedByMe = true;
         await _call!.startCall(
-            chatId: _activeChat!['id'] as String, peerId: peerId, video: video);
+            chatId: _activeChat!['id'] as String,
+            peerId: peerId,
+            peerName: _chatTitle(_activeChat!),
+            video: video);
       }
       if (mounted) setState(() {});
     } catch (e) {
@@ -8660,7 +8699,7 @@ class _HomePageState extends State<HomePage>
             child: Opacity(
               opacity: dark ? 0.075 : 0.035,
               child: Center(
-                child:                 Image.asset(
+                child: Image.asset(
                   'assets/safari-logo-transparent.png',
                   width: MediaQuery.sizeOf(context).width * 0.9,
                   height: MediaQuery.sizeOf(context).width * 0.9,

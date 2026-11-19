@@ -24,6 +24,7 @@ import 'dart:async';
 
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import 'call_foreground_service.dart';
 import 'data_saver.dart';
 
 /// Default ICE servers. TURN is empty by default (STUN-only, like the
@@ -55,10 +56,16 @@ typedef SendSignal = void Function(
     String chatId, String type, String toUserId, Map<String, dynamic> payload);
 
 class CallController {
-  CallController({required this.sendSignal, required this.usage});
+  CallController({
+    required this.sendSignal,
+    required this.usage,
+    CallForegroundService? foregroundService,
+  }) : foregroundService =
+            foregroundService ?? MethodChannelCallForegroundService();
 
   final SendSignal sendSignal;
   final DataUsageTracker usage;
+  final CallForegroundService foregroundService;
 
   RTCPeerConnection? _pc;
   MediaStream? _localStream;
@@ -263,6 +270,7 @@ class CallController {
   Future<void> startCall(
       {required String chatId,
       required String peerId,
+      String peerName = '',
       bool video = false}) async {
     _pendingDirectIce.clear();
     _directRemoteDescriptionSet = false;
@@ -271,20 +279,35 @@ class CallController {
     this.video = video;
     audioOnly = !video;
     _iceRestarted = false;
-    _pc = await _newPc();
-    _localStream = await _getLocalMedia(video: video);
-    _localStream!.getTracks().forEach(_pc!.addTrack);
-    final offer = await _pc!.createOffer(
-        {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
-    final capped = capSdpBitrates(offer.sdp ?? '', video: video);
-    await _pc!.setLocalDescription(RTCSessionDescription(capped, offer.type));
-    state = CallState.outgoing;
-    _stateController.add(state);
-    sendSignal(chatId, 'call-offer', peerId, {
-      'sdp': capped,
-      'type': offer.type,
-      'video': video,
-    });
+    var serviceStartAttempted = false;
+    try {
+      _pc = await _newPc();
+      _localStream = await _getLocalMedia(video: video);
+      serviceStartAttempted = true;
+      await foregroundService.start(
+        chatId: chatId,
+        peerName: peerName,
+        video: video,
+      );
+      _localStream!.getTracks().forEach(_pc!.addTrack);
+      final offer = await _pc!.createOffer(
+          {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+      final capped = capSdpBitrates(offer.sdp ?? '', video: video);
+      await _pc!.setLocalDescription(RTCSessionDescription(capped, offer.type));
+      state = CallState.outgoing;
+      _stateController.add(state);
+      sendSignal(chatId, 'call-offer', peerId, {
+        'sdp': capped,
+        'type': offer.type,
+        'video': video,
+      });
+    } catch (_) {
+      await _cleanup();
+      state = CallState.idle;
+      _stateController.add(state);
+      if (serviceStartAttempted) await foregroundService.stop();
+      rethrow;
+    }
   }
 
   /// Handle an incoming call-offer (called from the WS event loop).
@@ -301,33 +324,50 @@ class CallController {
     return IncomingCall(chatId: chatId, peerId: peerId, offer: offer);
   }
 
-  Future<void> acceptCall(IncomingCall call) async {
-    _pc = await _newPc();
+  Future<void> acceptCall(IncomingCall call, {String peerName = ''}) async {
     _iceRestarted = false;
-    _localStream = await _getLocalMedia(video: video);
-    _localStream!.getTracks().forEach(_pc!.addTrack);
-    await _pc!.setRemoteDescription(RTCSessionDescription(
-        call.offer['sdp'] as String, call.offer['type'] as String));
-    _directRemoteDescriptionSet = true;
-    await _flushDirectIce();
-    final answer = await _pc!.createAnswer(
-        {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
-    final capped = capSdpBitrates(answer.sdp ?? '', video: video);
-    await _pc!.setLocalDescription(RTCSessionDescription(capped, answer.type));
-    _callStartedAt = DateTime.now();
-    state = CallState.inCall;
-    _stateController.add(state);
-    sendSignal(call.chatId, 'call-answer', call.peerId, {
-      'sdp': capped,
-      'type': answer.type,
-      'video': video,
-    });
+    var serviceStartAttempted = false;
+    try {
+      _pc = await _newPc();
+      _localStream = await _getLocalMedia(video: video);
+      serviceStartAttempted = true;
+      await foregroundService.start(
+        chatId: call.chatId,
+        peerName: peerName,
+        video: video,
+      );
+      _localStream!.getTracks().forEach(_pc!.addTrack);
+      await _pc!.setRemoteDescription(RTCSessionDescription(
+          call.offer['sdp'] as String, call.offer['type'] as String));
+      _directRemoteDescriptionSet = true;
+      await _flushDirectIce();
+      final answer = await _pc!.createAnswer(
+          {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+      final capped = capSdpBitrates(answer.sdp ?? '', video: video);
+      await _pc!
+          .setLocalDescription(RTCSessionDescription(capped, answer.type));
+      _callStartedAt = DateTime.now();
+      state = CallState.inCall;
+      _stateController.add(state);
+      sendSignal(call.chatId, 'call-answer', call.peerId, {
+        'sdp': capped,
+        'type': answer.type,
+        'video': video,
+      });
+    } catch (_) {
+      await _cleanup();
+      state = CallState.idle;
+      _stateController.add(state);
+      if (serviceStartAttempted) await foregroundService.stop();
+      rethrow;
+    }
   }
 
-  void declineCall(IncomingCall call) {
+  Future<void> declineCall(IncomingCall call) async {
     sendSignal(call.chatId, 'call-end', call.peerId, {'reason': 'declined'});
     state = CallState.idle;
     _stateController.add(state);
+    await foregroundService.stop();
   }
 
   // ---- Stage 3: group calls (mesh) ----
@@ -337,6 +377,7 @@ class CallController {
   Future<void> startGroupCall(
       {required String chatId,
       required List<String> peerIds,
+      String peerName = '',
       bool video = false}) async {
     this.chatId = chatId;
     isGroup = true;
@@ -344,24 +385,40 @@ class CallController {
     audioOnly = !video;
     _iceRestarted = false;
     _groupPeers.addAll(peerIds);
-    _localStream = await _getLocalMedia(video: video);
-    for (final peer in peerIds) {
-      final pc = await _newPcForPeer(peer);
-      _groupPcs[peer] = pc;
-      _localStream!.getTracks().forEach(pc.addTrack);
-      final offer = await pc.createOffer(
-          {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
-      final capped = capSdpBitrates(offer.sdp ?? '', video: video);
-      await pc.setLocalDescription(RTCSessionDescription(capped, offer.type));
-      sendSignal(chatId, 'call-offer', peer, {
-        'sdp': capped,
-        'type': offer.type,
-        'video': video,
-        'group': true,
-      });
+    var serviceStartAttempted = false;
+    try {
+      _localStream = await _getLocalMedia(video: video);
+      serviceStartAttempted = true;
+      await foregroundService.start(
+        chatId: chatId,
+        peerName: peerName,
+        video: video,
+      );
+      state = CallState.outgoing;
+      _stateController.add(state);
+      for (final peer in peerIds) {
+        final pc = await _newPcForPeer(peer);
+        _groupPcs[peer] = pc;
+        _localStream!.getTracks().forEach(pc.addTrack);
+        final offer = await pc.createOffer(
+            {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+        final capped = capSdpBitrates(offer.sdp ?? '', video: video);
+        await pc.setLocalDescription(RTCSessionDescription(capped, offer.type));
+        sendSignal(chatId, 'call-offer', peer, {
+          'sdp': capped,
+          'type': offer.type,
+          'video': video,
+          'group': true,
+        });
+        if (state == CallState.idle) return;
+      }
+    } catch (_) {
+      await _cleanupGroup();
+      state = CallState.idle;
+      _stateController.add(state);
+      if (serviceStartAttempted) await foregroundService.stop();
+      rethrow;
     }
-    state = CallState.outgoing;
-    _stateController.add(state);
   }
 
   /// Handle an incoming group-call offer. The offer is parked until
@@ -380,61 +437,81 @@ class CallController {
 
   /// Accept a group call: answer the peer who invited us, then offer
   /// to every other member (mesh) so all pairs connect.
-  Future<void> acceptGroupCall(
-      IncomingCall call, List<String> otherMemberIds) async {
+  Future<void> acceptGroupCall(IncomingCall call, List<String> otherMemberIds,
+      {String peerName = ''}) async {
     _iceRestarted = false;
-    _localStream ??= await _getLocalMedia(video: video);
-    _groupPeers.addAll(otherMemberIds);
-    _groupPeers.add(call.peerId);
-    // Answer the peer who invited us.
-    final pc = await _newPcForPeer(call.peerId);
-    _groupPcs[call.peerId] = pc;
-    _localStream!.getTracks().forEach(pc.addTrack);
-    await pc.setRemoteDescription(RTCSessionDescription(
-        call.offer['sdp'] as String, call.offer['type'] as String));
-    _groupRemoteDescriptions.add(call.peerId);
-    await _flushGroupIce(call.peerId);
-    final answer = await pc.createAnswer(
-        {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
-    final capped = capSdpBitrates(answer.sdp ?? '', video: video);
-    await pc.setLocalDescription(RTCSessionDescription(capped, answer.type));
-    sendSignal(call.chatId, 'call-answer', call.peerId, {
-      'sdp': capped,
-      'type': answer.type,
-      'video': video,
-      'group': true,
-    });
-    // Offer to the remaining members (mesh).
-    for (final peer in otherMemberIds) {
-      if (peer == call.peerId || _groupPcs.containsKey(peer)) continue;
-      final p2 = await _newPcForPeer(peer);
-      _groupPcs[peer] = p2;
-      _localStream!.getTracks().forEach(p2.addTrack);
-      final offer = await p2.createOffer(
+    var serviceStartAttempted = false;
+    try {
+      _localStream ??= await _getLocalMedia(video: video);
+      serviceStartAttempted = true;
+      await foregroundService.start(
+        chatId: call.chatId,
+        peerName: peerName,
+        video: video,
+      );
+      _groupPeers.addAll(otherMemberIds);
+      _groupPeers.add(call.peerId);
+      // Answer the peer who invited us.
+      final pc = await _newPcForPeer(call.peerId);
+      _groupPcs[call.peerId] = pc;
+      _localStream!.getTracks().forEach(pc.addTrack);
+      await pc.setRemoteDescription(RTCSessionDescription(
+          call.offer['sdp'] as String, call.offer['type'] as String));
+      _groupRemoteDescriptions.add(call.peerId);
+      await _flushGroupIce(call.peerId);
+      final answer = await pc.createAnswer(
           {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
-      final cappedOffer = capSdpBitrates(offer.sdp ?? '', video: video);
-      await p2.setLocalDescription(
-          RTCSessionDescription(cappedOffer, offer.type));
-      sendSignal(call.chatId, 'call-offer', peer, {
-        'sdp': cappedOffer,
-        'type': offer.type,
+      final capped = capSdpBitrates(answer.sdp ?? '', video: video);
+      await pc.setLocalDescription(RTCSessionDescription(capped, answer.type));
+      sendSignal(call.chatId, 'call-answer', call.peerId, {
+        'sdp': capped,
+        'type': answer.type,
         'video': video,
         'group': true,
       });
+      if (state == CallState.idle) return;
+      // Offer to the remaining members (mesh).
+      for (final peer in otherMemberIds) {
+        if (state == CallState.idle) return;
+        if (peer == call.peerId || _groupPcs.containsKey(peer)) continue;
+        final p2 = await _newPcForPeer(peer);
+        _groupPcs[peer] = p2;
+        _localStream!.getTracks().forEach(p2.addTrack);
+        final offer = await p2.createOffer(
+            {'offerToReceiveAudio': 1, 'offerToReceiveVideo': video ? 1 : 0});
+        final cappedOffer = capSdpBitrates(offer.sdp ?? '', video: video);
+        await p2.setLocalDescription(
+            RTCSessionDescription(cappedOffer, offer.type));
+        sendSignal(call.chatId, 'call-offer', peer, {
+          'sdp': cappedOffer,
+          'type': offer.type,
+          'video': video,
+          'group': true,
+        });
+        if (state == CallState.idle) return;
+      }
+      if (state == CallState.idle) return;
+      _callStartedAt = DateTime.now();
+      state = CallState.inCall;
+      _stateController.add(state);
+    } catch (_) {
+      await _cleanupGroup();
+      state = CallState.idle;
+      _stateController.add(state);
+      if (serviceStartAttempted) await foregroundService.stop();
+      rethrow;
     }
-    _callStartedAt = DateTime.now();
-    state = CallState.inCall;
-    _stateController.add(state);
   }
 
   /// Decline a group-call invite: only the inviter is told.
-  void declineGroupCall(IncomingCall call) {
+  Future<void> declineGroupCall(IncomingCall call) async {
     sendSignal(call.chatId, 'call-end', call.peerId, {'reason': 'declined'});
     _pendingGroupOffers.remove(call.peerId);
     if (_groupPcs.isEmpty) {
       isGroup = false;
       state = CallState.idle;
       _stateController.add(state);
+      await foregroundService.stop();
     }
   }
 
@@ -476,6 +553,7 @@ class CallController {
     await _cleanupGroup();
     state = CallState.idle;
     _stateController.add(state);
+    await foregroundService.stop();
   }
 
   /// One peer left a group call. When nobody is left, the call ends
@@ -493,6 +571,7 @@ class CallController {
       await _cleanupGroup();
       state = CallState.idle;
       _stateController.add(state);
+      await foregroundService.stop();
     }
   }
 
@@ -616,6 +695,7 @@ class CallController {
     await _cleanup();
     state = CallState.idle;
     _stateController.add(state);
+    await foregroundService.stop();
   }
 
   /// Remote peer ended the call.
@@ -624,6 +704,7 @@ class CallController {
     await _cleanup();
     state = CallState.idle;
     _stateController.add(state);
+    await foregroundService.stop();
   }
 
   Future<void> _recordUsage() async {
