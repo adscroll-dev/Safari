@@ -335,6 +335,13 @@ type Story struct {
 	CreatedAt       time.Time `json:"created_at"`
 }
 
+type StatusExclusion struct {
+	OwnerID     string    `json:"owner_id"`
+	UserID      string    `json:"user_id"`
+	DisplayName string    `json:"display_name"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
 // StoryView is one user having viewed a story.
 type StoryView struct {
 	UserID      string    `json:"user_id"`

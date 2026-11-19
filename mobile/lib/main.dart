@@ -225,6 +225,170 @@ class _CommunityJoinRequestsState extends State<CommunityJoinRequests> {
   }
 }
 
+class StatusExclusionsSettings extends StatefulWidget {
+  const StatusExclusionsSettings({
+    super.key,
+    required this.api,
+    required this.users,
+    required this.currentUserId,
+  });
+
+  final ApiClient api;
+  final Map<String, Map<String, dynamic>> users;
+  final String currentUserId;
+
+  @override
+  State<StatusExclusionsSettings> createState() =>
+      _StatusExclusionsSettingsState();
+}
+
+class _StatusExclusionsSettingsState extends State<StatusExclusionsSettings> {
+  List<dynamic> _exclusions = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final exclusions = await widget.api.getStatusExclusions();
+      if (mounted) {
+        setState(() {
+          _exclusions = exclusions;
+          _loading = false;
+          _error = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  Future<void> _add(String userId) async {
+    try {
+      await widget.api.addStatusExclusion(userId);
+      await _refresh();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _remove(String userId) async {
+    try {
+      await widget.api.removeStatusExclusion(userId);
+      await _refresh();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _showPeoplePicker() async {
+    final excludedIDs = _exclusions
+        .map((item) => (item as Map<String, dynamic>)['user_id'] as String?)
+        .whereType<String>()
+        .toSet();
+    final people = widget.users.entries
+        .where((entry) =>
+            entry.key != widget.currentUserId &&
+            !excludedIDs.contains(entry.key))
+        .toList()
+      ..sort((a, b) => _displayName(a.key, a.value)
+          .toLowerCase()
+          .compareTo(_displayName(b.key, b.value).toLowerCase()));
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: FractionallySizedBox(
+          heightFactor: 0.7,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Add people',
+                    style: Theme.of(sheetContext).textTheme.titleMedium),
+              ),
+              Expanded(
+                child: people.isEmpty
+                    ? const Center(child: Text('No people available'))
+                    : ListView.builder(
+                        itemCount: people.length,
+                        itemBuilder: (context, index) {
+                          final person = people[index];
+                          final name = _displayName(person.key, person.value);
+                          return ListTile(
+                            leading: OrbitAvatar(label: name, radius: 20),
+                            title: Text(name),
+                            onTap: () =>
+                                Navigator.pop(sheetContext, person.key),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected != null) await _add(selected);
+  }
+
+  String _displayName(String id, Map<String, dynamic> user) =>
+      user['display_name'] as String? ?? user['username'] as String? ?? id;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading && _exclusions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(_error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        for (final item in _exclusions)
+          Builder(builder: (context) {
+            final exclusion = item as Map<String, dynamic>;
+            final userId = exclusion['user_id'] as String? ?? '';
+            final name = _displayName(userId, widget.users[userId] ?? const {});
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              leading: OrbitAvatar(label: name, radius: 20),
+              title: Text(name),
+              trailing: TextButton(
+                onPressed: userId.isEmpty ? null : () => _remove(userId),
+                child: const Text('Remove'),
+              ),
+            );
+          }),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          leading: const Icon(Icons.person_add_alt_1),
+          title: const Text('Add people'),
+          onTap: _showPeoplePicker,
+        ),
+      ],
+    );
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Register FCM's background handler before the app starts. Failures
@@ -481,8 +645,8 @@ class _HomePageState extends State<HomePage>
   // Last-seen privacy (Telegram/WhatsApp-style): "everyone" or
   // "nobody". Loaded from the server after login.
   String _lastSeenVisibility = 'everyone';
-  // Status privacy (Stage 2): who may see my status — "everyone"
-  // (default) or "nobody". Loaded from the server after login.
+  // Status privacy (Stage 2): who may see my status — everyone,
+  // nobody, or selected exclusions. Loaded from the server after login.
   String _statusPrivacy = 'everyone';
   // Stage 11 (Settings parity): avatar/about/groups privacy and
   // read receipts, from the combined /privacy-settings endpoint.
@@ -7853,6 +8017,22 @@ class _HomePageState extends State<HomePage>
             if (v != null) _setStatusPrivacy(v);
           },
         ),
+        RadioListTile<String>(
+          title: const Text('Except specific people'),
+          subtitle: const Text(
+              'The people you choose cannot see your status updates.'),
+          value: 'except',
+          groupValue: _statusPrivacy,
+          onChanged: (v) {
+            if (v != null) _setStatusPrivacy(v);
+          },
+        ),
+        if (_statusPrivacy == 'except')
+          StatusExclusionsSettings(
+            api: _api,
+            users: _usersById,
+            currentUserId: _user?['id'] as String? ?? '',
+          ),
         header('Privacy'),
         SwitchListTile(
           title: const Text('Read receipts'),

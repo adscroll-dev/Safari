@@ -122,6 +122,10 @@ func (s *MemoryStore) DeleteUser(userID string) error {
 	delete(s.byName, strings.ToLower(u.Username))
 	delete(s.lastSeenVisibility, userID)
 	delete(s.statusPrivacy, userID)
+	delete(s.statusExclusions, userID)
+	for ownerID := range s.statusExclusions {
+		delete(s.statusExclusions[ownerID], userID)
+	}
 	delete(s.readReceipts, userID)
 	delete(s.avatarPrivacy, userID)
 	delete(s.aboutPrivacy, userID)

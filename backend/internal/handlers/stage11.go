@@ -63,7 +63,7 @@ func (h *Handler) SetPrivacySettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.StatusPrivacy != nil && !store.ValidStatusPrivacy(*req.StatusPrivacy) {
-		middleware.WriteError(w, http.StatusBadRequest, "status_privacy must be \"everyone\" or \"nobody\"")
+		middleware.WriteError(w, http.StatusBadRequest, "status_privacy must be \"everyone\", \"nobody\", or \"except\"")
 		return
 	}
 	for field, v := range map[string]*string{

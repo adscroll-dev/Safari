@@ -231,7 +231,7 @@ func (h *Handler) ListStories(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) visibleStories(in []*models.Story, me string) []*models.Story {
 	out := []*models.Story{}
 	for _, st := range in {
-		if st.UserID != me && h.Store.GetStatusPrivacy(st.UserID) == store.StatusNobody {
+		if h.statusHiddenFrom(st.UserID, me) {
 			continue
 		}
 		cp := *st

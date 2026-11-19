@@ -280,6 +280,9 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 				} else {
 					h.GetStatusPrivacy(w, r)
 				}
+			case path == "/api/users/me/status-exclusions" ||
+				strings.HasPrefix(path, "/api/users/me/status-exclusions/"):
+				h.StatusExclusions(w, r)
 			case path == "/api/calls":
 				if method == http.MethodPost {
 					h.CreateCallRecord(w, r)

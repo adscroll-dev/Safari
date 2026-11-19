@@ -244,6 +244,8 @@ func main() {
 			middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 	})))
+	mux.Handle("/api/users/me/status-exclusions", authMW(http.HandlerFunc(h.StatusExclusions)))
+	mux.Handle("/api/users/me/status-exclusions/", authMW(http.HandlerFunc(h.StatusExclusions)))
 	// Stage 11: combined privacy settings (last seen, status,
 	// avatar, about, groups, read receipts) in one call.
 	mux.Handle("/api/users/me/privacy-settings", authMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

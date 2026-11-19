@@ -250,3 +250,82 @@ func (s *PostgresStore) SetStatusPrivacy(userID, privacy string) error {
 	}
 	return nil
 }
+
+func (s *PostgresStore) ListStatusExclusions(ownerID string) ([]*models.StatusExclusion, error) {
+	if !isUUID(ownerID) {
+		return nil, ErrNotFound
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.pool.Query(ctx,
+		`SELECT e.owner_id, e.excluded_user_id, u.display_name, e.created_at
+		 FROM status_exclusions e JOIN users u ON u.id::text = e.excluded_user_id
+		 WHERE e.owner_id = $1 ORDER BY e.created_at, e.excluded_user_id`, ownerID)
+	if err != nil {
+		return nil, mapStoreErr(err)
+	}
+	defer rows.Close()
+	out := []*models.StatusExclusion{}
+	for rows.Next() {
+		var exclusion models.StatusExclusion
+		if err := rows.Scan(&exclusion.OwnerID, &exclusion.UserID, &exclusion.DisplayName, &exclusion.CreatedAt); err != nil {
+			return nil, mapStoreErr(err)
+		}
+		out = append(out, &exclusion)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapStoreErr(err)
+	}
+	return out, nil
+}
+
+func (s *PostgresStore) AddStatusExclusion(ownerID, excludedID string) error {
+	if !isUUID(ownerID) || !isUUID(excludedID) {
+		return ErrNotFound
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var ownerExists, excludedExists bool
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, ownerID).Scan(&ownerExists); err != nil {
+		return mapStoreErr(err)
+	}
+	if err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)`, excludedID).Scan(&excludedExists); err != nil {
+		return mapStoreErr(err)
+	}
+	if !ownerExists || !excludedExists {
+		return ErrNotFound
+	}
+	if ownerID == excludedID {
+		return ErrForbidden
+	}
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO status_exclusions (owner_id, excluded_user_id)
+		 VALUES ($1, $2) ON CONFLICT (owner_id, excluded_user_id) DO NOTHING`,
+		ownerID, excludedID)
+	return mapStoreErr(err)
+}
+
+func (s *PostgresStore) RemoveStatusExclusion(ownerID, excludedID string) error {
+	if !isUUID(ownerID) {
+		return ErrNotFound
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM status_exclusions WHERE owner_id = $1 AND excluded_user_id = $2`,
+		ownerID, excludedID)
+	return mapStoreErr(err)
+}
+
+func (s *PostgresStore) IsStatusExcluded(ownerID, viewerID string) bool {
+	if !isUUID(ownerID) || !isUUID(viewerID) {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var excluded bool
+	err := s.pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM status_exclusions WHERE owner_id = $1 AND excluded_user_id = $2)`,
+		ownerID, viewerID).Scan(&excluded)
+	return err == nil && excluded
+}

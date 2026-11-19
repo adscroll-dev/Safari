@@ -26,7 +26,7 @@ import (
 //   GET    /api/stories/{id}/replies         replies (owner only)
 //   POST   /api/stories/{id}/reply           reply (also a DM message)
 //   GET    /api/users/me/status-privacy      {"status_privacy": ...}
-//   PUT    /api/users/me/status-privacy      {"status_privacy": "everyone"|"nobody"}
+//   PUT    /api/users/me/status-privacy      {"status_privacy": "everyone"|"nobody"|"except"}
 
 // storyBackgroundPalette is the fixed set of background colours a
 // text status may use (WhatsApp-style). The client offers the same list.
@@ -82,11 +82,25 @@ func (h *Handler) storyForViewer(w http.ResponseWriter, r *http.Request, id stri
 		return nil, false
 	}
 	me := middleware.UserID(r)
-	if st.UserID != me && h.Store.GetStatusPrivacy(st.UserID) == store.StatusNobody {
+	if h.statusHiddenFrom(st.UserID, me) {
 		middleware.WriteError(w, http.StatusForbidden, "this status is private")
 		return nil, false
 	}
 	return st, true
+}
+
+func (h *Handler) statusHiddenFrom(ownerID, viewerID string) bool {
+	if ownerID == viewerID {
+		return false
+	}
+	switch h.Store.GetStatusPrivacy(ownerID) {
+	case store.StatusNobody:
+		return true
+	case store.StatusExcept:
+		return h.Store.IsStatusExcluded(ownerID, viewerID)
+	default:
+		return false
+	}
 }
 
 // DeleteStory deletes the requester's own story (and its views,
@@ -337,7 +351,7 @@ func (h *Handler) SetStatusPrivacy(w http.ResponseWriter, r *http.Request) {
 	}
 	if !store.ValidStatusPrivacy(req.StatusPrivacy) {
 		middleware.WriteError(w, http.StatusBadRequest,
-			"status_privacy must be \"everyone\" or \"nobody\"")
+			"status_privacy must be \"everyone\", \"nobody\", or \"except\"")
 		return
 	}
 	me := middleware.UserID(r)
@@ -349,4 +363,92 @@ func (h *Handler) SetStatusPrivacy(w http.ResponseWriter, r *http.Request) {
 	middleware.WriteJSON(w, http.StatusOK, map[string]string{
 		"status_privacy": req.StatusPrivacy,
 	})
+}
+
+func (h *Handler) StatusExclusions(w http.ResponseWriter, r *http.Request) {
+	me := middleware.UserID(r)
+	switch r.Method {
+	case http.MethodGet:
+		exclusions, err := h.Store.ListStatusExclusions(me)
+		if err != nil {
+			if err == store.ErrNotFound {
+				middleware.WriteError(w, http.StatusNotFound, "user not found")
+				return
+			}
+			middleware.WriteError(w, http.StatusInternalServerError, "could not load status exclusions")
+			return
+		}
+		middleware.WriteJSON(w, http.StatusOK, exclusions)
+	case http.MethodPost:
+		var req struct {
+			UserID string `json:"user_id"`
+		}
+		if !decode(w, r, &req) {
+			return
+		}
+		if req.UserID == "" {
+			middleware.WriteError(w, http.StatusBadRequest, "user_id is required")
+			return
+		}
+		before, err := h.Store.ListStatusExclusions(me)
+		if err != nil {
+			if err == store.ErrNotFound {
+				middleware.WriteError(w, http.StatusNotFound, "user not found")
+				return
+			}
+			middleware.WriteError(w, http.StatusInternalServerError, "could not load status exclusions")
+			return
+		}
+		alreadyExcluded := false
+		for _, exclusion := range before {
+			if exclusion.UserID == req.UserID {
+				alreadyExcluded = true
+				break
+			}
+		}
+		if err := h.Store.AddStatusExclusion(me, req.UserID); err != nil {
+			switch err {
+			case store.ErrNotFound:
+				middleware.WriteError(w, http.StatusNotFound, "user not found")
+			case store.ErrForbidden:
+				middleware.WriteError(w, http.StatusBadRequest, "you cannot exclude yourself")
+			default:
+				middleware.WriteError(w, http.StatusInternalServerError, "could not add status exclusion")
+			}
+			return
+		}
+		after, err := h.Store.ListStatusExclusions(me)
+		if err != nil {
+			middleware.WriteError(w, http.StatusInternalServerError, "could not load status exclusions")
+			return
+		}
+		for _, exclusion := range after {
+			if exclusion.UserID == req.UserID {
+				code := http.StatusCreated
+				if alreadyExcluded {
+					code = http.StatusOK
+				}
+				middleware.WriteJSON(w, code, exclusion)
+				return
+			}
+		}
+		middleware.WriteError(w, http.StatusInternalServerError, "could not load added status exclusion")
+	case http.MethodDelete:
+		userID := strings.TrimPrefix(r.URL.Path, "/api/users/me/status-exclusions/")
+		if userID == r.URL.Path || userID == "" || strings.Contains(userID, "/") {
+			middleware.WriteError(w, http.StatusBadRequest, "user_id is required")
+			return
+		}
+		if err := h.Store.RemoveStatusExclusion(me, userID); err != nil {
+			if err == store.ErrNotFound {
+				middleware.WriteError(w, http.StatusNotFound, "user not found")
+				return
+			}
+			middleware.WriteError(w, http.StatusInternalServerError, "could not remove status exclusion")
+			return
+		}
+		middleware.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	default:
+		middleware.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }

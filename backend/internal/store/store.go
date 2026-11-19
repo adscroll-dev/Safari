@@ -101,6 +101,7 @@ type StoreIface interface {
 	CreateStory(st *models.Story) error
 	ListStories() []*models.Story
 	ListStoriesByUser(userID string) []*models.Story
+	StoriesByMediaURL(mediaURL string) []*models.Story
 	// Stage 2 (status gaps).
 	StoryByID(id string) *models.Story
 	DeleteStory(id string) error
@@ -115,6 +116,10 @@ type StoreIface interface {
 	ListStoryReplies(storyID string) []*models.StoryReply
 	GetStatusPrivacy(userID string) string
 	SetStatusPrivacy(userID, privacy string) error
+	ListStatusExclusions(ownerID string) ([]*models.StatusExclusion, error)
+	AddStatusExclusion(ownerID, excludedID string) error
+	RemoveStatusExclusion(ownerID, excludedID string) error
+	IsStatusExcluded(ownerID, viewerID string) bool
 	// Stage 3 (calls): one record per finished/missed call, written
 	// by the caller when the call ends.
 	CreateCallRecord(rec *models.CallRecord) error
@@ -285,10 +290,11 @@ type MemoryStore struct {
 	// Stage 2: story viewers (story id -> user id -> viewed at),
 	// reactions (story id -> user id -> reaction) and replies
 	// (story id -> replies in order); status privacy per user.
-	storyViews     map[string]map[string]time.Time
-	storyReactions map[string]map[string]storyReaction
-	storyReplies   map[string][]*models.StoryReply
-	statusPrivacy  map[string]string
+	storyViews       map[string]map[string]time.Time
+	storyReactions   map[string]map[string]storyReaction
+	storyReplies     map[string][]*models.StoryReply
+	statusPrivacy    map[string]string
+	statusExclusions map[string]map[string]time.Time
 	// Stage 3: call history, newest first per user (call records in
 	// insertion order; ListCallRecordsForUser sorts them).
 	callRecords []*models.CallRecord
@@ -367,6 +373,7 @@ func NewMemoryStore() *MemoryStore {
 		storyReactions:        map[string]map[string]storyReaction{},
 		storyReplies:          map[string][]*models.StoryReply{},
 		statusPrivacy:         map[string]string{},
+		statusExclusions:      map[string]map[string]time.Time{},
 		callRecords:           []*models.CallRecord{},
 		polls:                 map[string]*models.Poll{},
 		pollVotes:             map[string]map[string][]int{},

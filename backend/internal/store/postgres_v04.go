@@ -314,6 +314,24 @@ func (s *PostgresStore) ListStoriesByUser(userID string) []*models.Story {
 	return out
 }
 
+func (s *PostgresStore) StoriesByMediaURL(mediaURL string) []*models.Story {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rows, err := s.pool.Query(ctx,
+		`SELECT `+storyColumns+` FROM stories WHERE media_url = $1`, mediaURL)
+	if err != nil {
+		return []*models.Story{}
+	}
+	defer rows.Close()
+	out := []*models.Story{}
+	for rows.Next() {
+		if st, err := scanStory(rows); err == nil {
+			out = append(out, st)
+		}
+	}
+	return out
+}
+
 // --- Scheduled messages ---
 
 func scanScheduled(row pgx.Row) (*models.ScheduledMessage, error) {

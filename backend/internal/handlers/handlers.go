@@ -973,6 +973,13 @@ func (h *Handler) ServeUpload(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusNotFound, "not found")
 		return
 	}
+	mediaURL := "/uploads/" + name
+	for _, story := range h.Store.StoriesByMediaURL(mediaURL) {
+		if h.statusHiddenFrom(story.UserID, middleware.UserID(r)) {
+			middleware.WriteError(w, http.StatusForbidden, "this status is private")
+			return
+		}
+	}
 	absDir, err := filepath.Abs(h.uploadDir())
 	if err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not resolve upload directory")

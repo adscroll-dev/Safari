@@ -17,11 +17,13 @@ const (
 	StatusEveryone = "everyone"
 	// StatusNobody hides my status from everyone except myself.
 	StatusNobody = "nobody"
+	// StatusExcept hides my status from a list of selected people.
+	StatusExcept = "except"
 )
 
 // ValidStatusPrivacy reports whether v is an accepted status-privacy value.
 func ValidStatusPrivacy(v string) bool {
-	return v == StatusEveryone || v == StatusNobody
+	return v == StatusEveryone || v == StatusNobody || v == StatusExcept
 }
 
 // StoryByID returns the story with the given id, or nil. Expired
@@ -202,4 +204,71 @@ func (s *MemoryStore) SetStatusPrivacy(userID, privacy string) error {
 	}
 	s.statusPrivacy[userID] = privacy
 	return nil
+}
+
+// ListStatusExclusions returns the people ownerID excluded from their status.
+func (s *MemoryStore) ListStatusExclusions(ownerID string) ([]*models.StatusExclusion, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.users[ownerID]; !ok {
+		return nil, ErrNotFound
+	}
+	out := []*models.StatusExclusion{}
+	for userID, createdAt := range s.statusExclusions[ownerID] {
+		u, ok := s.users[userID]
+		if !ok {
+			continue
+		}
+		out = append(out, &models.StatusExclusion{
+			OwnerID: ownerID, UserID: userID, DisplayName: u.DisplayName, CreatedAt: createdAt,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].CreatedAt.Equal(out[j].CreatedAt) {
+			return out[i].UserID < out[j].UserID
+		}
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out, nil
+}
+
+// AddStatusExclusion adds an exclusion if it does not already exist.
+func (s *MemoryStore) AddStatusExclusion(ownerID, excludedID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.users[ownerID]; !ok {
+		return ErrNotFound
+	}
+	if _, ok := s.users[excludedID]; !ok {
+		return ErrNotFound
+	}
+	if ownerID == excludedID {
+		return ErrForbidden
+	}
+	if s.statusExclusions[ownerID] == nil {
+		s.statusExclusions[ownerID] = map[string]time.Time{}
+	}
+	if _, ok := s.statusExclusions[ownerID][excludedID]; !ok {
+		s.statusExclusions[ownerID][excludedID] = time.Now().UTC()
+	}
+	return nil
+}
+
+// RemoveStatusExclusion removes an exclusion if present.
+func (s *MemoryStore) RemoveStatusExclusion(ownerID, excludedID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.users[ownerID]; !ok {
+		return ErrNotFound
+	}
+	delete(s.statusExclusions[ownerID], excludedID)
+	return nil
+}
+
+// IsStatusExcluded reports whether viewerID is excluded by ownerID.
+func (s *MemoryStore) IsStatusExcluded(ownerID, viewerID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.statusExclusions[ownerID][viewerID]
+	return ok
 }

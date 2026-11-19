@@ -424,6 +424,12 @@ class ApiClient {
       _req('GET', '/api/users/me/status-privacy');
   Future<Map<String, dynamic>> setStatusPrivacy(String v) =>
       _req('PUT', '/api/users/me/status-privacy', {'status_privacy': v});
+  Future<List<dynamic>> getStatusExclusions() =>
+      _getList('/api/users/me/status-exclusions');
+  Future<Map<String, dynamic>> addStatusExclusion(String userId) =>
+      _req('POST', '/api/users/me/status-exclusions', {'user_id': userId});
+  Future<Map<String, dynamic>> removeStatusExclusion(String userId) =>
+      _req('DELETE', '/api/users/me/status-exclusions/$userId');
 
   /// Stage 3 (calls): record a finished/missed call (caller only)
   /// and list my call history, newest first.

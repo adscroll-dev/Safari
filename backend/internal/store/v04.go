@@ -229,6 +229,19 @@ func (s *MemoryStore) ListStoriesByUser(userID string) []*models.Story {
 	return out
 }
 
+func (s *MemoryStore) StoriesByMediaURL(mediaURL string) []*models.Story {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []*models.Story{}
+	for _, st := range s.stories {
+		if st.MediaURL == mediaURL {
+			cp := *st
+			out = append(out, &cp)
+		}
+	}
+	return out
+}
+
 // --- Scheduled messages ---
 
 func (s *MemoryStore) CreateScheduled(sm *models.ScheduledMessage) error {
