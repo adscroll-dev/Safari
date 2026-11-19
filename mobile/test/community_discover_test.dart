@@ -119,4 +119,77 @@ void main() {
     expect(requests.last.url.path,
         '/api/communities/community-1/join-requests/user-2/reject');
   });
+
+  testWidgets('review refreshes community member count in the sheet header',
+      (tester) async {
+    final requests = <http.Request>[];
+    var backendMemberCount = 1;
+    final client = MockClient((request) async {
+      requests.add(request);
+      if (request.url.path.endsWith('/join-requests')) {
+        return http.Response(
+            jsonEncode([
+              {'user_id': 'user-1', 'display_name': 'Requester One'},
+              {'user_id': 'user-2', 'display_name': 'Requester Two'},
+            ]),
+            200);
+      }
+      if (request.url.path.endsWith('/join-requests/user-1/approve')) {
+        backendMemberCount = 2;
+        return http.Response(jsonEncode({'status': 'ok'}), 200);
+      }
+      if (request.url.path == '/api/communities/community-1') {
+        return http.Response(
+            jsonEncode({
+              'community': {'member_count': backendMemberCount}
+            }),
+            200);
+      }
+      return http.Response(jsonEncode({'status': 'ok'}), 200);
+    });
+    final api = ApiClient(baseUrl: 'http://test', client: client);
+    var memberCount = 1;
+
+    // This harness mirrors _showCommunityDetail's header + onChanged wiring,
+    // pinning the contract that a review triggers a detail refetch.
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) => Column(
+            children: [
+              Text('$memberCount members'),
+              CommunityJoinRequests(
+                api: api,
+                communityId: 'community-1',
+                onChanged: () async {
+                  final detail = await api.getCommunity('community-1');
+                  setState(() {
+                    memberCount = detail['community']['member_count'] as int;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('1 members'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Approve').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Requester One'), findsNothing);
+    expect(find.text('2 members'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Reject').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Requester Two'), findsNothing);
+    expect(find.text('2 members'), findsOneWidget);
+    expect(
+      requests.where((request) =>
+          request.method == 'GET' &&
+          request.url.path == '/api/communities/community-1'),
+      hasLength(2),
+    );
+  });
 }

@@ -5962,6 +5962,8 @@ class _HomePageState extends State<HomePage>
         ? null
         : _chats.cast<Map?>().firstWhere((ch) => ch?['id'] == announcementId,
             orElse: () => null);
+    var memberCount = c['member_count'] ?? 0;
+    var sheetOpen = true;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -5978,19 +5980,40 @@ class _HomePageState extends State<HomePage>
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(c['description'] as String),
               ),
-            Text(
-                '${c['member_count'] ?? 0} members · ${subgroups.length} groups',
-                style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 12),
-            if (myRole == 'owner')
-              CommunityJoinRequests(
-                api: _api,
-                communityId: id,
-                onChanged: () async {
-                  await _refreshCommunities();
-                  await _refreshChats();
-                },
+            StatefulBuilder(
+              builder: (context, setSheetState) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      '$memberCount members · ${subgroups.length} groups',
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 12),
+                  if (myRole == 'owner')
+                    CommunityJoinRequests(
+                      api: _api,
+                      communityId: id,
+                      onChanged: () async {
+                        try {
+                          final refreshed = await _api.getCommunity(id);
+                          final refreshedCommunity = refreshed['community'];
+                          final refreshedCount = refreshedCommunity is Map
+                              ? refreshedCommunity['member_count']
+                              : null;
+                          if (sheetOpen && refreshedCount is int) {
+                            setSheetState(
+                                () => memberCount = refreshedCount);
+                          }
+                        } catch (_) {
+                          // Keep the displayed count if the header refresh fails.
+                        }
+                        await _refreshCommunities();
+                        await _refreshChats();
+                      },
+                    ),
+                ],
               ),
+            ),
             if (announcement != null)
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -6117,6 +6140,7 @@ class _HomePageState extends State<HomePage>
         ),
       ),
     );
+    sheetOpen = false;
   }
 
   /// Stage 6: add a subgroup — pick an existing group or create
