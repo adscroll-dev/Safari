@@ -25,7 +25,7 @@ class LinkPreviewCache {
     String? title;
     try {
       final res = await http
-          .get(Uri.parse(url), headers: {'User-Agent': 'Safari/0.7.8'})
+          .get(Uri.parse(url), headers: {'User-Agent': 'Safari/0.7.9'})
           .timeout(const Duration(seconds: 5));
       if (res.statusCode == 200 && res.body.length < 1024 * 1024) {
         final m = RegExp(r'<title[^>]*>(.*?)</title>',
