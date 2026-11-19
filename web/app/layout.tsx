@@ -38,6 +38,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* Mark JS as running BEFORE first paint, so the scroll-reveal
+            CSS only hides content when JS is actually there to reveal
+            it. Without JS (or if the script fails) every section stays
+            visible — never a blank page. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('safari-js');",
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   );

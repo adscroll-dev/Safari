@@ -228,9 +228,14 @@ section[id] { scroll-margin-top: 88px; }
   border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-/* Scroll reveal */
-.safari-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
-.safari-reveal.safari-in { opacity: 1; transform: none; }
+/* Scroll reveal — content is VISIBLE by default. Only when JS is
+   confirmed running (html.safari-js, added by the inline script in
+   layout.tsx before first paint) do sections start hidden and fade
+   in via .safari-in. Without JS, or if the reveal script ever fails,
+   nothing is ever invisible. */
+.safari-reveal { opacity: 1; transform: none; }
+html.safari-js .safari-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
+html.safari-js .safari-reveal.safari-in { opacity: 1; transform: none; }
 
 /* Floating motion */
 @keyframes safari-float-slow {
@@ -259,19 +264,21 @@ section[id] { scroll-margin-top: 88px; }
   .safari-nav-label { display: none; }
 }
 
-/* Hero layout order: stage first on phones, text first on desktop */
+/* Hero layout order: text (badge, headline, download button) FIRST
+   on phones so the download button is above the fold; the logo
+   stage follows. On desktop the text stays left, stage right. */
 .safari-hero-grid { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.safari-hero-text { order: 2; }
-.safari-hero-stage { order: 1; }
+.safari-hero-text { order: 1; }
+.safari-hero-stage { order: 2; min-height: 280px; }
 @media (min-width: 900px) {
   .safari-hero-grid { flex-direction: row; align-items: center; gap: 48px; }
   .safari-hero-text { order: 1; }
-  .safari-hero-stage { order: 2; }
+  .safari-hero-stage { order: 2; min-height: 380px; }
 }
 
 /* New animations respect reduced motion too */
 @media (prefers-reduced-motion: reduce) {
   .safari-float-slow, .safari-float-slow-alt, .safari-glow-pulse, .safari-eq-bar { animation: none; }
-  .safari-reveal { opacity: 1; transform: none; transition: none; }
+  html.safari-js .safari-reveal { opacity: 1; transform: none; transition: none; }
   html { scroll-behavior: auto; }
 }

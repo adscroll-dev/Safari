@@ -741,7 +741,7 @@ export default function LandingContent() {
                 {t.exploreCta}
               </a>
             </div>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 18 }}>
+            <p style={{ fontSize: 13, color: "#c1cbda", marginTop: 18 }}>
               {t.free} · {t.requires} · 0.7.8 (Beta)
             </p>
           </div>
@@ -759,7 +759,6 @@ export default function LandingContent() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              minHeight: 380,
               flex: "0 0 auto",
               width: "100%",
               maxWidth: 460,
@@ -866,7 +865,7 @@ export default function LandingContent() {
             <p
               style={{
                 margin: "0 0 28px",
-                color: "#94a3b8",
+                color: "#c1cbda",
                 fontSize: 15,
                 textAlign: "center",
               }}
@@ -895,7 +894,7 @@ export default function LandingContent() {
                   >
                     {f.title}
                   </h3>
-                  <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>
+                  <p style={{ margin: 0, color: "#c1cbda", fontSize: 14 }}>
                     {f.desc}
                   </p>
                 </section>
@@ -920,7 +919,7 @@ export default function LandingContent() {
             <p
               style={{
                 margin: "0 0 28px",
-                color: "#94a3b8",
+                color: "#c1cbda",
                 fontSize: 15,
                 textAlign: "center",
               }}
@@ -1032,7 +1031,7 @@ export default function LandingContent() {
                 <p
                   style={{
                     margin: "0 0 28px",
-                    color: "#94a3b8",
+                    color: "#c1cbda",
                     fontSize: 15,
                     maxWidth: 560,
                   }}
@@ -1067,7 +1066,7 @@ export default function LandingContent() {
                     >
                       🛡 {s.title}
                     </h3>
-                    <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>
+                    <p style={{ margin: 0, color: "#c1cbda", fontSize: 14 }}>
                       {s.desc}
                     </p>
                   </div>
@@ -1103,7 +1102,7 @@ export default function LandingContent() {
               <h2 style={{ margin: "0 0 8px", fontSize: 28, color: "#f8fafc" }}>
                 {t.downloadTitle}
               </h2>
-              <p style={{ color: "#94a3b8", fontSize: 14, margin: "0 0 20px" }}>
+              <p style={{ color: "#c1cbda", fontSize: 14, margin: "0 0 20px" }}>
                 {t.versionLine}
               </p>
 
@@ -1169,7 +1168,7 @@ export default function LandingContent() {
                   fontSize: 14,
                 }}
               >
-                <span style={{ color: "#94a3b8" }}>{label}</span>
+                <span style={{ color: "#c1cbda" }}>{label}</span>
                 <span
                   style={{ fontWeight: 600, textAlign: "end", color: "#f1f5f9" }}
                 >
@@ -1187,7 +1186,7 @@ export default function LandingContent() {
               {t.aboutTitle}
             </h2>
             <p style={{ color: "#cbd5e1", margin: "0 0 12px" }}>{t.intro}</p>
-            <ul style={{ color: "#94a3b8", margin: 0, paddingInlineStart: 20 }}>
+            <ul style={{ color: "#c1cbda", margin: 0, paddingInlineStart: 20 }}>
               {t.features.map((f) => (
                 <li key={f.title}>
                   <strong style={{ color: "#e2e8f0" }}>{f.title}:</strong>{" "}
@@ -1200,7 +1199,7 @@ export default function LandingContent() {
 
         <p
           style={{
-            color: "#94a3b8",
+            color: "#c1cbda",
             fontSize: 14,
             marginTop: 32,
             textAlign: "center",
