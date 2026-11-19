@@ -152,6 +152,10 @@ type registerReq struct {
 	// 2026-11-14). Kept so older clients can still send it.
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
+	InviteCode  string `json:"invite_code"`
+	DeviceID    string `json:"device_id"`
+	DeviceName  string `json:"device_name"`
+	Platform    string `json:"platform"`
 }
 
 // Register starts a registration (v0.7): it validates the input,
@@ -181,6 +185,26 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusBadRequest, "name is required")
 		return
 	}
+	if !validateAuthDevice(w, req.DeviceID, req.DeviceName, req.Platform) {
+		return
+	}
+	req.Platform = strings.ToLower(req.Platform)
+	req.InviteCode = strings.ToUpper(strings.TrimSpace(req.InviteCode))
+	if req.InviteCode != "" {
+		invite, err := h.Store.SignupInviteCodeByCode(req.InviteCode)
+		if err != nil {
+			middleware.WriteError(w, http.StatusBadRequest, "invalid invite code")
+			return
+		}
+		if !time.Now().UTC().Before(invite.ExpiresAt) {
+			middleware.WriteError(w, http.StatusBadRequest, "invite code expired")
+			return
+		}
+		if invite.Uses >= invite.MaxUses {
+			middleware.WriteError(w, http.StatusBadRequest, "invite code already used")
+			return
+		}
+	}
 	// The username is chosen by the system from the user's name.
 	username := generateUsername(req.DisplayName, req.Email, func(u string) bool {
 		_, err := h.Store.UserByUsername(u)
@@ -202,7 +226,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	now := time.Now().UTC()
 	if err := h.Store.SavePendingUser(&models.PendingUser{
 		Email: req.Email, Username: username, DisplayName: req.DisplayName,
-		PasswordHash: hash, ExpiresAt: now.Add(codeTTL), CreatedAt: now,
+		PasswordHash: hash, InviteCode: req.InviteCode,
+		DeviceID: req.DeviceID, DeviceName: req.DeviceName, Platform: req.Platform,
+		ExpiresAt: now.Add(codeTTL), CreatedAt: now,
 	}); err != nil {
 		log.Printf("register: save pending user failed: %v", err)
 		middleware.WriteError(w, http.StatusInternalServerError, "could not start registration")
@@ -218,8 +244,11 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 type loginReq struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email      string `json:"email"`
+	Password   string `json:"password"`
+	DeviceID   string `json:"device_id"`
+	DeviceName string `json:"device_name"`
+	Platform   string `json:"platform"`
 }
 
 // Login checks the password (v0.7) and, on success, emails a 6-digit
@@ -235,6 +264,9 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	var req loginReq
 	if !decode(w, r, &req) {
+		return
+	}
+	if !validateAuthDevice(w, req.DeviceID, req.DeviceName, req.Platform) {
 		return
 	}
 	email := strings.TrimSpace(strings.ToLower(req.Email))

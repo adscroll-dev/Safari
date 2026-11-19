@@ -309,6 +309,17 @@ type Device struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// SignupInviteCode is a single-use-or-limited-use code that can be used
+// while creating an account.
+type SignupInviteCode struct {
+	Code      string    `json:"code"`
+	InviterID string    `json:"inviter_id"`
+	MaxUses   int       `json:"max_uses"`
+	Uses      int       `json:"uses"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // PublicDevice is the safe view of a device returned to other users so
 // they can fetch a key bundle per device. It carries no secrets.
 type PublicDevice struct {
@@ -399,6 +410,10 @@ type PendingUser struct {
 	Username     string
 	DisplayName  string
 	PasswordHash string
+	InviteCode   string
+	DeviceID     string
+	DeviceName   string
+	Platform     string
 	ExpiresAt    time.Time // same 10-minute window as its code
 	CreatedAt    time.Time
 }

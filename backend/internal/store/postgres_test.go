@@ -58,6 +58,17 @@ func TestMigrationMatchesFile(t *testing.T) {
 	if string(embedded019) != string(canonical019) || strings.TrimSpace(migration019SQL) != strings.TrimSpace(string(canonical019)) {
 		t.Fatal("migration 019 differs between backend/migrations and internal/store/migrations")
 	}
+	canonical020, err := os.ReadFile("../../migrations/020_signup_extras.sql")
+	if err != nil {
+		t.Fatalf("read canonical migration 020: %v", err)
+	}
+	embedded020, err := os.ReadFile("migrations/020_signup_extras.sql")
+	if err != nil {
+		t.Fatalf("read embedded migration 020: %v", err)
+	}
+	if string(embedded020) != string(canonical020) || strings.TrimSpace(migration020SQL) != strings.TrimSpace(string(canonical020)) {
+		t.Fatal("migration 020 differs between backend/migrations and internal/store/migrations")
+	}
 }
 
 func mustRead(t *testing.T, path string) string {

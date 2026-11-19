@@ -547,9 +547,13 @@ class _OrbitRingPainter extends CustomPainter {
 
 class HomePage extends StatefulWidget {
   const HomePage(
-      {super.key, required this.onToggleTheme, required this.onToggleLang});
+      {super.key,
+      required this.onToggleTheme,
+      required this.onToggleLang,
+      this.apiClient});
   final VoidCallback onToggleTheme;
   final VoidCallback onToggleLang;
+  final ApiClient? apiClient;
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -557,11 +561,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late final Future<void> _prefsInitialization;
-  final _api = ApiClient();
+  late final ApiClient _api;
   final _usage = DataUsageTracker();
   final _callForegroundService = MethodChannelCallForegroundService();
   final _email = TextEditingController();
   final _displayName = TextEditingController();
+  final _inviteCode = TextEditingController();
   final _password = TextEditingController();
   final _draft = TextEditingController();
   final _searchCtrl = TextEditingController();
@@ -726,6 +731,7 @@ class _HomePageState extends State<HomePage>
   @override
   void initState() {
     super.initState();
+    _api = widget.apiClient ?? ApiClient();
     WidgetsBinding.instance.addObserver(this);
     _callForegroundService.setOpenCallHandler((chatId) {
       if (mounted) unawaited(_consumePendingCallNavigation());
@@ -1115,7 +1121,7 @@ class _HomePageState extends State<HomePage>
     try {
       blocked = await _api.listBlocked();
     } catch (e) {
-      setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = e.toString());
       return;
     }
     if (!mounted) return;
@@ -1299,6 +1305,7 @@ class _HomePageState extends State<HomePage>
     _codeCtrl.dispose();
     _email.dispose();
     _displayName.dispose();
+    _inviteCode.dispose();
     _password.dispose();
     _draft.dispose();
     _searchCtrl.dispose();
@@ -1325,10 +1332,24 @@ class _HomePageState extends State<HomePage>
       _error = null;
     });
     try {
+      await _prefsInitialization;
       final out = _registerMode
           ? await _api.register(
-              _email.text.trim(), _displayName.text.trim(), _password.text)
-          : await _api.login(_email.text.trim(), _password.text);
+              _email.text.trim(),
+              _displayName.text.trim(),
+              _password.text,
+              inviteCode: _inviteCode.text,
+              deviceId: _deviceId,
+              deviceName: 'Safari ${_api.devicePlatform}',
+              platform: _api.devicePlatform,
+            )
+          : await _api.login(
+              _email.text.trim(),
+              _password.text,
+              deviceId: _deviceId,
+              deviceName: 'Safari ${_api.devicePlatform}',
+              platform: _api.devicePlatform,
+            );
       if (out['status'] == 'code_sent') {
         // No token yet: the user must enter the emailed 6-digit code.
         // On registration the server also tells us the username it
@@ -1361,10 +1382,28 @@ class _HomePageState extends State<HomePage>
     setState(() => _error = null);
     try {
       final out = _codePurpose == 'register'
-          ? await _api.verifyRegister(_codeEmail, code)
-          : await _api.verifyLogin(_codeEmail, code);
+          ? await _api.verifyRegister(
+              _codeEmail,
+              code,
+              deviceId: _deviceId,
+              deviceName: 'Safari ${_api.devicePlatform}',
+              platform: _api.devicePlatform,
+            )
+          : await _api.verifyLogin(
+              _codeEmail,
+              code,
+              deviceId: _deviceId,
+              deviceName: 'Safari ${_api.devicePlatform}',
+              platform: _api.devicePlatform,
+            );
+      if (!mounted) return;
       _resendTimer?.cancel();
       setState(() => _codeStep = false);
+      if (_codePurpose == 'login' && out['new_device'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signed in from a new device')),
+        );
+      }
       await _finishLogin(out['user'] as Map<String, dynamic>);
     } catch (e) {
       setState(() => _error = e.toString());
@@ -3865,6 +3904,7 @@ class _HomePageState extends State<HomePage>
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    Key? key,
     TextInputType keyboardType = TextInputType.text,
     bool obscureText = false,
     Widget? suffix,
@@ -3898,6 +3938,7 @@ class _HomePageState extends State<HomePage>
             ],
           ),
           child: TextField(
+            key: key,
             controller: controller,
             keyboardType: keyboardType,
             obscureText: obscureText,
@@ -4180,6 +4221,7 @@ class _HomePageState extends State<HomePage>
                     controller: _codeCtrl,
                     label: '6-digit code',
                     icon: Icons.pin_outlined,
+                    key: const ValueKey('signup-code'),
                     keyboardType: TextInputType.number,
                     maxLength: 6,
                     textAlign: TextAlign.center,
@@ -4234,11 +4276,19 @@ class _HomePageState extends State<HomePage>
                       controller: _displayName,
                       label: 'Your name',
                       icon: Icons.person_outline,
+                      key: const ValueKey('signup-display-name'),
                     ),
                     const SizedBox(height: 6),
                     const Text(
                       'Your username is chosen automatically from your name.',
                       style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 14),
+                    _authField(
+                      controller: _inviteCode,
+                      label: 'Have an invite code?',
+                      icon: Icons.card_giftcard_outlined,
+                      key: const ValueKey('signup-invite-code'),
                     ),
                     const SizedBox(height: 14),
                   ],
@@ -4247,6 +4297,7 @@ class _HomePageState extends State<HomePage>
                     label: 'Email',
                     icon: Icons.mail_outline,
                     keyboardType: TextInputType.emailAddress,
+                    key: const ValueKey('signup-email'),
                   ),
                   const SizedBox(height: 14),
                   _authField(
@@ -4254,6 +4305,7 @@ class _HomePageState extends State<HomePage>
                     label: 'Password',
                     icon: Icons.lock_outline,
                     obscureText: _obscurePassword,
+                    key: const ValueKey('signup-password'),
                     suffix: IconButton(
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_outlined
@@ -6693,6 +6745,57 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _createSignupInvite() async {
+    try {
+      final invite = await _api.createSignupInvite();
+      if (!mounted) return;
+      final code = invite['code'] as String;
+      final maxUses = invite['max_uses'] as int? ?? 1;
+      final uses = invite['uses'] as int? ?? 0;
+      final expiry =
+          DateTime.tryParse(invite['expires_at'] as String? ?? '')?.toLocal();
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Invite friends'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(
+                code,
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text('Uses left: ${maxUses - uses}'),
+              Text('Expires: ${expiry?.toString() ?? 'Unknown'}'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: code));
+                if (!mounted || !dialogContext.mounted) return;
+                Navigator.pop(dialogContext);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invite code copied')),
+                );
+              },
+              child: const Text('Copy'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
   /// Stage 7: linked devices — every device registered for my
   /// account, with remove (never the device I am on now).
   Future<void> _showLinkedDevices() async {
@@ -6728,6 +6831,24 @@ class _HomePageState extends State<HomePage>
                 itemBuilder: (context, i) {
                   final d = devices[i] as Map<String, dynamic>;
                   final isThis = d['device_id'] == _deviceId;
+                  String seenAt(dynamic value) {
+                    final date = DateTime.tryParse(value as String? ?? '');
+                    if (date == null) return 'Unknown';
+                    final local = date.toLocal();
+                    return '${local.year}-${local.month.toString().padLeft(2, '0')}-'
+                        '${local.day.toString().padLeft(2, '0')} '
+                        '${local.hour.toString().padLeft(2, '0')}:'
+                        '${local.minute.toString().padLeft(2, '0')}';
+                  }
+
+                  final createdAt =
+                      DateTime.tryParse(d['created_at'] as String? ?? '');
+                  final age = createdAt == null
+                      ? null
+                      : DateTime.now().toUtc().difference(createdAt.toUtc());
+                  final isNew = age != null &&
+                      !age.isNegative &&
+                      age < const Duration(hours: 24);
                   final name = (d['name'] as String?)?.isNotEmpty == true
                       ? d['name'] as String
                       : (d['device_id'] as String? ?? 'Device');
@@ -6740,10 +6861,24 @@ class _HomePageState extends State<HomePage>
                             : Icons.computer_outlined),
                     title: Text(name),
                     subtitle: Text(
-                        '${d['platform'] ?? ''}${isThis ? ' · This device' : ''}'),
-                    trailing: isThis
-                        ? null
-                        : IconButton(
+                        '${d['platform'] ?? ''}${isThis ? ' · This device' : ''}\n'
+                        'First seen: ${seenAt(d['created_at'])} · '
+                        'Last seen: ${seenAt(d['last_seen_at'])}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isNew)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 6),
+                            child: Chip(
+                              label: Text('NEW'),
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        if (!isThis)
+                          IconButton(
                             icon: const Icon(Icons.delete_outline),
                             tooltip: 'Remove device',
                             onPressed: () async {
@@ -6756,6 +6891,8 @@ class _HomePageState extends State<HomePage>
                               }
                             },
                           ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -7971,6 +8108,14 @@ class _HomePageState extends State<HomePage>
           title: const Text('Change email'),
           subtitle: Text(_user?['email'] as String? ?? ''),
           onTap: _changeEmail,
+        ),
+        header('Invite friends'),
+        ListTile(
+          leading: const Icon(Icons.card_giftcard_outlined),
+          title: const Text('Create invite code'),
+          subtitle: const Text('Invite friends to sign up by email'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _createSignupInvite,
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

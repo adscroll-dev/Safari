@@ -107,6 +107,14 @@ var validPlatforms = map[string]bool{
 	"": true, "web": true, "android": true, "ios": true, "desktop": true,
 }
 
+func validateAuthDevice(w http.ResponseWriter, deviceID, name, platform string) bool {
+	if len(deviceID) > 64 || len(name) > 64 || !validPlatforms[strings.ToLower(platform)] {
+		middleware.WriteError(w, http.StatusBadRequest, "invalid device_id, device_name or platform")
+		return false
+	}
+	return true
+}
+
 type registerDeviceReq struct {
 	DeviceID string `json:"device_id"`
 	Name     string `json:"name"`
@@ -155,6 +163,10 @@ func (h *Handler) RemoveDevice(w http.ResponseWriter, r *http.Request) {
 	deviceID := strings.Split(rest, "/")[0]
 	if deviceID == "" {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid device id")
+		return
+	}
+	if err := h.Store.RevokeDevice(middleware.UserID(r), deviceID); err != nil {
+		middleware.WriteError(w, http.StatusInternalServerError, "could not revoke device")
 		return
 	}
 	if err := h.Store.RemoveDevice(middleware.UserID(r), deviceID); err != nil {

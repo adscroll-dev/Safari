@@ -29,9 +29,10 @@ func readRandom(b []byte) (int, error) { return rand.Read(b) }
 // (Kept import-free on purpose; see NewID.)
 
 var (
-	ErrNotFound      = errors.New("not found")
-	ErrAlreadyExists = errors.New("already exists")
-	ErrForbidden     = errors.New("forbidden")
+	ErrNotFound              = errors.New("not found")
+	ErrAlreadyExists         = errors.New("already exists")
+	ErrForbidden             = errors.New("forbidden")
+	ErrInviteCodeUnavailable = errors.New("signup invite code unavailable")
 )
 
 // StoreIface is the interface handlers depend on.
@@ -189,6 +190,8 @@ type StoreIface interface {
 	ListDevices(userID string) []*models.Device
 	RemoveDevice(userID, deviceID string) error
 	TouchDevice(userID, deviceID string) error
+	RevokeDevice(userID, deviceID string) error
+	IsDeviceRevoked(userID, deviceID string) bool
 	FetchOneTimePreKeyForDevice(userID, deviceID string) (*models.OneTimePreKey, error)
 	SavePushSubscription(userID string, sub push.Subscription) error
 	ListPushSubscriptions(userID string) []push.Subscription
@@ -214,6 +217,10 @@ type StoreIface interface {
 	SavePendingUser(p *models.PendingUser) error
 	GetPendingUser(email string) (*models.PendingUser, error)
 	DeletePendingUser(email string) error
+	CreateSignupInviteCode(code *models.SignupInviteCode) error
+	SignupInviteCodeByCode(code string) (*models.SignupInviteCode, error)
+	UseSignupInviteCode(code string) error
+	ListSignupInviteCodes(userID string) []*models.SignupInviteCode
 
 	// Invite links for groups/channels (Telegram-style). A token is
 	// unique; revoking keeps the row so old links fail closed.
@@ -271,13 +278,15 @@ type MemoryStore struct {
 	// v0.6 state
 	groupSenderKeys map[string]*models.GroupSenderKey // distribution key, see v06.go
 	// Stage 7 state
-	reports   []*models.Report
-	devices   map[string]*models.Device      // userID + "/" + deviceID
-	pushSubs  map[string][]push.Subscription // userID -> subscriptions
-	fcmTokens map[string][]push.FCMToken     // userID -> FCM tokens
+	reports        []*models.Report
+	devices        map[string]*models.Device // userID + "/" + deviceID
+	revokedDevices map[string]time.Time
+	pushSubs       map[string][]push.Subscription // userID -> subscriptions
+	fcmTokens      map[string][]push.FCMToken     // userID -> FCM tokens
 	// v0.7 state: email verification codes and pending registrations.
-	emailCodes   map[string]*models.EmailCode   // lower(email) + "|" + purpose
-	pendingUsers map[string]*models.PendingUser // lower(email) -> pending registration
+	emailCodes        map[string]*models.EmailCode   // lower(email) + "|" + purpose
+	pendingUsers      map[string]*models.PendingUser // lower(email) -> pending registration
+	signupInviteCodes map[string]*models.SignupInviteCode
 	// Invite links for groups/channels (Telegram-style).
 	invites map[string]*models.ChatInvite // token -> invite
 	// Last-seen privacy: user id -> "everyone" | "nobody" (default
@@ -360,11 +369,13 @@ func NewMemoryStore() *MemoryStore {
 		chatSettings:          map[string]models.ChatSettings{},
 		groupSenderKeys:       map[string]*models.GroupSenderKey{},
 		devices:               map[string]*models.Device{},
+		revokedDevices:        map[string]time.Time{},
 		pushSubs:              map[string][]push.Subscription{},
 		reports:               []*models.Report{},
 		fcmTokens:             map[string][]push.FCMToken{},
 		emailCodes:            map[string]*models.EmailCode{},
 		pendingUsers:          map[string]*models.PendingUser{},
+		signupInviteCodes:     map[string]*models.SignupInviteCode{},
 		invites:               map[string]*models.ChatInvite{},
 		lastSeenVisibility:    map[string]string{},
 		pinnedMessages:        map[string]string{},

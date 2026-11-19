@@ -89,13 +89,17 @@ func (s *PostgresStore) SavePendingUser(p *models.PendingUser) error {
 		p.CreatedAt = time.Now().UTC()
 	}
 	_, err := s.pool.Exec(ctx,
-		`INSERT INTO pending_users (email, username, display_name, password_hash, expires_at, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO pending_users
+		   (email, username, display_name, password_hash, invite_code, device_id, device_name, platform, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 ON CONFLICT (email) DO UPDATE SET
 		   username = EXCLUDED.username, display_name = EXCLUDED.display_name,
 		   password_hash = EXCLUDED.password_hash,
+		   invite_code = EXCLUDED.invite_code, device_id = EXCLUDED.device_id,
+		   device_name = EXCLUDED.device_name, platform = EXCLUDED.platform,
 		   expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at`,
-		p.Email, p.Username, p.DisplayName, p.PasswordHash, p.ExpiresAt, p.CreatedAt)
+		p.Email, p.Username, p.DisplayName, p.PasswordHash, p.InviteCode,
+		p.DeviceID, p.DeviceName, p.Platform, p.ExpiresAt, p.CreatedAt)
 	return mapStoreErr(err)
 }
 
@@ -104,9 +108,11 @@ func (s *PostgresStore) GetPendingUser(email string) (*models.PendingUser, error
 	defer cancel()
 	var p models.PendingUser
 	err := s.pool.QueryRow(ctx,
-		`SELECT email, username, display_name, password_hash, expires_at, created_at
+		`SELECT email, username, display_name, password_hash, invite_code,
+		        device_id, device_name, platform, expires_at, created_at
 		 FROM pending_users WHERE email = $1`, email).
-		Scan(&p.Email, &p.Username, &p.DisplayName, &p.PasswordHash, &p.ExpiresAt, &p.CreatedAt)
+		Scan(&p.Email, &p.Username, &p.DisplayName, &p.PasswordHash, &p.InviteCode,
+			&p.DeviceID, &p.DeviceName, &p.Platform, &p.ExpiresAt, &p.CreatedAt)
 	if err != nil {
 		return nil, mapStoreErr(err)
 	}

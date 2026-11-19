@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vyro/backend/internal/auth"
+	"github.com/vyro/backend/internal/store"
 )
 
 type ctxKey string
@@ -37,7 +38,7 @@ func WriteError(w http.ResponseWriter, status int, msg string) {
 
 // Auth verifies a Bearer JWT and puts the user id in the request context.
 // Returns 401 when the token is missing or invalid.
-func Auth(secret string) func(http.Handler) http.Handler {
+func Auth(secret string, dataStore store.StoreIface) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			header := r.Header.Get("Authorization")
@@ -53,6 +54,10 @@ func Auth(secret string) func(http.Handler) http.Handler {
 			claims, err := auth.ValidateJWT(secret, token)
 			if err != nil {
 				WriteError(w, http.StatusUnauthorized, "invalid token")
+				return
+			}
+			if claims.DeviceID != "" && dataStore.IsDeviceRevoked(claims.UserID, claims.DeviceID) {
+				WriteError(w, http.StatusUnauthorized, "device revoked")
 				return
 			}
 			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)

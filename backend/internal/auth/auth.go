@@ -35,14 +35,15 @@ type Claims struct {
 	UserID   string `json:"sub"`
 	Email    string `json:"email"`
 	Username string `json:"username"`
+	DeviceID string `json:"device_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
 // GenerateJWT issues a signed token for a user.
-func GenerateJWT(secret, userID, email, username string, expiry time.Duration) (string, error) {
+func GenerateJWT(secret, userID, email, username, deviceID string, expiry time.Duration) (string, error) {
 	now := time.Now()
 	claims := Claims{
-		UserID: userID, Email: email, Username: username,
+		UserID: userID, Email: email, Username: username, DeviceID: deviceID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),

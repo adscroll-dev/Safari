@@ -89,6 +89,7 @@ func (s *MemoryStore) RegisterDevice(d *models.Device) error {
 		return ErrNotFound
 	}
 	now := time.Now().UTC()
+	delete(s.revokedDevices, deviceKey(d.UserID, d.DeviceID))
 	if existing, ok := s.devices[deviceKey(d.UserID, d.DeviceID)]; ok {
 		existing.Name = d.Name
 		existing.Platform = d.Platform
@@ -132,6 +133,20 @@ func (s *MemoryStore) RemoveDevice(userID, deviceID string) error {
 	}
 	delete(s.devices, deviceKey(userID, deviceID))
 	return nil
+}
+
+func (s *MemoryStore) RevokeDevice(userID, deviceID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.revokedDevices[deviceKey(userID, deviceID)] = time.Now().UTC()
+	return nil
+}
+
+func (s *MemoryStore) IsDeviceRevoked(userID, deviceID string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, revoked := s.revokedDevices[deviceKey(userID, deviceID)]
+	return revoked
 }
 
 // TouchDevice records that a device was seen now.

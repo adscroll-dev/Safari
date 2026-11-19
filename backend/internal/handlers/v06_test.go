@@ -739,7 +739,7 @@ func TestMultiDeviceWebSocketFanOut(t *testing.T) {
 
 	// Two simulated devices for Bob, one for Alice (her second device;
 	// her first device sends over HTTP).
-	srv := httptest.NewServer(middleware.Auth("test-secret")(http.HandlerFunc(h.WebSocketHandler)))
+	srv := httptest.NewServer(middleware.Auth("test-secret", h.Store)(http.HandlerFunc(h.WebSocketHandler)))
 	defer srv.Close()
 	bobDev1 := wsDial(t, srv.URL, bobTok)
 	defer bobDev1.Close()

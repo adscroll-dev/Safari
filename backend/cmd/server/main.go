@@ -158,7 +158,7 @@ func main() {
 	h.MaxUploadMB = cfg.MaxUploadMB
 
 	mux := http.NewServeMux()
-	authMW := middleware.Auth(cfg.JWTSecret)
+	authMW := middleware.Auth(cfg.JWTSecret, s)
 
 	// Public.
 	mux.HandleFunc("/health", h.Health)
@@ -172,6 +172,7 @@ func main() {
 	mux.HandleFunc("/api/bot/send", h.BotSend)
 
 	// Authenticated.
+	mux.Handle("/api/signup-invites", authMW(http.HandlerFunc(h.SignupInvites)))
 	mux.Handle("/api/uploads", authMW(http.HandlerFunc(h.Upload)))
 	mux.Handle("/uploads/", authMW(http.HandlerFunc(h.ServeUpload)))
 	mux.Handle("/stickers/", authMW(http.HandlerFunc(h.ServeCatalogFile)))

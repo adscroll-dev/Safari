@@ -78,8 +78,13 @@ func (s *PostgresStore) RegisterDevice(d *models.Device) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 	var createdAt, lastSeen time.Time
-	err := s.pool.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO user_devices (user_id, device_id, name, platform)
 		 VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (user_id, device_id) DO UPDATE
@@ -88,6 +93,14 @@ func (s *PostgresStore) RegisterDevice(d *models.Device) error {
 		d.UserID, d.DeviceID, d.Name, d.Platform).Scan(&createdAt, &lastSeen)
 	if err != nil {
 		return mapStoreErr(err)
+	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM revoked_devices WHERE user_id = $1 AND device_id = $2`,
+		d.UserID, d.DeviceID); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return err
 	}
 	d.CreatedAt, d.LastSeenAt = createdAt, lastSeen
 	return nil

@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -163,8 +164,11 @@ func codeSentResponseWithUsername(w http.ResponseWriter, status int, email, purp
 }
 
 type verifyReq struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	Email      string `json:"email"`
+	Code       string `json:"code"`
+	DeviceID   string `json:"device_id"`
+	DeviceName string `json:"device_name"`
+	Platform   string `json:"platform"`
 }
 
 // VerifyRegister completes a pending registration: the emailed code
@@ -180,6 +184,10 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	if !validateAuthDevice(w, req.DeviceID, req.DeviceName, req.Platform) {
+		return
+	}
+	req.Platform = strings.ToLower(req.Platform)
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 	if !emailRe.MatchString(email) {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid email")
@@ -199,7 +207,16 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusUnauthorized, "invalid or expired code")
 		return
 	}
-	_ = h.Store.DeletePendingUser(email)
+	if pending.InviteCode != "" {
+		if err := h.Store.UseSignupInviteCode(pending.InviteCode); err != nil {
+			if errors.Is(err, store.ErrInviteCodeUnavailable) {
+				middleware.WriteError(w, http.StatusBadRequest, "invite code expired or already used")
+			} else {
+				middleware.WriteError(w, http.StatusInternalServerError, "could not use invite code")
+			}
+			return
+		}
+	}
 	user := &models.User{
 		Email: pending.Email, Username: pending.Username,
 		DisplayName: pending.DisplayName, PasswordHash: pending.PasswordHash,
@@ -212,7 +229,22 @@ func (h *Handler) VerifyRegister(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not create user")
 		return
 	}
-	h.issueToken(w, user, http.StatusCreated)
+	deviceID, deviceName, platform := pending.DeviceID, pending.DeviceName, pending.Platform
+	if deviceID == "" {
+		deviceID, deviceName, platform = req.DeviceID, req.DeviceName, req.Platform
+	}
+	if deviceID != "" {
+		if err := h.Store.RegisterDevice(&models.Device{
+			UserID: user.ID, DeviceID: deviceID,
+			Name: deviceName, Platform: platform,
+		}); err != nil {
+			log.Printf("verify-register: register device failed: %v", err)
+			middleware.WriteError(w, http.StatusInternalServerError, "could not register device")
+			return
+		}
+	}
+	_ = h.Store.DeletePendingUser(email)
+	h.issueToken(w, user, http.StatusCreated, deviceID, false)
 }
 
 // VerifyLogin completes a login: the emailed code is checked and a
@@ -226,6 +258,10 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &req) {
 		return
 	}
+	if !validateAuthDevice(w, req.DeviceID, req.DeviceName, req.Platform) {
+		return
+	}
+	req.Platform = strings.ToLower(req.Platform)
 	email := strings.TrimSpace(strings.ToLower(req.Email))
 	if !emailRe.MatchString(email) {
 		middleware.WriteError(w, http.StatusBadRequest, "invalid email")
@@ -245,20 +281,50 @@ func (h *Handler) VerifyLogin(w http.ResponseWriter, r *http.Request) {
 		middleware.WriteError(w, http.StatusUnauthorized, "invalid or expired code")
 		return
 	}
-	h.issueToken(w, user, http.StatusOK)
+	newDevice := false
+	if req.DeviceID != "" {
+		known := false
+		for _, device := range h.Store.ListDevices(user.ID) {
+			if device.DeviceID == req.DeviceID {
+				known = true
+				break
+			}
+		}
+		device := &models.Device{
+			UserID: user.ID, DeviceID: req.DeviceID,
+			Name: req.DeviceName, Platform: req.Platform,
+		}
+		if known {
+			if err := h.Store.TouchDevice(user.ID, req.DeviceID); err != nil {
+				middleware.WriteError(w, http.StatusInternalServerError, "could not update device")
+				return
+			}
+		} else {
+			if err := h.Store.RegisterDevice(device); err != nil {
+				middleware.WriteError(w, http.StatusInternalServerError, "could not register device")
+				return
+			}
+			newDevice = true
+		}
+	}
+	h.issueToken(w, user, http.StatusOK, req.DeviceID, newDevice)
 }
 
 // issueToken mints a JWT for user and writes the {"user","token"}
 // response used by both verify endpoints.
-func (h *Handler) issueToken(w http.ResponseWriter, user *models.User, status int) {
-	token, err := auth.GenerateJWT(h.JWTSecret, user.ID, user.Email, user.Username, h.JWTExpiry)
+func (h *Handler) issueToken(w http.ResponseWriter, user *models.User, status int, deviceID string, newDevice bool) {
+	token, err := auth.GenerateJWT(h.JWTSecret, user.ID, user.Email, user.Username, deviceID, h.JWTExpiry)
 	if err != nil {
 		middleware.WriteError(w, http.StatusInternalServerError, "could not issue token")
 		return
 	}
-	middleware.WriteJSON(w, status, map[string]interface{}{
-		"user": user.Public(), "token": token,
-	})
+	response := map[string]interface{}{
+		"user": user.Public(), "token": token, "new_device": newDevice,
+	}
+	if deviceID != "" {
+		response["device_id"] = deviceID
+	}
+	middleware.WriteJSON(w, status, response)
 }
 
 type resendReq struct {

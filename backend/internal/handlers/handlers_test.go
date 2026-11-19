@@ -158,8 +158,10 @@ func doJSON(t *testing.T, h *Handler, method, path string, body interface{}, tok
 	case path == "/api/auth/resend-code":
 		h.ResendCode(rec, req)
 	default:
-		middleware.Auth("test-secret")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		middleware.Auth("test-secret", h.Store)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
+			case path == "/api/signup-invites":
+				h.SignupInvites(w, r)
 			case path == "/api/chats" && method == http.MethodPost:
 				h.CreateChat(w, r)
 			case path == "/api/chats" && method == http.MethodGet:
@@ -668,7 +670,7 @@ func uploadFile(t *testing.T, h *Handler, token, filename string, content []byte
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	rec := httptest.NewRecorder()
-	middleware.Auth("test-secret")(http.HandlerFunc(h.Upload)).ServeHTTP(rec, req)
+	middleware.Auth("test-secret", h.Store)(http.HandlerFunc(h.Upload)).ServeHTTP(rec, req)
 	return rec
 }
 
@@ -716,7 +718,7 @@ func TestFileUploadAndImageMessage(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, up.URL, nil)
 	req.Header.Set("Authorization", "Bearer "+aliceTok)
 	down := httptest.NewRecorder()
-	middleware.Auth("test-secret")(http.HandlerFunc(h.ServeUpload)).ServeHTTP(down, req)
+	middleware.Auth("test-secret", h.Store)(http.HandlerFunc(h.ServeUpload)).ServeHTTP(down, req)
 	if down.Code != http.StatusOK || !bytes.Equal(down.Body.Bytes(), png) {
 		t.Fatalf("download: expected 200 with png bytes, got %d len %d", down.Code, down.Body.Len())
 	}
@@ -724,7 +726,7 @@ func TestFileUploadAndImageMessage(t *testing.T) {
 	req = httptest.NewRequest(http.MethodGet, "/uploads/../handlers.go", nil)
 	req.Header.Set("Authorization", "Bearer "+aliceTok)
 	trav := httptest.NewRecorder()
-	middleware.Auth("test-secret")(http.HandlerFunc(h.ServeUpload)).ServeHTTP(trav, req)
+	middleware.Auth("test-secret", h.Store)(http.HandlerFunc(h.ServeUpload)).ServeHTTP(trav, req)
 	if trav.Code != http.StatusNotFound {
 		t.Fatalf("traversal: expected 404, got %d", trav.Code)
 	}

@@ -59,7 +59,7 @@ func TestStatusExclusionsVisibilityAndMedia(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, mediaURL, nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		rec := httptest.NewRecorder()
-		middleware.Auth("test-secret")(http.HandlerFunc(h.ServeUpload)).ServeHTTP(rec, req)
+		middleware.Auth("test-secret", h.Store)(http.HandlerFunc(h.ServeUpload)).ServeHTTP(rec, req)
 		return rec
 	}
 	assertAllowed := func(label, token string) {

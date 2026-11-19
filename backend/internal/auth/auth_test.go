@@ -32,7 +32,7 @@ func TestHashPasswordTooShort(t *testing.T) {
 }
 
 func TestJWTRoundTrip(t *testing.T) {
-	token, err := GenerateJWT("test-secret", "u1", "a@example.com", "alice", time.Hour)
+	token, err := GenerateJWT("test-secret", "u1", "a@example.com", "alice", "", time.Hour)
 	if err != nil {
 		t.Fatalf("GenerateJWT: %v", err)
 	}
@@ -46,14 +46,14 @@ func TestJWTRoundTrip(t *testing.T) {
 }
 
 func TestJWTWrongSecretRejected(t *testing.T) {
-	token, _ := GenerateJWT("secret-a", "u1", "a@example.com", "alice", time.Hour)
+	token, _ := GenerateJWT("secret-a", "u1", "a@example.com", "alice", "", time.Hour)
 	if _, err := ValidateJWT("secret-b", token); err == nil {
 		t.Fatal("token signed with another secret was accepted")
 	}
 }
 
 func TestJWTExpiredRejected(t *testing.T) {
-	token, err := GenerateJWT("test-secret", "u1", "a@example.com", "alice", -time.Hour)
+	token, err := GenerateJWT("test-secret", "u1", "a@example.com", "alice", "", -time.Hour)
 	if err != nil {
 		t.Fatalf("GenerateJWT: %v", err)
 	}

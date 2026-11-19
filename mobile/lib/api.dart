@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
 
 import 'data_saver.dart';
@@ -33,6 +33,18 @@ class ApiClient {
       return 'http://10.0.2.2:8080';
     }
     return 'http://localhost:8080';
+  }
+
+  String get devicePlatform {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return 'android';
+      case TargetPlatform.iOS:
+        return 'ios';
+      default:
+        return 'desktop';
+    }
   }
 
   final String baseUrl;
@@ -109,34 +121,79 @@ class ApiClient {
   /// (user direction 2026-11-14): the user never picks one. The
   /// register response carries the generated "username".
   Future<Map<String, dynamic>> register(
-      String email, String displayName, String password) async {
+    String email,
+    String displayName,
+    String password, {
+    String? inviteCode,
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+  }) async {
     final out = await _req('POST', '/api/auth/register', {
       'email': email,
       'password': password,
       'display_name': displayName,
+      if (inviteCode?.trim().isNotEmpty == true)
+        'invite_code': inviteCode!.trim(),
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceName != null) 'device_name': deviceName,
+      if (platform != null) 'platform': platform,
     });
     if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
-  Future<Map<String, dynamic>> login(String email, String password) async {
-    final out = await _req(
-        'POST', '/api/auth/login', {'email': email, 'password': password});
+  Future<Map<String, dynamic>> login(
+    String email,
+    String password, {
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+  }) async {
+    final out = await _req('POST', '/api/auth/login', {
+      'email': email,
+      'password': password,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceName != null) 'device_name': deviceName,
+      if (platform != null) 'platform': platform,
+    });
     if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
   /// Verify a 6-digit code (register or login). Returns {user, token}.
-  Future<Map<String, dynamic>> verifyRegister(String email, String code) async {
-    final out = await _req(
-        'POST', '/api/auth/verify-register', {'email': email, 'code': code});
+  Future<Map<String, dynamic>> verifyRegister(
+    String email,
+    String code, {
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+  }) async {
+    final out = await _req('POST', '/api/auth/verify-register', {
+      'email': email,
+      'code': code,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceName != null) 'device_name': deviceName,
+      if (platform != null) 'platform': platform,
+    });
     if (out['token'] != null) token = out['token'] as String;
     return out;
   }
 
-  Future<Map<String, dynamic>> verifyLogin(String email, String code) async {
-    final out = await _req(
-        'POST', '/api/auth/verify-login', {'email': email, 'code': code});
+  Future<Map<String, dynamic>> verifyLogin(
+    String email,
+    String code, {
+    String? deviceId,
+    String? deviceName,
+    String? platform,
+  }) async {
+    final out = await _req('POST', '/api/auth/verify-login', {
+      'email': email,
+      'code': code,
+      if (deviceId != null) 'device_id': deviceId,
+      if (deviceName != null) 'device_name': deviceName,
+      if (platform != null) 'platform': platform,
+    });
     if (out['token'] != null) token = out['token'] as String;
     return out;
   }
@@ -323,6 +380,13 @@ class ApiClient {
   Future<List<dynamic>> listDevices() => _getList('/api/devices');
   Future<void> removeDevice(String deviceId) =>
       _req('DELETE', '/api/devices/$deviceId');
+  Future<Map<String, dynamic>> createSignupInvite(
+          {int maxUses = 1, int expiresInHours = 168}) =>
+      _req('POST', '/api/signup-invites', {
+        'max_uses': maxUses,
+        'expires_in_hours': expiresInHours,
+      });
+  Future<List<dynamic>> listSignupInvites() => _getList('/api/signup-invites');
 
   // Stage 6 — Communities (WhatsApp parity).
   Future<List<dynamic>> listCommunities() => _getList('/api/communities');
@@ -651,7 +715,7 @@ class ApiClient {
       _req('POST', '/api/devices', {
         'device_id': deviceId,
         'name': deviceName,
-        'platform': 'android',
+        'platform': devicePlatform,
       });
 
   /// FCM push: register this device's Firebase token so the server can
