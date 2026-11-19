@@ -75,7 +75,7 @@ void main() {
         [
           'دستیار سافاری',
           'دربارهٔ استفاده از سافاری از من بپرسید',
-          'روی دستگاه شما و بر پایهٔ قوانین اجرا می‌شود، نه هوش مصنوعی ابری.',
+          'این دستیار روی دستگاه شما و بر اساس قوانین ازپیش‌تعریف‌شده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
           'چطور گروه بسازم؟',
           'چطور کسی را با لینک دعوت کنم؟',
           'چطور تماس تصویری برقرار کنم؟',
@@ -205,6 +205,10 @@ void main() {
       );
       expect(decorator.decoration.filled, isFalse);
       expect(decorator.decoration.fillColor, Colors.transparent);
+      expect(
+        tester.widget<TextField>(field).decoration!.hintStyle!.color,
+        const Color(0xFFC1CBDA),
+      );
     }
   });
 }

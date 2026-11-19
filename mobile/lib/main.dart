@@ -214,7 +214,7 @@ const _assistantTranslations = <String, List<String>>{
   ],
   'Runs on this device — rule-based, not cloud AI.': [
     'Runs on this device — rule-based, not cloud AI.',
-    'روی دستگاه شما و بر پایهٔ قوانین اجرا می‌شود، نه هوش مصنوعی ابری.',
+    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیش‌تعریف‌شده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
     'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
   ],
   'How do I create a group?': [
@@ -242,6 +242,21 @@ String assistantLocalizedText(BuildContext context, String key) {
     _ => 0,
   };
   return _assistantTranslations[key]?[index] ?? key;
+}
+
+String chatPageText(BuildContext context, String key) {
+  const text = <String, List<String>>{
+    'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
+    'Channels': ['Channels', 'کانال‌ها', 'القنوات'],
+    'Pinned': ['Pinned', 'سنجاق‌شده', 'المثبّتة'],
+  };
+  final language = Localizations.localeOf(context).languageCode;
+  final index = switch (language) {
+    'fa' => 1,
+    'ar' => 2,
+    _ => 0,
+  };
+  return text[key]?[index] ?? key;
 }
 
 class AssistantWelcomeContent extends StatelessWidget {
@@ -394,7 +409,7 @@ class ChatSearchCapsule extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
             hintStyle: const TextStyle(
-              color: OrbitalColors.mutedBlue,
+              color: Color(0xFFC1CBDA),
               fontSize: 15,
             ),
             prefixIcon: const Icon(
@@ -4475,8 +4490,9 @@ class _HomePageState extends State<HomePage>
     if (_assistantTranslations.containsKey(key)) {
       return assistantLocalizedText(context, key);
     }
+    final chatText = chatPageText(context, key);
+    if (chatText != key) return chatText;
     const text = <String, List<String>>{
-      'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
       'Updates': ['Updates', 'به‌روزرسانی‌ها', 'التحديثات'],
       'Communities': ['Communities', 'انجمن‌ها', 'المجتمعات'],
       'Calls': ['Calls', 'تماس‌ها', 'المكالمات'],
@@ -4523,9 +4539,9 @@ class _HomePageState extends State<HomePage>
         'الانضمام عبر رابط دعوة'
       ],
       'Ask how to use Safari…': [
-        'Ask how to use Safari…',
-        'دربارهٔ استفاده از سافاری بپرسید…',
-        'اسأل عن كيفية استخدام سفاري…'
+        'Ask about Safari…',
+        'سؤالت را درباره سافاری بنویس…',
+        'اسأل عن سفاري…'
       ],
       'Back': ['Back', 'بازگشت', 'رجوع'],
       'Close search': ['Close search', 'بستن جست‌وجو', 'إغلاق البحث'],
@@ -5246,14 +5262,14 @@ class _HomePageState extends State<HomePage>
                             ] else ...[
                               if (showAssistantRow ||
                                   pinnedChats.isNotEmpty) ...[
-                                _chatSectionHeader('Pinned'),
+                                _chatSectionHeader(_orbitText('Pinned')),
                                 if (showAssistantRow)
                                   _assistantConversationRow(),
                                 for (final chat in pinnedChats)
                                   _chatRow(chat as Map<String, dynamic>),
                               ],
                               if (regularChats.isNotEmpty) ...[
-                                _chatSectionHeader('Chats'),
+                                _chatSectionHeader(_orbitText('Chats')),
                                 for (final chat in regularChats)
                                   _chatRow(chat as Map<String, dynamic>),
                               ],
@@ -8374,7 +8390,7 @@ class _HomePageState extends State<HomePage>
         header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Safari 0.7.11 (mobile)'),
+          title: Text('Safari 0.7.12 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
