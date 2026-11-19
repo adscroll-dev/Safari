@@ -31,7 +31,14 @@ class CallForegroundService : Service() {
         val peerName = intent?.getStringExtra(EXTRA_PEER_NAME).orEmpty()
         val chatId = intent?.getStringExtra(EXTRA_CHAT_ID).orEmpty()
         val notification = buildNotification(peerName, video, chatId)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        // The foreground-service type must match THIS call, not the
+        // Manifest's declared maximum: a voice call uses MICROPHONE
+        // only, a video call uses MICROPHONE | CAMERA. The
+        // three-parameter startForeground() exists since API 29 (Q), so
+        // use it there and above; below API 29 the two-parameter call
+        // falls back to the Manifest types (both), which is the only
+        // option on those versions.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             var serviceType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             if (video) {
                 serviceType = serviceType or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
