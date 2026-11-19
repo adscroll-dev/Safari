@@ -11,40 +11,41 @@ type Apk = {
 };
 
 // Per-ABI split APKs, arm64 first (most modern phones). Verified
-// 2026-11-19 with aapt2 (package app.vyro, version 0.7.7, label
+// 2026-11-19 with aapt2 (package app.vyro, version 0.7.8, label
 // "Safari"; live API https://vyro-api-wf4b.onrender.com present in
-// each APK's own libapp.so, no dev URL; CAMERA + RECORD_AUDIO present;
+// each APK's own libapp.so, no dev URL; CAMERA + RECORD_AUDIO +
+// FOREGROUND_SERVICE + FOREGROUND_SERVICE_MICROPHONE +
+// FOREGROUND_SERVICE_CAMERA + MODIFY_AUDIO_SETTINGS present;
 // release-signed with the Safari Release cert, SHA-256
 // 9368f4db62b68230946883a146dabd06a2437cf25e01a85206b5be70087ab077).
-// Rebuilt 2026-11-19 00:33 +0430 — v0.7.7: ORBITAL NEXUS redesign
-// (stages 1+2, matches the user's neon reference) + ChatGPT 0.7.6
-// fixes (E2EE fail-closed, persistent E2EE state, group device-ID
-// fix, target SDK 36, AGP 8.9.1) + ChatGPT 0.7.7 fixes (device_*
-// backup domains, BLUETOOTH_CONNECT).
+// Rebuilt 2026-11-19 11:45 +0430 — v0.7.8: call foreground service
+// (calls continue in background; per-call type: voice = MICROPHONE
+// only, video = MICROPHONE | CAMERA, from API 30) + MODIFY_AUDIO_SETTINGS
+// + ChatGPT 0.7.8 reviews (no blocking issues in final review).
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
-    href: "/downloads/safari-0.7.7-arm64-v8a.apk",
+    href: "/downloads/safari-0.7.8-arm64-v8a.apk",
     size: "35.3 MB",
-    bytes: "35,274,854 bytes",
+    bytes: "35,274,971 bytes",
     sha256:
-      "4b676eb1e0ec2cee129ac92fdc716890fb80b7b661308e88aebc8420aa5d7533",
+      "0ca6c5bcbb058746f7a4b2d72607bfc9f4d1d7811de9c949a1e066f408e9d2b7",
   },
   {
     abi: "armeabi-v7a",
-    href: "/downloads/safari-0.7.7-armeabi-v7a.apk",
+    href: "/downloads/safari-0.7.8-armeabi-v7a.apk",
     size: "28.4 MB",
-    bytes: "28,402,255 bytes",
+    bytes: "28,418,769 bytes",
     sha256:
-      "2daee501ee205ab85beccd39e803a0da011073d972905cfc3045262e8bcebd48",
+      "6df1aa73b352cadff4633ac07e1cfe0eb364d0bfe59cc49f5c882028d382b09a",
   },
   {
     abi: "x86_64",
-    href: "/downloads/safari-0.7.7-x86_64.apk",
+    href: "/downloads/safari-0.7.8-x86_64.apk",
     size: "37.8 MB",
-    bytes: "37,819,231 bytes",
+    bytes: "37,819,359 bytes",
     sha256:
-      "429bc90c86d4ffe24082b30813526fd178f6cc58014c1b9dc8471ac5736bf7d9",
+      "53ca5b52b277c38f6e86f68698f0c9a443c9f41da98282e7dc002b902d37961c",
   },
 ];
 
