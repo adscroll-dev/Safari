@@ -214,7 +214,7 @@ const _assistantTranslations = <String, List<String>>{
   ],
   'Runs on this device — rule-based, not cloud AI.': [
     'Runs on this device — rule-based, not cloud AI.',
-    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیش‌تعریف‌شده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
+    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیشتعریفشده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
     'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
   ],
   'How do I create a group?': [
@@ -4540,7 +4540,7 @@ class _HomePageState extends State<HomePage>
       ],
       'Ask how to use Safari…': [
         'Ask about Safari…',
-        'سؤالت را درباره سافاری بنویس…',
+        'سؤالت را بنویس…',
         'اسأل عن سفاري…'
       ],
       'Back': ['Back', 'بازگشت', 'رجوع'],
@@ -5330,17 +5330,22 @@ class _HomePageState extends State<HomePage>
     setState(() => _chatSearchOpen = false);
   }
 
-  Widget _chatSectionHeader(String label) => Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 4),
-        child: Text(
-          label,
-          style: OrbitalTypography.secondary.copyWith(
-            color: OrbitalColors.moonlight,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
+  Widget _chatSectionHeader(String label) {
+    // ChatGPT visual review (0.7.12): moonlight is too pale on the light
+    // background — use slate #64748B in light mode for readability.
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 4),
+      child: Text(
+        label,
+        style: OrbitalTypography.secondary.copyWith(
+          color: dark ? OrbitalColors.moonlight : const Color(0xFF64748B),
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
         ),
-      );
+      ),
+    );
+  }
 
   Widget _buildChatsSkeleton() {
     return OrbitShimmer(
