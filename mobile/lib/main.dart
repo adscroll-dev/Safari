@@ -205,6 +205,236 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+const _assistantTranslations = <String, List<String>>{
+  'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
+  'Ask me about using Safari': [
+    'Ask me about using Safari',
+    'دربارهٔ استفاده از سافاری از من بپرسید',
+    'اسألني عن كيفية استخدام سفاري'
+  ],
+  'Runs on this device — rule-based, not cloud AI.': [
+    'Runs on this device — rule-based, not cloud AI.',
+    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیشتعریفشده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
+    'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
+  ],
+  'How do I create a group?': [
+    'How do I create a group?',
+    'چطور گروه بسازم؟',
+    'كيف أنشئ مجموعة؟'
+  ],
+  'How do I invite someone with an invite link?': [
+    'How do I invite someone with an invite link?',
+    'چطور کسی را با لینک دعوت کنم؟',
+    'كيف أدعو شخصًا برابط دعوة؟'
+  ],
+  'How do I make a video call?': [
+    'How do I make a video call?',
+    'چطور تماس تصویری برقرار کنم؟',
+    'كيف أجري مكالمة فيديو؟'
+  ],
+};
+
+String assistantLocalizedText(BuildContext context, String key) {
+  final language = Localizations.localeOf(context).languageCode;
+  final index = switch (language) {
+    'fa' => 1,
+    'ar' => 2,
+    _ => 0,
+  };
+  return _assistantTranslations[key]?[index] ?? key;
+}
+
+String chatPageText(BuildContext context, String key) {
+  const text = <String, List<String>>{
+    'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
+    'Channels': ['Channels', 'کانال‌ها', 'القنوات'],
+    'Pinned': ['Pinned', 'سنجاق‌شده', 'المثبّتة'],
+  };
+  final language = Localizations.localeOf(context).languageCode;
+  final index = switch (language) {
+    'fa' => 1,
+    'ar' => 2,
+    _ => 0,
+  };
+  return text[key]?[index] ?? key;
+}
+
+class AssistantWelcomeContent extends StatelessWidget {
+  const AssistantWelcomeContent({
+    super.key,
+    required this.controller,
+    required this.onSend,
+    required this.avatar,
+  });
+
+  final TextEditingController controller;
+  final Future<void> Function() onSend;
+  final Widget avatar;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            avatar,
+            const SizedBox(height: 16),
+            Text(
+              assistantLocalizedText(context, 'Ask me about using Safari'),
+              textAlign: TextAlign.center,
+              style: OrbitalTypography.secondary.copyWith(
+                color: dark
+                    ? OrbitalColors.moonlight
+                    : WaColors.lightTextSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              assistantLocalizedText(
+                  context, 'Runs on this device — rule-based, not cloud AI.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: dark
+                    ? OrbitalColors.mutedBlue
+                    : WaColors.lightTextSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            AssistantStarterSuggestions(
+              controller: controller,
+              onSend: onSend,
+              prompts: [
+                assistantLocalizedText(context, 'How do I create a group?'),
+                assistantLocalizedText(
+                    context, 'How do I invite someone with an invite link?'),
+                assistantLocalizedText(context, 'How do I make a video call?'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AssistantStarterSuggestions extends StatelessWidget {
+  const AssistantStarterSuggestions({
+    super.key,
+    required this.controller,
+    required this.onSend,
+    required this.prompts,
+  });
+
+  final TextEditingController controller;
+  final Future<void> Function() onSend;
+  final List<String> prompts;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final chipBackground = Color.alphaBlend(
+      OrbitalColors.electricCyan.withOpacity(dark ? 0.18 : 0.14),
+      dark ? OrbitalColors.nebulaNavy : Colors.white,
+    );
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: prompts
+          .map(
+            (prompt) => ActionChip(
+              backgroundColor: chipBackground,
+              side: BorderSide(
+                color: OrbitalColors.electricCyan.withOpacity(0.56),
+              ),
+              labelStyle: TextStyle(
+                color: dark
+                    ? OrbitalColors.stellarWhite
+                    : OrbitalColors.nebulaNavy,
+                fontWeight: FontWeight.w600,
+              ),
+              label: Text(prompt),
+              onPressed: () {
+                controller.text = prompt;
+                unawaited(onSend());
+              },
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class ChatSearchCapsule extends StatelessWidget {
+  const ChatSearchCapsule({
+    super.key,
+    required this.controller,
+    required this.focusNode,
+    required this.hintText,
+    required this.clearTooltip,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String hintText;
+  final String clearTooltip;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: OrbitalColors.nebulaNavy.withOpacity(0.94),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: OrbitalColors.electricCyan.withOpacity(0.16),
+          ),
+        ),
+        child: TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textInputAction: TextInputAction.search,
+          onChanged: onChanged,
+          style: OrbitalTypography.body.copyWith(
+            color: OrbitalColors.stellarWhite,
+          ),
+          cursorColor: OrbitalColors.electricCyan,
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: const TextStyle(
+              color: Color(0xFFC1CBDA),
+              fontSize: 15,
+            ),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: OrbitalColors.mutedBlue,
+              size: 21,
+            ),
+            suffixIcon: controller.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: clearTooltip,
+                    icon: const Icon(Icons.close, size: 18),
+                    onPressed: onClear,
+                  ),
+            contentPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 14, 0),
+            filled: false,
+            fillColor: Colors.transparent,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
+        ),
+      );
+}
+
 class _HomePageState extends State<HomePage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late final Future<void> _prefsInitialization;
@@ -217,7 +447,10 @@ class _HomePageState extends State<HomePage>
   final _draft = TextEditingController();
   final _searchCtrl = TextEditingController();
   final _chatListSearchCtrl = TextEditingController();
+  final _chatListSearchFocus = FocusNode();
+  final _assistantInputCtrl = TextEditingController();
   final _chatListScrollController = ScrollController();
+  final _assistantScrollController = ScrollController();
   Map<String, dynamic>? _user;
   List<dynamic> _chats = [];
   bool _chatsLoaded = false;
@@ -242,6 +475,9 @@ class _HomePageState extends State<HomePage>
   List<dynamic> _messages = [];
   List<dynamic> _stories = [];
   Map<String, dynamic>? _activeChat;
+  final List<Map<String, dynamic>> _assistantMessages = [];
+  bool _assistantActive = false;
+  bool _chatSearchOpen = false;
   String? _error;
   bool _registerMode = false;
   // 3D registration page: show/hide password (eye icon).
@@ -879,6 +1115,10 @@ class _HomePageState extends State<HomePage>
     await prefs.remove('vyro_session_user');
     await prefs.remove('vyro_cached_chats');
     await prefs.remove('vyro_outbox');
+    final deletedUserId = _user?['id'] as String?;
+    if (deletedUserId != null) {
+      await prefs.remove('vyro_assistant_messages_$deletedUserId');
+    }
     for (final k in prefs
         .getKeys()
         .where((k) => k.startsWith('vyro_cached_msgs_'))
@@ -891,6 +1131,8 @@ class _HomePageState extends State<HomePage>
       _codeStep = false;
       _showSettings = false;
       _activeChat = null;
+      _assistantActive = false;
+      _assistantMessages.clear();
       _messages = [];
       _chats = [];
       _stories = [];
@@ -950,7 +1192,10 @@ class _HomePageState extends State<HomePage>
     _draft.dispose();
     _searchCtrl.dispose();
     _chatListSearchCtrl.dispose();
+    _chatListSearchFocus.dispose();
+    _assistantInputCtrl.dispose();
     _chatListScrollController.dispose();
+    _assistantScrollController.dispose();
     super.dispose();
   }
 
@@ -1074,9 +1319,37 @@ class _HomePageState extends State<HomePage>
       }
       await prefs.setString('vyro_session_user', jsonEncode(u));
     }
+    final assistantHistory = <Map<String, dynamic>>[];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('vyro_assistant_messages_$userId');
+      if (saved != null) {
+        final decoded = jsonDecode(saved);
+        if (decoded is! List) {
+          throw const FormatException('Expected an assistant message list');
+        }
+        for (final item in decoded) {
+          if (item is! Map ||
+              !['user', 'assistant'].contains(item['role']) ||
+              item['content'] is! String) {
+            throw const FormatException('Invalid assistant message');
+          }
+          assistantHistory.add(Map<String, dynamic>.from(item));
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Could not restore assistant history: $e');
+      }
+    }
     _chatListSearchCtrl.clear();
     setState(() {
       _user = u;
+      _assistantMessages
+        ..clear()
+        ..addAll(assistantHistory);
+      _assistantActive = false;
+      _chatSearchOpen = false;
       _chatsLoaded = false;
       _chatLoadError = null;
     });
@@ -2455,7 +2728,7 @@ class _HomePageState extends State<HomePage>
     final picker = ImagePicker();
     final picked =
         await picker.pickImage(source: ImageSource.gallery, maxWidth: 1920);
-    if (picked == null) return;
+    if (!mounted || picked == null) return;
     try {
       final bytes = await picked.readAsBytes();
       final compressed = DataSaver.compressImage(bytes);
@@ -3100,63 +3373,345 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  /// Local Safari assistant (on-device, rule-based — not a cloud AI).
-  /// Clearly labeled as such in the UI.
   void _showAssistant() {
-    final input = TextEditingController();
-    String answer = '';
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 16,
-              right: 16,
-              top: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('🤖 Safari Assistant',
-                  style: Theme.of(context).textTheme.titleMedium),
-              const Text(
-                'Local assistant — runs on your device, rule-based. '
-                'Not a cloud AI; it only knows how Safari works.',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+    _chatListSearchFocus.unfocus();
+    setState(() {
+      _activeChat = null;
+      _assistantActive = true;
+      _chatSearchOpen = false;
+      _chatListSearchCtrl.clear();
+    });
+    _scrollAssistantToEnd();
+  }
+
+  void _closeAssistant() => setState(() => _assistantActive = false);
+
+  void _scrollAssistantToEnd() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_assistantScrollController.hasClients) {
+        _assistantScrollController.animateTo(
+          _assistantScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendAssistantMessage() async {
+    final prompt = _assistantInputCtrl.text.trim();
+    if (prompt.isEmpty) return;
+    final reply = assistantReply(prompt).text;
+    final now = DateTime.now().toIso8601String();
+    _assistantInputCtrl.clear();
+    setState(() {
+      _assistantMessages
+        ..add({'role': 'user', 'content': prompt, 'created_at': now})
+        ..add({
+          'role': 'assistant',
+          'content': reply,
+          'created_at': DateTime.now().toIso8601String(),
+        });
+    });
+    _scrollAssistantToEnd();
+    final userId = _user?['id'] as String?;
+    if (userId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = await prefs.setString(
+        'vyro_assistant_messages_$userId',
+        jsonEncode(_assistantMessages),
+      );
+      if (!saved) {
+        throw StateError('Device storage rejected assistant history');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Could not save assistant history: $e');
+      }
+    }
+  }
+
+  String _assistantLastReply() {
+    for (final message in _assistantMessages.reversed) {
+      if (message['role'] == 'assistant') {
+        return message['content'] as String? ?? '';
+      }
+    }
+    return '';
+  }
+
+  Widget _assistantAvatar({double size = 52}) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: OrbitalColors.primaryOrbit,
+        boxShadow: [
+          BoxShadow(color: Color(0x7722D3EE), blurRadius: 16),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'assets/safari-logo-transparent.png',
+              width: size * 0.82,
+              height: size * 0.82,
+              fit: BoxFit.cover,
+            ),
+          ),
+          PositionedDirectional(
+            bottom: size * 0.06,
+            end: size * 0.08,
+            child: Container(
+              padding: EdgeInsets.all(size * 0.04),
+              decoration: const BoxDecoration(
+                color: OrbitalColors.deepSpace,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 12),
-              Row(children: [
+              child: Icon(
+                Icons.smart_toy_outlined,
+                size: size * 0.24,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _assistantConversationRow() {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 5, 20, 5),
+      child: Material(
+        color: OrbitalColors.deepSpace.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(OrbitalRadii.card),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _showAssistant,
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(OrbitalRadii.card),
+              border: Border.all(color: Colors.white.withOpacity(0.06)),
+            ),
+            child: Row(
+              children: [
+                _assistantAvatar(),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: TextField(
-                    controller: input,
-                    decoration: const InputDecoration(
-                        hintText: 'Ask how to use Safari…'),
-                    onSubmitted: (_) {
-                      final r = assistantReply(input.text);
-                      setSheetState(() => answer = r.text);
-                    },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _orbitText('Safari assistant'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: OrbitalTypography.cardTitle.copyWith(
+                                color: OrbitalColors.stellarWhite,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.push_pin_outlined,
+                            size: 15,
+                            color: OrbitalColors.mutedBlue,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        _assistantLastReply(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: OrbitalTypography.secondary.copyWith(
+                          color: OrbitalColors.moonlight,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () {
-                    final r = assistantReply(input.text);
-                    setSheetState(() => answer = r.text);
-                  },
-                  child: const Text('Ask'),
-                ),
-              ]),
-              if (answer.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Text(answer),
-                ),
-              const SizedBox(height: 16),
-            ],
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _assistantChatAppBar() {
+    return vyroAppBar(
+      context,
+      titleWidget: Row(
+        children: [
+          _assistantAvatar(size: 36),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _orbitText('Safari assistant'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+      leading: IconButton(
+        tooltip: _orbitText('Back'),
+        icon: const Icon(Icons.arrow_back),
+        onPressed: _closeAssistant,
+      ),
+      actions: const [],
+    );
+  }
+
+  Widget _buildAssistantBody() {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      decoration: _wallpaperDecoration(
+        _wallpaperForChat(null),
+        dark,
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: _assistantMessages.isEmpty
+                ? AssistantWelcomeContent(
+                    controller: _assistantInputCtrl,
+                    onSend: _sendAssistantMessage,
+                    avatar: _assistantAvatar(size: 76),
+                  )
+                : ListView.builder(
+                    controller: _assistantScrollController,
+                    padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
+                    itemCount: _assistantMessages.length,
+                    itemBuilder: (context, index) {
+                      final message = _assistantMessages[index];
+                      final mine = message['role'] == 'user';
+                      final bubble = Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: mine ? OrbitalColors.primaryOrbit : null,
+                          color: mine
+                              ? null
+                              : (dark
+                                  ? OrbitalColors.nebulaNavy.withOpacity(0.96)
+                                  : WaColors.lightBubbleIn),
+                          borderRadius: BorderRadius.circular(18),
+                          border: mine
+                              ? null
+                              : Border.all(
+                                  color: Colors.white.withOpacity(0.08)),
+                        ),
+                        child: Text(
+                          message['content'] as String? ?? '',
+                          style: TextStyle(
+                            color: mine
+                                ? Colors.white
+                                : (dark
+                                    ? OrbitalColors.stellarWhite
+                                    : WaColors.lightText),
+                          ),
+                        ),
+                      );
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Align(
+                          alignment: mine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: bubble,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          if (_assistantMessages.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: AssistantStarterSuggestions(
+                controller: _assistantInputCtrl,
+                onSend: _sendAssistantMessage,
+                prompts: [
+                  _orbitText('How do I create a group?'),
+                  _orbitText('How do I invite someone with an invite link?'),
+                  _orbitText('How do I make a video call?'),
+                ],
+              ),
+            ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  _error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _assistantInputCtrl,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.send,
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _sendAssistantMessage(),
+                      decoration: InputDecoration(
+                        hintText: _orbitText('Ask how to use Safari…'),
+                        filled: true,
+                        fillColor: dark
+                            ? OrbitalColors.deepSpace
+                            : Colors.white.withOpacity(0.92),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: _orbitText('Send'),
+                    onPressed: _assistantInputCtrl.text.trim().isEmpty
+                        ? null
+                        : _sendAssistantMessage,
+                    icon: const Icon(Icons.send),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -3894,31 +4449,50 @@ class _HomePageState extends State<HomePage>
         ),
       );
     }
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: _activeChat == null
-          ? (_showSettings
-              ? _buildSettingsBody()
-              : Column(
-                  children: [
-                    if (_incomingCall != null) _incomingCallBanner(),
-                    if (_incomingCall == null &&
-                        (_call?.state == CallState.inCall ||
-                            _call?.state == CallState.outgoing))
-                      _inCallReturnBar(),
-                    Expanded(child: _buildHomeBody()),
-                  ],
-                ))
-          : _buildChatBody(),
-      bottomNavigationBar:
-          _activeChat == null && !_showSettings ? _buildSafariNavBar() : null,
-      floatingActionButton: _buildFab(),
+    return PopScope<Object?>(
+      canPop: !_assistantActive && !_chatSearchOpen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_assistantActive) {
+          _closeAssistant();
+        } else if (_chatSearchOpen) {
+          _closeChatSearch();
+        }
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(),
+        body: _assistantActive
+            ? _buildAssistantBody()
+            : _activeChat == null
+                ? (_showSettings
+                    ? _buildSettingsBody()
+                    : Column(
+                        children: [
+                          if (_incomingCall != null) _incomingCallBanner(),
+                          if (_incomingCall == null &&
+                              (_call?.state == CallState.inCall ||
+                                  _call?.state == CallState.outgoing))
+                            _inCallReturnBar(),
+                          Expanded(child: _buildHomeBody()),
+                        ],
+                      ))
+                : _buildChatBody(),
+        bottomNavigationBar:
+            _activeChat == null && !_assistantActive && !_showSettings
+                ? _buildSafariNavBar()
+                : null,
+        floatingActionButton: _buildFab(),
+      ),
     );
   }
 
   String _orbitText(String key) {
+    if (_assistantTranslations.containsKey(key)) {
+      return assistantLocalizedText(context, key);
+    }
+    final chatText = chatPageText(context, key);
+    if (chatText != key) return chatText;
     const text = <String, List<String>>{
-      'Chats': ['Chats', 'گفت‌وگوها', 'المحادثات'],
       'Updates': ['Updates', 'به‌روزرسانی‌ها', 'التحديثات'],
       'Communities': ['Communities', 'انجمن‌ها', 'المجتمعات'],
       'Calls': ['Calls', 'تماس‌ها', 'المكالمات'],
@@ -3949,6 +4523,29 @@ class _HomePageState extends State<HomePage>
         'جست‌وجوی گفت‌وگوها',
         'البحث في المحادثات'
       ],
+      'New direct message': [
+        'New direct message',
+        'پیام مستقیم جدید',
+        'رسالة مباشرة جديدة'
+      ],
+      'New group / channel': [
+        'New group / channel',
+        'ایجاد گروه یا کانال',
+        'إنشاء مجموعة أو قناة'
+      ],
+      'Join via invite link': [
+        'Join via invite link',
+        'پیوستن با لینک دعوت',
+        'الانضمام عبر رابط دعوة'
+      ],
+      'Ask how to use Safari…': [
+        'Ask about Safari…',
+        'سؤالت را بنویس…',
+        'اسأل عن سفاري…'
+      ],
+      'Back': ['Back', 'بازگشت', 'رجوع'],
+      'Close search': ['Close search', 'بستن جست‌وجو', 'إغلاق البحث'],
+      'Send': ['Send', 'ارسال', 'إرسال'],
       'Search messages and contacts…': [
         'Search messages and contacts…',
         'جست‌وجوی پیام‌ها و مخاطبان…',
@@ -4021,7 +4618,6 @@ class _HomePageState extends State<HomePage>
         'أنت غير متصل. تُعرض المحادثات المحفوظة وستُرسل الرسائل عند إعادة الاتصال.'
       ],
       'Settings': ['Settings', 'تنظیمات', 'الإعدادات'],
-      'Safari assistant': ['Safari assistant', 'دستیار سافاری', 'مساعد سفاري'],
       'Dark mode': ['Dark mode', 'حالت تاریک', 'الوضع الداكن'],
       'Language': ['Language', 'زبان', 'اللغة'],
       'Camera': ['Camera', 'دوربین', 'الكاميرا'],
@@ -4039,6 +4635,7 @@ class _HomePageState extends State<HomePage>
 
   /// Section header for the shell; chat controls remain on this route.
   PreferredSizeWidget _buildAppBar() {
+    if (_assistantActive) return _assistantChatAppBar();
     if (_activeChat != null) return _buildChatAppBar();
     if (_showSettings) {
       return vyroAppBar(
@@ -4052,18 +4649,24 @@ class _HomePageState extends State<HomePage>
       );
     }
     final actions = <Widget>[
-      IconButton(
-        icon: const Icon(Icons.search),
-        tooltip: _orbitText('Search'),
-        onPressed: _showSearchSheet,
-      ),
-      if (_tabIndex == 0)
+      if (!(_tabIndex == 0 && _chatSearchOpen))
+        IconButton(
+          icon: const Icon(Icons.search),
+          tooltip: _orbitText('Search'),
+          onPressed: _tabIndex == 0 ? _toggleChatSearch : _showSearchSheet,
+        ),
+      if (_tabIndex == 0) ...[
+        IconButton(
+          icon: const Icon(Icons.smart_toy_outlined),
+          tooltip: _orbitText('Safari assistant'),
+          onPressed: _showAssistant,
+        ),
         IconButton(
           icon: const Icon(Icons.add_comment_outlined),
           tooltip: _orbitText('New chat'),
           onPressed: _showNewChatSheet,
-        )
-      else if (_tabIndex == 1)
+        ),
+      ] else if (_tabIndex == 1)
         IconButton(
           icon: const Icon(Icons.add_circle_outline),
           tooltip: _orbitText('Create update'),
@@ -4456,6 +5059,7 @@ class _HomePageState extends State<HomePage>
   /// status). Calls: new call (goes to Chats to pick a chat).
   /// Communities: none. Inside a chat: back.
   Widget? _buildFab() {
+    if (_assistantActive) return null;
     if (_activeChat != null) {
       return _safariFab(
         icon: Icons.arrow_back,
@@ -4557,6 +5161,18 @@ class _HomePageState extends State<HomePage>
                 _chatPreview(c).toLowerCase().contains(query) ||
                 _peerUsername(c).toLowerCase().contains(query);
           }).toList();
+    final assistantHasConversation = _assistantMessages.isNotEmpty;
+    final assistantMatchesFilter =
+        _chatTypeFilter == 'All' || _chatTypeFilter == 'Personal';
+    final assistantMatchesQuery = query.isEmpty ||
+        _orbitText('Safari assistant').toLowerCase().contains(query) ||
+        'safari assistant'.contains(query) ||
+        _assistantLastReply().toLowerCase().contains(query);
+    final showAssistantRow = !_showArchived &&
+        _folderFilter.isEmpty &&
+        assistantHasConversation &&
+        assistantMatchesFilter &&
+        assistantMatchesQuery;
     final pinnedChats = shown
         .where((chat) => (chat as Map<String, dynamic>)['pinned'] == true)
         .toList();
@@ -4566,7 +5182,20 @@ class _HomePageState extends State<HomePage>
     return Column(
       children: [
         _offlineBanner(),
-        _chatSearchCapsule(),
+        if (_chatSearchOpen)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(20, 8, 12, 8),
+            child: Row(
+              children: [
+                Expanded(child: _chatSearchCapsule()),
+                IconButton(
+                  tooltip: _orbitText('Close search'),
+                  icon: const Icon(Icons.close),
+                  onPressed: _closeChatSearch,
+                ),
+              ],
+            ),
+          ),
         if (_showArchived)
           ListTile(
             leading: const Icon(Icons.arrow_back),
@@ -4591,26 +5220,36 @@ class _HomePageState extends State<HomePage>
                       onPressed: _refreshChats,
                       emblem: const NexusEmptyOrbit(),
                     )
-                  : shown.isEmpty
+                  : shown.isEmpty && !showAssistantRow
                       ? SafariEmptyState(
                           icon: Icons.chat_bubble_outline,
                           title: _showArchived
                               ? _orbitText('No archived chats')
-                              : _chats.isEmpty
+                              : _chats.isEmpty &&
+                                      !assistantHasConversation &&
+                                      query.isEmpty
                                   ? _orbitText('No chats yet')
                                   : _orbitText('No matching chats'),
                           subtitle: _showArchived
                               ? _orbitText(
                                   'There are no archived conversations.')
-                              : _chats.isEmpty
+                              : _chats.isEmpty &&
+                                      !assistantHasConversation &&
+                                      query.isEmpty
                                   ? _orbitText(
                                       'Start a conversation and your chats will appear here.')
                                   : _orbitText(
                                       'Try another filter to see your chats.'),
-                          buttonLabel: _chats.isEmpty
+                          buttonLabel: _chats.isEmpty &&
+                                  !assistantHasConversation &&
+                                  query.isEmpty
                               ? _orbitText('New conversation')
                               : null,
-                          onPressed: _chats.isEmpty ? _showNewChatSheet : null,
+                          onPressed: _chats.isEmpty &&
+                                  !assistantHasConversation &&
+                                  query.isEmpty
+                              ? _showNewChatSheet
+                              : null,
                           emblem: const NexusEmptyOrbit(),
                         )
                       : ListView(
@@ -4621,13 +5260,16 @@ class _HomePageState extends State<HomePage>
                               for (final chat in shown)
                                 _chatRow(chat as Map<String, dynamic>),
                             ] else ...[
-                              if (pinnedChats.isNotEmpty) ...[
-                                _chatSectionHeader('Pinned'),
+                              if (showAssistantRow ||
+                                  pinnedChats.isNotEmpty) ...[
+                                _chatSectionHeader(_orbitText('Pinned')),
+                                if (showAssistantRow)
+                                  _assistantConversationRow(),
                                 for (final chat in pinnedChats)
                                   _chatRow(chat as Map<String, dynamic>),
                               ],
                               if (regularChats.isNotEmpty) ...[
-                                _chatSectionHeader('Chats'),
+                                _chatSectionHeader(_orbitText('Chats')),
                                 for (final chat in regularChats)
                                   _chatRow(chat as Map<String, dynamic>),
                               ],
@@ -4658,65 +5300,52 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _chatSearchCapsule() {
-    return Container(
-      height: 52,
-      margin: const EdgeInsetsDirectional.fromSTEB(20, 8, 20, 8),
-      decoration: BoxDecoration(
-        color: OrbitalColors.nebulaNavy.withOpacity(0.94),
-        // A true pill: radius well past half the height, with a faint
-        // cyan outline so the capsule reads as one rounded unit.
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: OrbitalColors.electricCyan.withOpacity(0.16)),
-      ),
-      child: TextField(
-        controller: _chatListSearchCtrl,
-        textInputAction: TextInputAction.search,
-        onChanged: (_) => setState(() {}),
-        style: OrbitalTypography.body.copyWith(
-          color: OrbitalColors.stellarWhite,
-        ),
-        cursorColor: OrbitalColors.electricCyan,
-        decoration: InputDecoration(
-          hintText: _orbitText('Search chats'),
-          hintStyle: const TextStyle(
-            color: OrbitalColors.mutedBlue,
-            fontSize: 15,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            color: OrbitalColors.mutedBlue,
-            size: 21,
-          ),
-          suffixIcon: _chatListSearchCtrl.text.isEmpty
-              ? null
-              : IconButton(
-                  tooltip: _orbitText('Clear search'),
-                  icon: const Icon(Icons.close, size: 18),
-                  onPressed: () {
-                    _chatListSearchCtrl.clear();
-                    setState(() {});
-                  },
-                ),
-          contentPadding: const EdgeInsetsDirectional.fromSTEB(0, 0, 14, 0),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+    return ChatSearchCapsule(
+      controller: _chatListSearchCtrl,
+      focusNode: _chatListSearchFocus,
+      hintText: _orbitText('Search chats'),
+      clearTooltip: _orbitText('Clear search'),
+      onChanged: (_) => setState(() {}),
+      onClear: () {
+        _chatListSearchCtrl.clear();
+        setState(() {});
+      },
+    );
+  }
+
+  void _toggleChatSearch() {
+    if (_chatSearchOpen) {
+      _closeChatSearch();
+      return;
+    }
+    setState(() => _chatSearchOpen = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _chatSearchOpen) _chatListSearchFocus.requestFocus();
+    });
+  }
+
+  void _closeChatSearch() {
+    _chatListSearchFocus.unfocus();
+    _chatListSearchCtrl.clear();
+    setState(() => _chatSearchOpen = false);
+  }
+
+  Widget _chatSectionHeader(String label) {
+    // ChatGPT visual review (0.7.12): moonlight is too pale on the light
+    // background — use slate #64748B in light mode for readability.
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 4),
+      child: Text(
+        label,
+        style: OrbitalTypography.secondary.copyWith(
+          color: dark ? OrbitalColors.moonlight : const Color(0xFF64748B),
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
         ),
       ),
     );
   }
-
-  Widget _chatSectionHeader(String label) => Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(22, 8, 22, 4),
-        child: Text(
-          label,
-          style: OrbitalTypography.secondary.copyWith(
-            color: OrbitalColors.moonlight,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
-        ),
-      );
 
   Widget _buildChatsSkeleton() {
     return OrbitShimmer(
@@ -7766,7 +8395,7 @@ class _HomePageState extends State<HomePage>
         header('About'),
         const ListTile(
           leading: Icon(Icons.info_outline),
-          title: Text('Safari 0.7.8 (mobile)'),
+          title: Text('Safari 0.7.12 (mobile)'),
           subtitle: Text('Go backend · Next.js web · Flutter mobile. '
               'Push notifications on mobile use FCM (Firebase).'),
         ),
@@ -8098,109 +8727,183 @@ class _HomePageState extends State<HomePage>
   }
 
   void _showNewChatSheet() {
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.person_add_outlined),
-              title: const Text('New direct message'),
-              onTap: () async {
-                Navigator.pop(context);
-                final users = await _api.listUsers();
-                if (!context.mounted || users.isEmpty) return;
-                // Stage 7: contact search — pick by name or username.
-                final queryCtrl = TextEditingController();
-                final picked = await showDialog<Map<String, dynamic>>(
-                  context: context,
-                  builder: (context) => StatefulBuilder(
-                    builder: (context, setDialogState) => AlertDialog(
-                      title: const Text('New direct message'),
-                      content: SizedBox(
-                        width: double.maxFinite,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextField(
-                              controller: queryCtrl,
-                              decoration: const InputDecoration(
-                                  hintText: 'Search contacts…',
-                                  prefixIcon: Icon(Icons.search)),
-                              onChanged: (_) => setDialogState(() {}),
-                            ),
-                            Flexible(
-                              child: ListView(
-                                shrinkWrap: true,
-                                children: users.where((u) {
-                                  final m = u as Map<String, dynamic>;
-                                  if (m['id'] == _user?['id']) return false;
-                                  final q = queryCtrl.text.trim().toLowerCase();
-                                  if (q.isEmpty) return true;
-                                  final name =
-                                      ((m['display_name'] as String?) ?? '')
-                                          .toLowerCase();
-                                  final username =
-                                      ((m['username'] as String?) ?? '')
-                                          .toLowerCase();
-                                  return name.contains(q) ||
-                                      username.contains(q);
-                                }).map((u) {
-                                  final m = u as Map<String, dynamic>;
-                                  return ListTile(
-                                    leading: WaAvatar(
-                                        label: (m['display_name'] as String?) ??
-                                            (m['username'] as String?) ??
-                                            '?',
-                                        radius: 20),
-                                    title: Text(
-                                        (m['display_name'] as String?) ??
-                                            (m['username'] as String?) ??
-                                            ''),
-                                    subtitle: Text(
-                                        '@${m['username'] as String? ?? ''}'),
-                                    onTap: () => Navigator.pop(context, m),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ],
-                        ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      isDismissible: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (sheetContext) {
+        final dockClearance = MediaQuery.of(sheetContext).padding.bottom + 78;
+        return Padding(
+          padding: EdgeInsets.only(bottom: dockClearance),
+          child: Material(
+            color: OrbitalColors.deepSpace,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(24),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 10, bottom: 8),
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: OrbitalColors.mutedBlue,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      actions: [
-                        TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel')),
-                      ],
                     ),
                   ),
-                );
-                if (picked == null) return;
-                final chat = await _api.createDm(picked['id'] as String);
-                await _refreshChats();
-                await _openChat(chat);
-              },
+                  ListTile(
+                    dense: true,
+                    minVerticalPadding: 8,
+                    leading: const Icon(
+                      Icons.person_add_outlined,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('New direct message'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      final users = await _api.listUsers();
+                      if (!mounted || users.isEmpty) return;
+                      // Stage 7: contact search — pick by name or username.
+                      final queryCtrl = TextEditingController();
+                      final picked = await showDialog<Map<String, dynamic>>(
+                        context: context,
+                        builder: (context) => StatefulBuilder(
+                          builder: (context, setDialogState) => AlertDialog(
+                            title: Text(_orbitText('New direct message')),
+                            content: SizedBox(
+                              width: double.maxFinite,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  TextField(
+                                    controller: queryCtrl,
+                                    decoration: const InputDecoration(
+                                        hintText: 'Search contacts…',
+                                        prefixIcon: Icon(Icons.search)),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                  Flexible(
+                                    child: ListView(
+                                      shrinkWrap: true,
+                                      children: users.where((u) {
+                                        final m = u as Map<String, dynamic>;
+                                        if (m['id'] == _user?['id']) {
+                                          return false;
+                                        }
+                                        final q =
+                                            queryCtrl.text.trim().toLowerCase();
+                                        if (q.isEmpty) return true;
+                                        final name =
+                                            ((m['display_name'] as String?) ??
+                                                    '')
+                                                .toLowerCase();
+                                        final username =
+                                            ((m['username'] as String?) ?? '')
+                                                .toLowerCase();
+                                        return name.contains(q) ||
+                                            username.contains(q);
+                                      }).map((u) {
+                                        final m = u as Map<String, dynamic>;
+                                        return ListTile(
+                                          leading: WaAvatar(
+                                              label: (m['display_name']
+                                                      as String?) ??
+                                                  (m['username'] as String?) ??
+                                                  '?',
+                                              radius: 20),
+                                          title: Text(
+                                              (m['display_name'] as String?) ??
+                                                  (m['username'] as String?) ??
+                                                  ''),
+                                          subtitle: Text(
+                                              '@${m['username'] as String? ?? ''}'),
+                                          onTap: () =>
+                                              Navigator.pop(context, m),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            actions: [
+                              TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel')),
+                            ],
+                          ),
+                        ),
+                      );
+                      if (picked == null) return;
+                      final chat = await _api.createDm(picked['id'] as String);
+                      await _refreshChats();
+                      await _openChat(chat);
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    minVerticalPadding: 8,
+                    leading: const Icon(
+                      Icons.group_add_outlined,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('New group / channel'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _createGroupOrChannel();
+                    },
+                  ),
+                  ListTile(
+                    dense: true,
+                    minVerticalPadding: 8,
+                    leading: const Icon(
+                      Icons.link,
+                      color: OrbitalColors.electricCyan,
+                    ),
+                    title: Text(
+                      _orbitText('Join via invite link'),
+                      style: const TextStyle(
+                        color: OrbitalColors.stellarWhite,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      _joinViaInvite();
+                    },
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.group_add_outlined),
-              title: const Text('New group / channel'),
-              onTap: () {
-                Navigator.pop(context);
-                _createGroupOrChannel();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.link),
-              title: const Text('Join via invite link'),
-              onTap: () {
-                Navigator.pop(context);
-                _joinViaInvite();
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
