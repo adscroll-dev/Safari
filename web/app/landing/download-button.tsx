@@ -23,14 +23,16 @@ type Apk = {
 // placeholder, Persian Chats labels) + ChatGPT visual-review
 // follow-ups (joined intro word, shorter Persian hint, darker
 // Chats headings in light mode; no blocking issues in final review).
+// Rebuilt again 2026-11-21 (same 0.7.12): Assistant intro word now
+// uses ZWNJ half-spaces (ChatGPT rebuilt-APK review); new APK hashes.
 const apks: Apk[] = [
   {
     abi: "arm64-v8a",
     href: "/downloads/safari-0.7.12-arm64-v8a.apk",
     size: "35.3 MB",
-    bytes: "35,340,505 bytes",
+    bytes: "35,340,515 bytes",
     sha256:
-      "1efac7e7bd732782ef6f2777c8405eb20fa8bf949c685ce7148e3cd91ae905b0",
+      "446759f39a41db2de0f0b7f7f0ace49fec1ff0ec47d332f92a43bca0c5f777bc",
   },
   {
     abi: "armeabi-v7a",
@@ -38,15 +40,15 @@ const apks: Apk[] = [
     size: "28.5 MB",
     bytes: "28,451,535 bytes",
     sha256:
-      "2ffa1c143e397aa4701a88b756b15428b444ad7de64b96fcea7b9f915b7ef49e",
+      "84ec2a29af227947eef9d80442f1ea3124302158c59943b42134e3cb65779813",
   },
   {
     abi: "x86_64",
     href: "/downloads/safari-0.7.12-x86_64.apk",
     size: "37.8 MB",
-    bytes: "37,819,363 bytes",
+    bytes: "37,819,361 bytes",
     sha256:
-      "5ca5bbdfeaf8f249735b877a56dd98f1c9dc2cc0faa8f2a577f32169daf8db7c",
+      "2d479f7ff578461259416002221acc592a800b9b3a949b4664e843275788d3e1",
   },
 ];
 
