@@ -12,9 +12,9 @@ import 'package:vyro/main.dart';
 
 const _helper = 'http://localhost:1099';
 const _faIntro =
-    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیش‌تعریف‌شده کار می‌کند و به هوش مصنوعی ابری متصل نیست.';
+    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیشتعریفشده کار می‌کند و به هوش مصنوعی ابری متصل نیست.';
 const _enIntro = 'Runs on this device — rule-based, not cloud AI.';
-const _faHint = 'سؤالت را درباره سافاری بنویس…';
+const _faHint = 'سؤالت را بنویس…';
 const _enHint = 'Ask about Safari…';
 
 Future<Map<String, dynamic>> _getJson(String url) async {
