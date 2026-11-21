@@ -76,7 +76,14 @@ export type Strings = {
   securitySub: string;
   securityItems: { title: string; desc: string }[];
   navDownload: string;
+  navGames: string;
   privacyLink: string;
+  gamesTitle: string;
+  gamesDesc: string;
+  gamesVersionLine: string;
+  gamesDownloadButton: string;
+  gamesNote: string;
+  gamesFeatures: string[];
 };
 
 export const translations: Record<LangCode, Strings> = {
@@ -135,7 +142,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "Private by design",
     securitySub: "Security that works quietly in the background — so you can just talk.",
     navDownload: "Download",
+    navGames: "Games",
     privacyLink: "Privacy Policy",
+    gamesTitle: "Games",
+    gamesDesc:
+      "Safari City — an open-world Android game. Explore a 3D city on foot or by car, take on missions, outrun the police, sail boats, fly a seaplane, and dive for treasure. Free to download and play, and it works fully offline.",
+    gamesVersionLine: "Version 0.15.0 · Android · 22.3 MB (23,431,772 bytes)",
+    gamesDownloadButton: "Download Safari City for Android",
+    gamesNote:
+      "Safari City is in active development — new versions with new features arrive regularly.",
+    gamesFeatures: [
+      "Open 3D city — walk, drive, ride a motorbike",
+      "Missions, races, taxi and bus jobs",
+      "Police chases, boats, jet-ski and seaplane",
+      "Diving, fishing and sunken treasure",
+    ],
     securityItems: [
       { title: "End-to-end encryption", desc: "Your private chats are locked so only you and the person you’re talking to can read them." },
       { title: "App lock", desc: "Lock Safari with a PIN or your fingerprint. Your chats stay hidden until it’s you." },
@@ -197,7 +218,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "حریم خصوصی، از پایه",
     securitySub: "امنیتی که بی‌صدا در پس‌زمینه کار می‌کند — تا شما فقط حرف بزنید.",
     navDownload: "دانلود",
+    navGames: "بازی‌ها",
     privacyLink: "سیاست حریم خصوصی",
+    gamesTitle: "بازی‌ها",
+    gamesDesc:
+      "Safari City — یک بازی جهان‌باز برای اندروید. در یک شهر سه‌بعدی پیاده یا با ماشین بگردید، مأموریت انجام دهید، از پلیس فرار کنید، با قایق و هواپیمای دریایی سفر کنید و زیر آب گنج پیدا کنید. دانلود و بازی رایگان است و کاملاً آفلاین کار می‌کند.",
+    gamesVersionLine: "نسخه ۰٫۱۵٫۰ · اندروید · ۲۲٫۳ مگابایت (۲۳٬۴۳۱٬۷۷۲ بایت)",
+    gamesDownloadButton: "دانلود Safari City برای اندروید",
+    gamesNote:
+      "Safari City در حال توسعه فعال است — نسخه‌های جدید با قابلیت‌های تازه مرتب می‌رسند.",
+    gamesFeatures: [
+      "شهر سه‌بعدی باز — پیاده، با ماشین و موتور",
+      "مأموریت‌ها، مسابقه‌ها، تاکسی و اتوبوس",
+      "تعقیب پلیس، قایق، جت‌اسکی و هواپیمای دریایی",
+      "غواصی، ماهیگیری و گنج غرق‌شده",
+    ],
     securityItems: [
       { title: "رمزنگاری سرتاسری", desc: "چت‌های خصوصی شما طوری قفل شده‌اند که فقط شما و طرف مقابلتان می‌توانید آن‌ها را بخوانید." },
       { title: "قفل برنامه", desc: "Safari را با پین یا اثر انگشت قفل کنید. چت‌هایتان تا وقتی شما نباشید پنهان می‌مانند." },
@@ -259,7 +294,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "الخصوصية بالتصميم",
     securitySub: "أمان يعمل بهدوء في الخلفية — لتتحدث أنت فقط.",
     navDownload: "تنزيل",
+    navGames: "الألعاب",
     privacyLink: "سياسة الخصوصية",
+    gamesTitle: "الألعاب",
+    gamesDesc:
+      "Safari City — لعبة عالم مفتوح لأندرويد. استكشف مدينة ثلاثية الأبعاد سيرًا على الأقدام أو بالسيارة، ونفّذ المهام، واهرب من الشرطة، وأبحر بالقوارب، وحلّق بالطائرة المائية، واغص للبحث عن الكنز. مجانية للتنزيل واللعب، وتعمل دون إنترنت تمامًا.",
+    gamesVersionLine: "الإصدار 0.15.0 · أندرويد · 22.3 م.ب. (23,431,772 بايت)",
+    gamesDownloadButton: "تنزيل Safari City لأندرويد",
+    gamesNote:
+      "Safari City قيد التطوير النشط — إصدارات جديدة بميزات جديدة تصل بانتظام.",
+    gamesFeatures: [
+      "مدينة مفتوحة ثلاثية الأبعاد — سيرًا أو بالسيارة أو بالدراجة",
+      "مهام وسباقات ووظائف سيارة أجرة وحافلة",
+      "مطاردات الشرطة والقوارب والدراجة المائية والطائرة المائية",
+      "الغوص والصيد والكنز الغارق",
+    ],
     securityItems: [
       { title: "تشفير كامل", desc: "دردشاتك الخاصة مقفلة بحيث لا يستطيع قراءتها سواك والشخص الذي تتحدث معه." },
       { title: "قفل التطبيق", desc: "اقفل Safari برمز PIN أو ببصمتك. تبقى دردشاتك مخفية حتى تكون أنت." },
@@ -321,7 +370,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "پرائیویسی، ڈیزائن سے",
     securitySub: "سیکیورٹی جو پس منظر میں خاموشی سے کام کرتی ہے — تاکہ آپ بس بات کریں۔",
     navDownload: "ڈاؤن لوڈ",
+    navGames: "گیمز",
     privacyLink: "پرائیویسی پالیسی",
+    gamesTitle: "گیمز",
+    gamesDesc:
+      "Safari City — اینڈرائیڈ کے لیے ایک اوپن ورلڈ گیم۔ 3D شہر میں پیدل یا گاڑی سے گھومیں، مشن مکمل کریں، پولیس سے بچیں، کشتی چلائیں، سی پلین اڑائیں اور خزانہ ڈھونڈیں۔ ڈاؤن لوڈ اور کھیلنا مفت ہے اور یہ مکمل طور پر آف لائن کام کرتی ہے۔",
+    gamesVersionLine: "ورژن 0.15.0 · اینڈرائیڈ · 22.3 MB (23,431,772 بائٹس)",
+    gamesDownloadButton: "اینڈرائیڈ کے لیے Safari City ڈاؤن لوڈ کریں",
+    gamesNote:
+      "Safari City مسلسل تیار ہو رہی ہے — نئے فیچرز کے ساتھ نئے ورژن باقاعدگی سے آتے ہیں۔",
+    gamesFeatures: [
+      "کھلا 3D شہر — پیدل، گاڑی یا موٹر بائیک سے",
+      "مشن، ریس، ٹیکسی اور بس کی نوکریاں",
+      "پولیس کا پیچھا، کشتی، جیٹ اسکی اور سی پلین",
+      "ڈائیونگ، ماہی گیری اور ڈوبا ہوا خزانہ",
+    ],
     securityItems: [
       { title: "مکمل خفیہ کاری", desc: "آپ کی نجی چیٹس اس طرح بند ہیں کہ صرف آپ اور جس سے آپ بات کر رہے ہیں وہی انہیں پڑھ سکتے ہیں۔" },
       { title: "ایپ لاک", desc: "Safari کو پن یا فنگر پرنٹ سے لاک کریں۔ آپ کی چیٹس تب تک چھپی رہتی ہیں جب تک آپ نہ ہوں۔" },
@@ -383,7 +446,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "Tasarım gereği gizlilik",
     securitySub: "Arka planda sessizce çalışan güvenlik — siz sadece konuşun.",
     navDownload: "İndir",
+    navGames: "Oyunlar",
     privacyLink: "Gizlilik Politikası",
+    gamesTitle: "Oyunlar",
+    gamesDesc:
+      "Safari City — Android için açık dünya oyunu. 3B bir şehirde yürüyerek veya arabayla gezin, görevleri tamamla, polisten kaç, tekneyle yol al, deniz uçağıyla uç ve hazine için dal. İndirmesi ve oynaması ücretsizdir ve tamamen çevrimdışı çalışır.",
+    gamesVersionLine: "Sürüm 0.15.0 · Android · 22,3 MB (23.431.772 bayt)",
+    gamesDownloadButton: "Android için Safari City'yi indirin",
+    gamesNote:
+      "Safari City aktif olarak geliştiriliyor — yeni özelliklerle yeni sürümler düzenli olarak geliyor.",
+    gamesFeatures: [
+      "Açık 3B şehir — yürüyerek, arabayla veya motosikletle",
+      "Görevler, yarışlar, taksi ve otobüs işleri",
+      "Polis kovalamacaları, tekne, jet-ski ve deniz uçağı",
+      "Dalış, balık tutma ve batık hazine",
+    ],
     securityItems: [
       { title: "Uçtan uca şifreleme", desc: "Özel sohbetleriniz öyle kilitli ki onları yalnızca siz ve konuştuğunuz kişi okuyabilir." },
       { title: "Uygulama kilidi", desc: "Safari’yi PIN veya parmak iziyle kilitleyin. Sohbetleriniz siz olana kadar gizli kalır." },
@@ -445,7 +522,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "Приватность по замыслу",
     securitySub: "Безопасность тихо работает в фоне — а вы просто общаетесь.",
     navDownload: "Скачать",
+    navGames: "Игры",
     privacyLink: "Политика конфиденциальности",
+    gamesTitle: "Игры",
+    gamesDesc:
+      "Safari City — игра с открытым миром для Android. Исследуйте 3D-город пешком или на машине, выполняйте задания, уходите от полиции, плавайте на лодках, летайте на гидросамолёте и ныряйте за сокровищами. Скачивание и игра бесплатны, а игра полностью работает офлайн.",
+    gamesVersionLine: "Версия 0.15.0 · Android · 22,3 МБ (23 431 772 байт)",
+    gamesDownloadButton: "Скачать Safari City для Android",
+    gamesNote:
+      "Safari City активно развивается — новые версии с новыми возможностями выходят регулярно.",
+    gamesFeatures: [
+      "Открытый 3D-город — пешком, на машине или мотоцикле",
+      "Задания, гонки, работа таксистом и водителем автобуса",
+      "Погони полиции, лодки, гидроцикл и гидросамолёт",
+      "Дайвинг, рыбалка и затонувшие сокровища",
+    ],
     securityItems: [
       { title: "Сквозное шифрование", desc: "Ваши личные чаты закрыты так, что прочитать их можете только вы и ваш собеседник." },
       { title: "Блокировка приложения", desc: "Запирайте Safari ПИН-кодом или отпечатком пальца. Чаты скрыты, пока это не вы." },
@@ -507,7 +598,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "Privacidad por diseño",
     securitySub: "Seguridad que trabaja en silencio en segundo plano, para que tú solo hables.",
     navDownload: "Descargar",
+    navGames: "Juegos",
     privacyLink: "Política de privacidad",
+    gamesTitle: "Juegos",
+    gamesDesc:
+      "Safari City: un juego de mundo abierto para Android. Explora una ciudad 3D a pie o en coche, completa misiones, escapa de la policía, navega en barco, vuela en hidroavión y bucea en busca de tesoros. Descargarlo y jugar es gratis, y funciona totalmente sin conexión.",
+    gamesVersionLine: "Versión 0.15.0 · Android · 22,3 MB (23 431 772 bytes)",
+    gamesDownloadButton: "Descargar Safari City para Android",
+    gamesNote:
+      "Safari City está en desarrollo activo: llegan nuevas versiones con novedades con regularidad.",
+    gamesFeatures: [
+      "Ciudad 3D abierta: a pie, en coche o en moto",
+      "Misiones, carreras, taxi y rutas de autobús",
+      "Persecuciones policiales, barco, moto acuática e hidroavión",
+      "Buceo, pesca y tesoros hundidos",
+    ],
     securityItems: [
       { title: "Cifrado de extremo a extremo", desc: "Tus chats privados están cerrados de forma que solo tú y la persona con la que hablas podéis leerlos." },
       { title: "Bloqueo de la app", desc: "Bloquea Safari con un PIN o tu huella. Tus chats permanecen ocultos hasta que seas tú." },
@@ -569,7 +674,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "La confidentialité par design",
     securitySub: "Une sécurité qui travaille silencieusement en arrière-plan — pour que vous n’ayez qu’à parler.",
     navDownload: "Télécharger",
+    navGames: "Jeux",
     privacyLink: "Politique de confidentialité",
+    gamesTitle: "Jeux",
+    gamesDesc:
+      "Safari City — un jeu en monde ouvert pour Android. Explorez une ville en 3D à pied ou en voiture, accomplissez des missions, échappez à la police, naviguez en bateau, volez en hydravion et plongez à la recherche de trésors. Téléchargement et jeu gratuits, et le jeu fonctionne entièrement hors ligne.",
+    gamesVersionLine: "Version 0.15.0 · Android · 22,3 Mo (23 431 772 octets)",
+    gamesDownloadButton: "Télécharger Safari City pour Android",
+    gamesNote:
+      "Safari City est en développement actif — de nouvelles versions avec de nouvelles fonctionnalités arrivent régulièrement.",
+    gamesFeatures: [
+      "Ville 3D ouverte — à pied, en voiture ou à moto",
+      "Missions, courses, taxi et lignes de bus",
+      "Poursuites policières, bateau, jet-ski et hydravion",
+      "Plongée, pêche et trésors engloutis",
+    ],
     securityItems: [
       { title: "Chiffrement de bout en bout", desc: "Vos discussions privées sont verrouillées de sorte que seuls vous et votre interlocuteur pouvez les lire." },
       { title: "Verrouillage de l’app", desc: "Verrouillez Safari avec un code PIN ou votre empreinte. Vos discussions restent cachées jusqu’à ce que ce soit vous." },
@@ -631,7 +750,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "Privatsphäre von Anfang an",
     securitySub: "Sicherheit, die leise im Hintergrund arbeitet — damit du einfach nur reden kannst.",
     navDownload: "Herunterladen",
+    navGames: "Spiele",
     privacyLink: "Datenschutzerklärung",
+    gamesTitle: "Spiele",
+    gamesDesc:
+      "Safari City — ein Open-World-Spiel für Android. Erkunde eine 3D-Stadt zu Fuß oder mit dem Auto, erfülle Missionen, entkomme der Polizei, fahre Boot, fliege mit dem Wasserflugzeug und tauche nach Schätzen. Download und Spielen sind kostenlos, und das Spiel funktioniert komplett offline.",
+    gamesVersionLine: "Version 0.15.0 · Android · 22,3 MB (23.431.772 Bytes)",
+    gamesDownloadButton: "Safari City für Android herunterladen",
+    gamesNote:
+      "Safari City wird aktiv weiterentwickelt — neue Versionen mit neuen Funktionen erscheinen regelmäßig.",
+    gamesFeatures: [
+      "Offene 3D-Stadt — zu Fuß, mit dem Auto oder Motorrad",
+      "Missionen, Rennen, Taxi- und Busjobs",
+      "Polizeiverfolgungen, Boot, Jet-Ski und Wasserflugzeug",
+      "Tauchen, Angeln und versunkene Schätze",
+    ],
     securityItems: [
       { title: "Ende-zu-Ende-Verschlüsselung", desc: "Deine privaten Chats sind so gesperrt, dass nur du und dein Gesprächspartner sie lesen können." },
       { title: "App-Sperre", desc: "Sperre Safari mit einer PIN oder deinem Fingerabdruck. Deine Chats bleiben verborgen, bis du es bist." },
@@ -693,7 +826,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "डिज़ाइन से ही निजी",
     securitySub: "सुरक्षा जो पृष्ठभूमि में चुपचाप काम करती है — ताकि आप बस बात करें।",
     navDownload: "डाउनलोड",
+    navGames: "गेम्स",
     privacyLink: "गोपनीयता नीति",
+    gamesTitle: "गेम्स",
+    gamesDesc:
+      "Safari City — Android के लिए एक ओपन-वर्ल्ड गेम। 3D शहर में पैदल या गाड़ी से घूमें, मिशन पूरे करें, पुलिस से बचें, नाव चलाएँ, सीप्लेन उड़ाएँ और खज़ाने के लिए गोता लगाएँ। डाउनलोड और खेलना मुफ़्त है, और यह पूरी तरह ऑफ़लाइन काम करता है।",
+    gamesVersionLine: "संस्करण 0.15.0 · Android · 22.3 MB (23,431,772 बाइट्स)",
+    gamesDownloadButton: "Android के लिए Safari City डाउनलोड करें",
+    gamesNote:
+      "Safari City लगातार विकसित हो रहा है — नई सुविधाओं के साथ नए संस्करण नियमित रूप से आते रहते हैं।",
+    gamesFeatures: [
+      "खुला 3D शहर — पैदल, गाड़ी या मोटरबाइक से",
+      "मिशन, रेस, टैक्सी और बस की नौकरियाँ",
+      "पुलिस का पीछा, नाव, जेट-स्की और सीप्लेन",
+      "गोताखोरी, मछली पकड़ना और डूबा हुआ खज़ाना",
+    ],
     securityItems: [
       { title: "एंड-टू-एंड एन्क्रिप्शन", desc: "आपकी निजी चैट इस तरह बंद हैं कि सिर्फ़ आप और जिससे आप बात कर रहे हैं वही उन्हें पढ़ सकते हैं।" },
       { title: "ऐप लॉक", desc: "Safari को पिन या अपने फ़िंगरप्रिंट से लॉक करें। आपकी चैट तब तक छिपी रहती हैं जब तक आप न हों।" },
@@ -755,7 +902,21 @@ export const translations: Record<LangCode, Strings> = {
     securityTitle: "له ډیزاین څخه شخصي",
     securitySub: "امنیت چې په شالید کې په خاموشۍ کار کوي — ترڅو تاسو یوازې خبرې وکړئ.",
     navDownload: "ډاونلوډ",
+    navGames: "لوبې",
     privacyLink: "د محرمیت تګلاره",
+    gamesTitle: "لوبې",
+    gamesDesc:
+      "Safari City — د Android لپاره د خلاصې نړۍ لوبه. په 3D ښار کې په پښو یا په موټر کې وګرځئ، ماموریتونه بشپړ کړئ، له پولیسو څخه وتښتئ، په کښتۍ کې سفر وکړئ، په سمندري الوتکه کې والوزئ او د خزانې لپاره غوټه ووهئ. ډاونلوډ او لوبېدل یې وړیا دي، او دا په بشپړ ډول آف‌لاین کار کوي.",
+    gamesVersionLine: "نسخه 0.15.0 · Android · 22.3 MB (23,431,772 بایټ)",
+    gamesDownloadButton: "د Android لپاره Safari City ډاونلوډ کړئ",
+    gamesNote:
+      "Safari City په فعاله توګه پراختیا مومي — د نویو ځانګړتیاوو سره نوې نسخې په منظمه توګه راځي.",
+    gamesFeatures: [
+      "خلاص 3D ښار — په پښو، په موټر یا موټرسایکل",
+      "ماموریتونه، سیالۍ، ټکسي او بس دندې",
+      "د پولیسو تعقیب، کښتۍ، جیټ سکي او سمندري الوتکه",
+      "غوټه وهل، کب نیول او ډوب شوی خزانه",
+    ],
     securityItems: [
       { title: "له پایه تر پایه کوډ کول", desc: "ستاسو شخصي چیټونه داسې تړل شوي چې یوازې تاسو او هغه څوک چې ورسره خبرې کوئ، لوستلی شئ." },
       { title: "د اپ قلف", desc: "Safari په PIN یا خپل ګوتې نښې سره قلف کړئ. ستاسو چیټونه تر هغه پټ پاتې کېږي تر څو چې تاسو نه یاست." },

@@ -657,6 +657,20 @@ export default function LandingContent() {
               ))}
             </select>
             <a
+              href="#games"
+              style={{
+                padding: "9px 18px",
+                fontSize: 14,
+                color: "#67e8f9",
+                textDecoration: "none",
+                fontWeight: 700,
+                border: "1px solid rgba(34,211,238,0.35)",
+                borderRadius: 999,
+              }}
+            >
+              🎮 {t.navGames}
+            </a>
+            <a
               href="#download"
               className="safari-btn-primary safari-nav-download"
               style={{ padding: "9px 18px", fontSize: 14 }}
@@ -1129,6 +1143,89 @@ export default function LandingContent() {
                 }}
               >
                 ⚠️ {t.warning}
+              </p>
+            </div>
+          </Reveal>
+        </section>
+
+        {/* GAMES — Safari City, the open-world Android game. Same
+            download pattern as Safari itself: a static APK file under
+            /downloads, one button, SHA-256 shown for verification.
+            Only real facts — no ratings, counts or reviews. */}
+        <section id="games" style={{ marginTop: 72 }}>
+          <Reveal>
+            <div className="safari-glass-dark" style={{ padding: 32 }}>
+              <h2 style={{ margin: "0 0 8px", fontSize: 28, color: "#f8fafc" }}>
+                🎮 {t.gamesTitle}
+              </h2>
+              <p
+                style={{
+                  margin: "0 0 4px",
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#67e8f9",
+                }}
+              >
+                Safari City
+              </p>
+              <p style={{ color: "#c1cbda", fontSize: 15, margin: "0 0 16px" }}>
+                {t.gamesDesc}
+              </p>
+              <ul
+                style={{
+                  color: "#c1cbda",
+                  margin: "0 0 20px",
+                  paddingInlineStart: 20,
+                  fontSize: 14,
+                }}
+              >
+                {t.gamesFeatures.map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+              <p style={{ margin: "0 0 12px", color: "#94a3b8", fontSize: 14 }}>
+                {t.gamesVersionLine}
+              </p>
+              <p style={{ margin: "0 0 12px" }}>
+                <a
+                  href="/downloads/safari-city-0.15.0-arm64-v8a.apk"
+                  className="safari-btn"
+                  style={{
+                    background:
+                      "linear-gradient(90deg,#22d3ee,#2563eb 55%,#7c3aed)",
+                    color: "#fff",
+                    padding: "16px 32px",
+                    borderRadius: 999,
+                    textDecoration: "none",
+                    fontWeight: 800,
+                    fontSize: 17,
+                    display: "inline-block",
+                    boxShadow:
+                      "0 16px 34px rgba(37,99,235,0.5), 0 0 24px rgba(34,211,238,0.35)",
+                  }}
+                >
+                  {t.gamesDownloadButton}
+                </a>
+              </p>
+              <p style={{ margin: "0 0 4px", fontSize: 13, color: "#cbd5e1" }}>
+                {t.verify}
+              </p>
+              <code
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  wordBreak: "break-all",
+                  background: "#0b1220",
+                  border: "1px solid #1e293b",
+                  borderRadius: 8,
+                  padding: 10,
+                  color: "#7dd3fc",
+                }}
+              >
+                0d6121879f6f43be5d16f15b4d20a38d46bb1becca042a3710d24ecd925be221
+              </code>
+              <p style={{ margin: "16px 0 0", fontSize: 14, color: "#94a3b8" }}>
+                {t.gamesNote}
               </p>
             </div>
           </Reveal>
