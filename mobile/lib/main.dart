@@ -214,7 +214,7 @@ const _assistantTranslations = <String, List<String>>{
   ],
   'Runs on this device — rule-based, not cloud AI.': [
     'Runs on this device — rule-based, not cloud AI.',
-    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیشتعریفشده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
+    'این دستیار روی دستگاه شما و بر اساس قوانین ازپیش‌تعریف‌شده کار می‌کند و به هوش مصنوعی ابری متصل نیست.',
     'يعمل على جهازك وفق قواعد محددة، وليس ذكاءً اصطناعيًا سحابيًا.'
   ],
   'How do I create a group?': [
